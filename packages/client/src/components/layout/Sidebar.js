@@ -37,7 +37,7 @@ export const Sidebar = ({ onLogout, permissions, isMobileOpen, setMobileOpen, is
         const hasSubItems = item.subItems && item.subItems.length > 0;
         const isActive = hasSubItems 
             ? item.subItems.some(sub => location.pathname.startsWith(sub.path))
-            : item.path === location.pathname;
+            : location.pathname.startsWith(item.path);
 
         const isDropdownOpen = openDropdowns[item.id] && !isCollapsed;
 

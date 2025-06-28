@@ -1,25 +1,22 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ChevronLeft, Menu } from 'lucide-react';
+import { useBreadcrumb } from '../../context/BreadcrumbContext';
 
 export const Header = ({ breadcrumbs, user, onMenuClick }) => {
     const navigate = useNavigate();
-
-    // The last item in the breadcrumbs array is the current page title.
-    const currentPage = breadcrumbs[breadcrumbs.length - 1];
-    // The second to last item is the parent page for the "Back" button.
-    const parentPage = breadcrumbs.length > 1 ? breadcrumbs[breadcrumbs.length - 2] : null;
+    const { dynamicCrumbs } = useBreadcrumb();
+    const finalCrumbs = dynamicCrumbs.length > 0 ? [{ name: 'Home', path: '/' }, ...dynamicCrumbs] : breadcrumbs;
+    const currentPage = finalCrumbs[finalCrumbs.length - 1];
+    const parentPage = finalCrumbs.length > 1 ? finalCrumbs[finalCrumbs.length - 2] : null;
 
     return (
         <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 h-16 flex items-center justify-between px-4 sm:px-6 flex-shrink-0">
-            {/* Left Section */}
             <div className="flex items-center min-w-0">
-                {/* Mobile: Hamburger Menu */}
                 <button onClick={onMenuClick} className="md:hidden mr-2 text-gray-500 hover:text-gray-700">
                     <Menu className="w-6 h-6" />
                 </button>
 
-                {/* Mobile: Back Button and Page Title */}
                 <div className="flex md:hidden items-center min-w-0">
                     {parentPage && (
                         <button onClick={() => navigate(parentPage.path)} className="mr-2 p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700">
@@ -29,12 +26,12 @@ export const Header = ({ breadcrumbs, user, onMenuClick }) => {
                     <h2 className="text-lg font-semibold truncate">{currentPage?.name}</h2>
                 </div>
 
-                {/* Desktop: Breadcrumbs */}
                 <nav className="hidden md:flex items-center" aria-label="Breadcrumb">
-                    {breadcrumbs.map((crumb, index) => (
+                    {/* --- 4. Render the final breadcrumbs --- */}
+                    {finalCrumbs.map((crumb, index) => (
                         <div key={index} className="flex items-center min-w-0">
                             {index > 0 && <span className="mx-2 text-gray-400">/</span>}
-                            {index === breadcrumbs.length - 1 ? (
+                            {index === finalCrumbs.length - 1 ? (
                                 <span className='font-semibold text-gray-800 dark:text-gray-200 truncate'>
                                     {crumb.name}
                                 </span>

@@ -128,7 +128,10 @@ export const EmployeeDetailPage = ({ onEdit, onDeactivate, permissions, onLogout
 
     useEffect(() => {
         fetchAllData();
-    }, [fetchAllData]);
+        return () => {
+            setDynamicCrumbs([]);
+        };
+    }, [fetchAllData, setDynamicCrumbs]);
 
     const handleTicketClick = (ticketId) => {
         if (ticketId) {

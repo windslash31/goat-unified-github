@@ -159,7 +159,6 @@ const AppContent = () => {
         const pageTitleMap = { 
             'profile': { name: "Profile", path: "/profile" },
             'employees': { name: "Employees", path: "/employees" },
-            'logs': { name: "Logs", path: "/logs" }, 
             'users': { name: "User Management", path: "/users" }, 
             'roles': { name: "Roles & Permissions", path: "/roles" },
             'access-denied': { name: 'Access Denied', path: '/access-denied'},
