@@ -4,6 +4,7 @@ import { EmployeeDetailHeader } from './EmployeeDetailPage/EmployeeDetailHeader'
 import { EmployeeDetailsTab } from './EmployeeDetailPage/EmployeeDetailsTab';
 import { EmployeeApplicationsTab } from './EmployeeDetailPage/EmployeeApplicationsTab';
 import { JumpCloudLogPage } from './EmployeeDetailPage/JumpcloudLogPage';
+import { JiraTicketModal } from '../components/ui/JiraTicketModal';
 import { WelcomePage } from '../components/ui/WelcomePage';
 import { AccessDeniedPage } from '../components/ui/AccessDeniedPage';
 
@@ -55,12 +56,15 @@ const InPageDropdownNav = ({ sections, onScrollTo }) => {
     );
 };
 
-
 export const ProfilePage = ({ employee, permissions, onEdit, onDeactivate, onLogout, user }) => {
     const [activeTab, setActiveTab] = useState('details');
     const [platformStatuses, setPlatformStatuses] = useState([]);
     const [isLoadingPlatforms, setIsLoadingPlatforms] = useState(true);
     const [tabData, setTabData] = useState({ jumpcloud: { data: null, loading: false, error: null } });
+    
+    // State for managing the Jira Ticket Modal
+    const [isJiraModalOpen, setIsJiraModalOpen] = useState(false);
+    const [selectedTicketId, setSelectedTicketId] = useState(null);
 
     const fetchSecondaryData = useCallback(() => {
         if (!employee) return;
@@ -105,6 +109,13 @@ export const ProfilePage = ({ employee, permissions, onEdit, onDeactivate, onLog
         }
     }, [employee, fetchSecondaryData]);
 
+    // Handler to open the Jira modal
+    const handleTicketClick = (ticketId) => {
+        if (ticketId) {
+            setSelectedTicketId(ticketId);
+            setIsJiraModalOpen(true);
+        }
+    };
 
     const handleScrollToSection = (sectionId) => {
         const element = document.getElementById(sectionId);
@@ -127,73 +138,77 @@ export const ProfilePage = ({ employee, permissions, onEdit, onDeactivate, onLog
     const TabButton = ({ id, label, icon }) => ( <button onClick={() => setActiveTab(id)} className={`flex items-center gap-2 py-3 px-4 border-b-2 font-semibold text-sm transition-colors whitespace-nowrap ${ activeTab === id ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300' }`}> {icon} {label} </button> );
 
     return (
-        <div>
-            <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-                <h1 className="text-2xl font-bold text-gray-900 dark:text-white">My Profile</h1>
-                <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">This is your personal employee record and application access list.</p>
-            </div>
-            <div className="p-4 sm:p-6 space-y-6">
-                <EmployeeDetailHeader
-                    employee={employee}
-                    onEdit={onEdit}
-                    onDeactivate={onDeactivate}
-                    permissions={permissions}
-                    isOwnProfile={true}
-                />
-                
-                <InPageDropdownNav sections={pageSections} onScrollTo={handleScrollToSection} />
-
-                <div className="space-y-6 md:hidden">
-                    <Section id="profile-details-section" title="Details" icon={<UserSquare className="w-5 h-5" />}>
-                        <EmployeeDetailsTab employee={employee} permissions={permissions} />
-                    </Section>
-                    <Section id="profile-apps-section" title="Apps & Platforms" icon={<LayoutGrid className="w-5 h-5" />}>
-                        <EmployeeApplicationsTab
-                            applications={employee.applications || []}
-                            platformStatuses={platformStatuses}
-                            isLoading={isLoadingPlatforms}
-                            permissions={permissions}
-                        />
-                    </Section>
-                    {permissions.includes('log:read:platform') && (
-                        <Section id="profile-jumpcloud-section" title="JumpCloud Log" icon={<HardDrive className="w-5 h-5" />}>
-                            <JumpCloudLogPage logs={tabData.jumpcloud.data || []} loading={tabData.jumpcloud.loading} error={tabData.jumpcloud.error} />
-                        </Section>
-                    )}
+        <>
+            <div>
+                <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+                    <h1 className="text-2xl font-bold text-gray-900 dark:text-white">My Profile</h1>
+                    <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">This is your personal employee record and application access list.</p>
                 </div>
+                <div className="p-4 sm:p-6 space-y-6">
+                    <EmployeeDetailHeader
+                        employee={employee}
+                        onEdit={onEdit}
+                        onDeactivate={onDeactivate}
+                        permissions={permissions}
+                        isOwnProfile={true}
+                    />
+                    
+                    <InPageDropdownNav sections={pageSections} onScrollTo={handleScrollToSection} />
 
-                <div className="hidden md:block">
-                    <div className="border-b border-gray-200 dark:border-gray-700 overflow-x-auto">
-                        <nav className="-mb-px flex space-x-4">
-                            <TabButton id="details" label="Details" icon={<UserSquare className="w-4 h-4"/>}/>
-                            <TabButton id="platforms" label="Apps & Platforms" icon={<LayoutGrid className="w-4 h-4"/>}/>
-                            
-                            {permissions.includes('log:read:platform') && (
-                                <TabButton id="jumpcloud" label="JumpCloud Log" icon={<HardDrive className="w-4 h-4"/>}/>
-                            )}
-                        </nav>
-                    </div>
-
-                    <div className="mt-6">
-                        <div style={{ display: activeTab === 'details' ? 'block' : 'none' }}>
-                            <EmployeeDetailsTab employee={employee} permissions={permissions} />
-                        </div>
-                        <div style={{ display: activeTab === 'platforms' ? 'block' : 'none' }}>
+                    <div className="space-y-6 md:hidden">
+                        <Section id="profile-details-section" title="Details" icon={<UserSquare className="w-5 h-5" />}>
+                            <EmployeeDetailsTab employee={employee} permissions={permissions} onTicketClick={handleTicketClick} />
+                        </Section>
+                        <Section id="profile-apps-section" title="Apps & Platforms" icon={<LayoutGrid className="w-5 h-5" />}>
                             <EmployeeApplicationsTab
                                 applications={employee.applications || []}
                                 platformStatuses={platformStatuses}
                                 isLoading={isLoadingPlatforms}
                                 permissions={permissions}
                             />
-                        </div>
+                        </Section>
                         {permissions.includes('log:read:platform') && (
-                            <div style={{ display: activeTab === 'jumpcloud' ? 'block' : 'none' }}>
+                            <Section id="profile-jumpcloud-section" title="JumpCloud Log" icon={<HardDrive className="w-5 h-5" />}>
                                 <JumpCloudLogPage logs={tabData.jumpcloud.data || []} loading={tabData.jumpcloud.loading} error={tabData.jumpcloud.error} />
-                            </div>
+                            </Section>
                         )}
+                    </div>
+
+                    <div className="hidden md:block">
+                        <div className="border-b border-gray-200 dark:border-gray-700 overflow-x-auto">
+                            <nav className="-mb-px flex space-x-4">
+                                <TabButton id="details" label="Details" icon={<UserSquare className="w-4 h-4"/>}/>
+                                <TabButton id="platforms" label="Apps & Platforms" icon={<LayoutGrid className="w-4 h-4"/>}/>
+                                
+                                {permissions.includes('log:read:platform') && (
+                                    <TabButton id="jumpcloud" label="JumpCloud Log" icon={<HardDrive className="w-4 h-4"/>}/>
+                                )}
+                            </nav>
+                        </div>
+
+                        <div className="mt-6">
+                            <div style={{ display: activeTab === 'details' ? 'block' : 'none' }}>
+                                <EmployeeDetailsTab employee={employee} permissions={permissions} onTicketClick={handleTicketClick} />
+                            </div>
+                            <div style={{ display: activeTab === 'platforms' ? 'block' : 'none' }}>
+                                <EmployeeApplicationsTab
+                                    applications={employee.applications || []}
+                                    platformStatuses={platformStatuses}
+                                    isLoading={isLoadingPlatforms}
+                                    permissions={permissions}
+                                />
+                            </div>
+                            {permissions.includes('log:read:platform') && (
+                                <div style={{ display: activeTab === 'jumpcloud' ? 'block' : 'none' }}>
+                                    <JumpCloudLogPage logs={tabData.jumpcloud.data || []} loading={tabData.jumpcloud.loading} error={tabData.jumpcloud.error} />
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
+
+            {isJiraModalOpen && <JiraTicketModal ticketId={selectedTicketId} onClose={() => setIsJiraModalOpen(false)} />}
+        </>
     );
 };
