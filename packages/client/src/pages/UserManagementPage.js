@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import toast from 'react-hot-toast';
 import { PlusCircle, Trash2 } from 'lucide-react';
 import { CreateUserModal } from '../components/ui/CreateUserModal';
@@ -11,13 +11,13 @@ export const UserManagementPage = ({ onLogout }) => {
     const [users, setUsers] = useState([]);
     const [roles, setRoles] = useState([]);
     const [loading, setLoading] = useState(true);
-    
+
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [userToDelete, setUserToDelete] = useState(null);
-    const [newPassword, setNewPassword] = useState(null); // State for the new password modal
+    const [newPassword, setNewPassword] = useState(null);
 
-    const fetchData = async () => {
+    const fetchData = useCallback(async () => {
         setLoading(true);
         const token = localStorage.getItem('accessToken');
         if (!token) { onLogout(); return; }
@@ -35,7 +35,7 @@ export const UserManagementPage = ({ onLogout }) => {
         } finally {
             setLoading(false);
         }
-    };
+    }, [onLogout]);
 
     useEffect(() => {
         fetchData();
@@ -173,7 +173,6 @@ export const UserManagementPage = ({ onLogout }) => {
                 </div>
             </div>
 
-            {/* --- FIX: Modals are now rendered inside a Portal --- */}
             <Portal>
                 {isCreateModalOpen && <CreateUserModal roles={roles} onClose={() => setIsCreateModalOpen(false)} onUserCreated={(password) => { setIsCreateModalOpen(false); fetchData(); setNewPassword(password); }} />}
                 {isDeleteModalOpen && <ConfirmationModal isOpen={isDeleteModalOpen} onClose={() => setIsDeleteModalOpen(false)} onConfirm={handleDeleteUser} title="Delete User" message={`Are you sure you want to delete the user "${userToDelete?.full_name}"? This will permanently revoke their access.`} />}
