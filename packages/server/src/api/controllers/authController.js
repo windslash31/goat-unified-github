@@ -1,0 +1,51 @@
+const authService = require('../../services/authService');
+const employeeService = require('../../services/employeeService');
+
+const login = async (req, res, next) => {
+    try {
+        const { email, password } = req.body;
+        if (!email || !password) {
+            return res.status(400).json({ message: 'Email and password are required.' });
+        }
+        const result = await authService.login(email, password);
+        res.json(result);
+    } catch (error) {
+        if (error.message.includes('Invalid credentials') || error.message.includes('role')) {
+            return res.status(401).json({ message: error.message });
+        }
+        next(error);
+    }
+};
+
+const logout = async (req, res, next) => {
+    try {
+        const authHeader = req.headers['authorization'];
+        const token = authHeader && authHeader.split(' ')[1];
+        await authService.logout(token);
+        res.status(200).json({ message: 'Logout successful.' });
+    } catch (error) {
+        next(error);
+    }
+};
+
+const getMe = async (req, res, next) => {
+    try {
+        const employeeId = req.user.employeeId;
+        if (!employeeId) {
+            return res.status(404).json({ message: "User account is not linked to an employee record." });
+        }
+        const employeeData = await employeeService.getEmployeeById(employeeId);
+        if (!employeeData) {
+            return res.status(404).json({ message: "Employee record not found." });
+        }
+        res.json(employeeData);
+    } catch (error) {
+        next(error);
+    }
+};
+
+module.exports = {
+    login,
+    logout,
+    getMe,
+};
