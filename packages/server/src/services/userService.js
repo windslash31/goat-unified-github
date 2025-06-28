@@ -25,16 +25,20 @@ const createUser = async (userData, actorId) => {
             throw new Error('A user with this email already exists.');
         }
 
+        // --- ADDED: Look for a matching employee ---
+        const employeeResult = await client.query('SELECT id FROM employees WHERE employee_email = $1', [email]);
+        const employeeId = employeeResult.rows.length > 0 ? employeeResult.rows[0].id : null;
+
         const temporaryPassword = Math.random().toString(36).slice(-10);
         const passwordHash = await bcrypt.hash(temporaryPassword, 10);
 
+        // --- MODIFIED: Include employee_id in the insert query ---
         const result = await client.query(
-            'INSERT INTO users (full_name, email, password_hash, role_id) VALUES ($1, $2, $3, $4) RETURNING id, full_name, email, role_id',
-            [fullName, email, passwordHash, roleId]
+            'INSERT INTO users (full_name, email, password_hash, role_id, employee_id) VALUES ($1, $2, $3, $4, $5) RETURNING id, full_name, email, role_id',
+            [fullName, email, passwordHash, roleId, employeeId]
         );
         const newUser = result.rows[0];
         
-        // --- FIX: Pass the actorId to the logger ---
         await logActivity(
             actorId,
             'USER_CREATE', 

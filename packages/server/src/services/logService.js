@@ -19,13 +19,13 @@ const sanitizeObject = (obj) => {
 };
 
 // --- FIX: The function now accepts a targetUserEmail to store directly ---
-const logActivity = async (actorUserId, actionType, details = {}, client = db) => {
+const logActivity = async (actorUserId, actionType, details = {}, dbClient = db) => {
     try {
         let actorEmail = null;
         let actorFullName = null;
 
         if (actorUserId) {
-            const actorResult = await client.query('SELECT email, full_name FROM users WHERE id = $1', [actorUserId]);
+            const actorResult = await dbClient.query('SELECT email, full_name FROM users WHERE id = $1', [actorUserId]);
             if (actorResult.rows.length > 0) {
                 actorEmail = actorResult.rows[0].email;
                 actorFullName = actorResult.rows[0].full_name;
@@ -33,7 +33,6 @@ const logActivity = async (actorUserId, actionType, details = {}, client = db) =
         }
         
         const sanitizedDetails = sanitizeObject(details);
-        // Extract target identifiers from details if they exist
         const targetEmployeeId = details.targetEmployeeId || null;
         const targetUserEmail = details.targetUserEmail || null;
 
@@ -43,7 +42,7 @@ const logActivity = async (actorUserId, actionType, details = {}, client = db) =
             VALUES ($1, $2, $3, $4, $5, $6, $7)
         `;
         
-        await client.query(logQuery, [actorUserId, actorEmail, actorFullName, actionType, targetEmployeeId, targetUserEmail, JSON.stringify(sanitizedDetails)]);
+        await dbClient.query(logQuery, [actorUserId, actorEmail, actorFullName, actionType, targetEmployeeId, targetUserEmail, JSON.stringify(sanitizedDetails)]);
 
     } catch (err) {
         console.error('Failed to log activity:', err);

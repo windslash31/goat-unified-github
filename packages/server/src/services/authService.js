@@ -1,4 +1,4 @@
-const db = require('../config/db'); // Corrected path
+const db = require('../config/db');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
@@ -14,24 +14,28 @@ const login = async (email, password) => {
     const userResult = await db.query(userQuery, [email]);
 
     if (userResult.rows.length === 0) {
-        await logActivity(null, 'USER_LOGIN_FAIL', null, { reason: 'User not found', emailAttempt: email });
+        // --- FIX: Pass the details object as the third argument ---
+        await logActivity(null, 'USER_LOGIN_FAIL', { reason: 'User not found', emailAttempt: email });
         throw new Error('Invalid credentials.');
     }
 
     const user = userResult.rows[0];
     if (!user.password_hash) {
-        await logActivity(user.id, 'USER_LOGIN_FAIL', null, { reason: 'Account not fully set up', emailAttempt: email });
+        // --- FIX: Pass the details object as the third argument ---
+        await logActivity(user.id, 'USER_LOGIN_FAIL', { reason: 'Account not fully set up', emailAttempt: email });
         throw new Error('Account credentials are not set up.');
     }
 
     const isPasswordCorrect = await bcrypt.compare(password, user.password_hash);
     if (!isPasswordCorrect) {
-        await logActivity(user.id, 'USER_LOGIN_FAIL', null, { reason: 'Incorrect password', emailAttempt: email });
+        // --- FIX: Pass the details object as the third argument ---
+        await logActivity(user.id, 'USER_LOGIN_FAIL', { reason: 'Incorrect password', emailAttempt: email });
         throw new Error('Invalid credentials.');
     }
     
     if (!user.role_name) {
-        await logActivity(user.id, 'USER_LOGIN_FAIL', null, { reason: 'User has no role assigned' });
+        // --- FIX: Pass the details object as the third argument ---
+        await logActivity(user.id, 'USER_LOGIN_FAIL', { reason: 'User has no role assigned' });
         throw new Error('Your account has no role assigned.');
     }
 
@@ -40,11 +44,13 @@ const login = async (email, password) => {
     const permissions = permissionsResult.rows.map(row => row.name);
 
     if (permissions.length === 0) {
-        await logActivity(user.id, 'USER_LOGIN_FAIL', null, { reason: 'Role has no permissions' });
+        // --- FIX: Pass the details object as the third argument ---
+        await logActivity(user.id, 'USER_LOGIN_FAIL', { reason: 'Role has no permissions' });
         throw new Error('Your assigned role has no permissions.');
     }
 
-    await logActivity(user.id, 'USER_LOGIN_SUCCESS');
+    // --- FIX: Pass the details object as the third argument ---
+    await logActivity(user.id, 'USER_LOGIN_SUCCESS', { targetUserEmail: user.email });
 
     const jwtPayload = { 
         id: user.id, 
