@@ -8,7 +8,7 @@ import { EditEmployeeModal } from './components/ui/EditEmployeeModal';
 import { DeactivateEmployeeModal } from './components/ui/DeactivateEmployeeModal';
 import { AccessDeniedPage } from './components/ui/AccessDeniedPage';
 
-// --- FIX: Adjust lazy imports to work with named exports ---
+// Lazy load page components for code splitting
 const LoginPage = lazy(() => import('./pages/LoginPage').then(module => ({ default: module.LoginPage })));
 const EmployeeListPage = lazy(() => import('./pages/EmployeeListPage').then(module => ({ default: module.EmployeeListPage })));
 const EmployeeDetailPage = lazy(() => import('./pages/EmployeeDetailPage/EmployeeDetailPage').then(module => ({ default: module.EmployeeDetailPage })));
@@ -16,7 +16,6 @@ const ProfilePage = lazy(() => import('./pages/ProfilePage').then(module => ({ d
 const ActivityLogPage = lazy(() => import('./pages/ActivityLogPage').then(module => ({ default: module.ActivityLogPage })));
 const UserManagementPage = lazy(() => import('./pages/UserManagementPage').then(module => ({ default: module.UserManagementPage })));
 const RoleManagementPage = lazy(() => import('./pages/RoleManagementPage').then(module => ({ default: module.RoleManagementPage })));
-
 
 const fetchMe = async (token) => {
     if (!token) throw new Error("No token provided");
@@ -222,7 +221,25 @@ const AppContent = () => {
                     }
                 >
                     <Route path="/profile" element={<ProfilePage employee={currentUserEmployeeRecord} permissions={currentUser.permissions} onEdit={handleOpenEditModal} onDeactivate={handleOpenDeactivateModal} onLogout={handleLogout} user={currentUser} />} />
-                    <Route path="/employees" element={<EmployeeListPage employees={employeeData?.employees || []} isLoading={isLoadingEmployees} filters={filters} setFilters={setFilters} pagination={pagination} setPagination={setPagination} sorting={sorting} setSorting={setSorting} />} />
+                    
+                    <Route 
+                        path="/employees" 
+                        element={
+                            <EmployeeListPage 
+                                employees={employeeData?.employees || []} 
+                                isLoading={isLoadingEmployees} 
+                                filters={filters} 
+                                setFilters={setFilters} 
+                                pagination={pagination} 
+                                setPagination={setPagination} 
+                                sorting={sorting} 
+                                setSorting={setSorting}
+                                onEdit={handleOpenEditModal}
+                                onDeactivate={handleOpenDeactivateModal}
+                            />
+                        } 
+                    />
+
                     <Route path="/employees/:employeeId" element={<EmployeeDetailPage onEdit={handleOpenEditModal} onDeactivate={handleOpenDeactivateModal} permissions={currentUser.permissions} onLogout={handleLogout} />} />
                     <Route path="/logs/activity" element={<ActivityLogPage onLogout={handleLogout} />} />
                     <Route path="/users" element={<UserManagementPage onLogout={handleLogout} />} />

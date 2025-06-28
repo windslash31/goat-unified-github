@@ -8,7 +8,6 @@ const useFetchOptions = (tableName, token) => {
         const fetchOptions = async () => {
             if (!tableName || !token) return;
             try {
-                // CORRECTED: The URL now points to the new, consolidated endpoint
                 const url = `${process.env.REACT_APP_API_BASE_URL}/api/employees/options/${tableName}`;
                 const response = await fetch(url, {
                     headers: { 'Authorization': `Bearer ${token}` }
@@ -18,7 +17,7 @@ const useFetchOptions = (tableName, token) => {
                 setOptions(data);
             } catch (error) {
                 console.error(`Failed to fetch options from ${tableName}:`, error);
-                setOptions([]); // Set to empty array on error
+                setOptions([]);
             }
         };
         fetchOptions();
@@ -29,9 +28,7 @@ const useFetchOptions = (tableName, token) => {
 export const EditEmployeeModal = ({ employee, onClose, onSave }) => {
     const [formData, setFormData] = useState({ ...employee });
     const token = localStorage.getItem('accessToken');
-    
-    // --- Fetching data for our dropdowns ---
-    // The hook now takes the table name as an argument
+
     const legalEntities = useFetchOptions('legal_entities', token);
     const officeLocations = useFetchOptions('office_locations', token);
     const employeeTypes = useFetchOptions('employee_types', token);
@@ -41,7 +38,11 @@ export const EditEmployeeModal = ({ employee, onClose, onSave }) => {
         const { name, value, type, checked } = e.target;
         setFormData(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
     };
-    
+
+    const handleToggleChange = (field, value) => {
+        setFormData(prev => ({...prev, [field]: value }));
+    };
+
     const formatDateForInput = (dateString) => {
         if (!dateString) return '';
         try {
@@ -58,7 +59,9 @@ export const EditEmployeeModal = ({ employee, onClose, onSave }) => {
         for (const key in formData) {
             const originalValue = employee[key] ?? '';
             const currentValue = formData[key] ?? '';
-            if (String(originalValue) !== String(currentValue)) {
+            if (key === 'is_active' && originalValue !== currentValue) {
+                 changes[key] = currentValue;
+            } else if (String(originalValue) !== String(currentValue)) {
                 changes[key] = currentValue === '' ? null : currentValue;
             }
         }
@@ -93,6 +96,10 @@ export const EditEmployeeModal = ({ employee, onClose, onSave }) => {
     };
     
     const inputClasses = "mt-1 block w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 dark:text-gray-200";
+    const baseButtonStyles = "px-4 py-2 text-sm font-semibold rounded-md shadow-sm border focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800";
+    const primaryButtonStyles = "bg-blue-600 border-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500";
+    const secondaryButtonStyles = "bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 focus:ring-gray-500";
+
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-50">
@@ -103,16 +110,22 @@ export const EditEmployeeModal = ({ employee, onClose, onSave }) => {
                 <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto">
                     <div className="p-6 space-y-8">
                         <Section title="Identity & Role">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                 <div>
                                     <label htmlFor="first_name" className="block text-sm font-medium text-gray-700 dark:text-gray-300">First Name</label>
                                     <input type="text" name="first_name" id="first_name" value={formData.first_name || ''} onChange={handleChange} className={inputClasses}/>
                                 </div>
                                 <div>
+                                    <label htmlFor="middle_name" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Middle Name</label>
+                                    <input type="text" name="middle_name" id="middle_name" value={formData.middle_name || ''} onChange={handleChange} className={inputClasses}/>
+                                </div>
+                                <div>
                                     <label htmlFor="last_name" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Last Name</label>
                                     <input type="text" name="last_name" id="last_name" value={formData.last_name || ''} onChange={handleChange} className={inputClasses}/>
                                 </div>
-                                 <div>
+                            </div>
+                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                                <div>
                                     <label htmlFor="position_name" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Position</label>
                                     <input type="text" name="position_name" id="position_name" value={formData.position_name || ''} onChange={handleChange} className={inputClasses}/>
                                 </div>
@@ -120,7 +133,7 @@ export const EditEmployeeModal = ({ employee, onClose, onSave }) => {
                                     <label htmlFor="position_level" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Position Level</label>
                                     <input type="text" name="position_level" id="position_level" value={formData.position_level || ''} onChange={handleChange} className={inputClasses}/>
                                 </div>
-                                <div>
+                                <div className="md:col-span-2">
                                     <label htmlFor="manager_email" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Manager Email</label>
                                     <input type="email" name="manager_email" id="manager_email" value={formData.manager_email || ''} onChange={handleChange} className={inputClasses} placeholder="manager@example.com"/>
                                 </div>
@@ -166,9 +179,19 @@ export const EditEmployeeModal = ({ employee, onClose, onSave }) => {
 
                         <Section title="Timeline & Status">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div className="flex items-center pt-6">
-                                    <input type="checkbox" name="is_active" id="is_active" checked={formData.is_active || false} onChange={handleChange} className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"/>
-                                    <label htmlFor="is_active" className="ml-2 block text-sm font-medium">Employee is Active</label>
+                                <div className="flex items-center">
+                                    <label htmlFor="is_active_toggle" className="block text-sm font-medium mr-4">Employee Status</label>
+                                    <button
+                                        type="button"
+                                        id="is_active_toggle"
+                                        onClick={() => handleToggleChange('is_active', !formData.is_active)}
+                                        className={`${formData.is_active ? 'bg-blue-600' : 'bg-gray-200 dark:bg-gray-600'} relative inline-flex h-6 w-11 items-center rounded-full transition-colors`}
+                                    >
+                                        <span className={`${formData.is_active ? 'translate-x-6' : 'translate-x-1'} inline-block h-4 w-4 transform rounded-full bg-white transition-transform`} />
+                                    </button>
+                                    <span className={`ml-3 text-sm font-semibold ${formData.is_active ? 'text-blue-600' : 'text-gray-500'}`}>
+                                        {formData.is_active ? 'Active' : 'Inactive'}
+                                    </span>
                                 </div>
                                 <div></div>
                                 <div>
@@ -200,10 +223,17 @@ export const EditEmployeeModal = ({ employee, onClose, onSave }) => {
                         </Section>
                     </div>
                     <div className="bg-gray-50 dark:bg-gray-900/50 px-6 py-4 flex justify-end gap-3 border-t border-gray-200 dark:border-gray-700">
-                         <button type="button" onClick={onClose} className="px-4 py-2 text-sm font-semibold text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 dark:focus:ring-offset-gray-800">
+                         <button
+                            type="button"
+                            onClick={onClose}
+                            className={`${baseButtonStyles} ${secondaryButtonStyles}`}
+                        >
                             Cancel
                         </button>
-                        <button type="submit" className="px-4 py-2 text-sm font-semibold text-white bg-blue-600 border border-transparent rounded-md shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-offset-gray-800">
+                        <button
+                            type="submit"
+                            className={`${baseButtonStyles} ${primaryButtonStyles}`}
+                        >
                             Save Changes
                         </button>
                     </div>

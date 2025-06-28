@@ -14,7 +14,6 @@ router.get('/:id/jumpcloud-logs', authenticateToken, authorizeAdminOrSelfForLogs
 router.get('/:id/google-logs', authenticateToken, authorizeAdminOrSelfForLogs, employeeController.getGoogleLogs);
 router.get('/:id/slack-logs', authenticateToken, authorizeAdminOrSelfForLogs, employeeController.getSlackLogs);
 router.get('/:id/unified-timeline', authenticateToken, authorizeAdminOrSelfForLogs, employeeController.getUnifiedTimeline);
-
 router.post('/:id/deactivate', authenticateToken, authorize('employee:deactivate'), employeeController.deactivateOnPlatforms);
 
 // Log a view action
@@ -22,5 +21,9 @@ router.post('/logs/view', authenticateToken, authorize('employee:read:all'), emp
 
 // Routes for dropdown options
 router.get('/options/:table', authenticateToken, authorize('employee:read:all'), employeeController.getEmployeeOptions);
+
+// Route for bulk actions
+router.post('/bulk-deactivate', authenticateToken, authorize('employee:deactivate'), employeeController.bulkDeactivateOnPlatforms);
+
 
 module.exports = router;

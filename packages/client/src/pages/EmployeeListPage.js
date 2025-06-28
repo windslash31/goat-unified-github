@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Search, Filter as FilterIcon, ChevronsUpDown, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, X, UserSearch } from 'lucide-react';
+import { Search, Filter as FilterIcon, ChevronsUpDown, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, X, UserSearch, MoreVertical, Edit, UserX } from 'lucide-react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { StatusBadge } from '../components/ui/StatusBadge';
 import { FilterPopover } from '../components/ui/FilterPopover';
+import toast from 'react-hot-toast';
 
 // A custom hook to delay the search input effect, reducing API calls.
 const useDebounce = (value, delay) => {
@@ -45,7 +46,6 @@ const useMediaQuery = (query) => {
     }, [query]);
     return matches;
 };
-
 
 // --- UI Sub-components ---
 
@@ -148,7 +148,7 @@ const EmptyState = () => (
 
 
 // --- MAIN PAGE COMPONENT ---
-export const EmployeeListPage = ({ employees, isLoading, filters, setFilters, pagination, setPagination, sorting, setSorting }) => {
+export const EmployeeListPage = ({ employees, isLoading, filters, setFilters, pagination, setPagination, sorting, setSorting, onEdit, onDeactivate }) => {
     const [isFilterPopoverOpen, setIsFilterPopoverOpen] = useState(false);
     const [searchInputValue, setSearchInputValue] = useState(filters.search);
     const debouncedSearchTerm = useDebounce(searchInputValue, 500);
@@ -156,6 +156,8 @@ export const EmployeeListPage = ({ employees, isLoading, filters, setFilters, pa
     const popoverRef = useRef(null);
     const token = localStorage.getItem('accessToken');
     const navigate = useNavigate();
+    
+    const [selectedRows, setSelectedRows] = useState(new Set());
     
     const isDesktop = useMediaQuery('(min-width: 768px)');
     
@@ -184,6 +186,10 @@ export const EmployeeListPage = ({ employees, isLoading, filters, setFilters, pa
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, [isFilterPopoverOpen]);
     
+    useEffect(() => {
+        setSelectedRows(new Set());
+    }, [filters, pagination.currentPage, employees]);
+
     const handleClearFilters = () => {
         setFilters({ 
             status: 'all', search: '', jobTitle: '', manager: '',
@@ -202,7 +208,42 @@ export const EmployeeListPage = ({ employees, isLoading, filters, setFilters, pa
         });
     }, [filters]);
 
-    // --- Component for Mobile Card View ---
+    const handleSelectAll = (e) => {
+        if (e.target.checked) {
+            setSelectedRows(new Set(employees.map(emp => emp.id)));
+        } else {
+            setSelectedRows(new Set());
+        }
+    };
+
+    const handleSelectRow = (employeeId) => {
+        const newSelection = new Set(selectedRows);
+        if (newSelection.has(employeeId)) {
+            newSelection.delete(employeeId);
+        } else {
+            newSelection.add(employeeId);
+        }
+        setSelectedRows(newSelection);
+    };
+
+    const handleBulkDeactivate = async () => {
+        const promise = fetch(`${process.env.REACT_APP_API_BASE_URL}/api/employees/bulk-deactivate`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify({ employeeIds: Array.from(selectedRows), platforms: ['google', 'slack', 'jumpcloud', 'atlassian'] })
+        });
+
+        toast.promise(promise, {
+            loading: 'Processing bulk deactivation...',
+            success: 'Bulk deactivation complete!',
+            error: 'An error occurred during bulk deactivation.',
+        });
+
+        promise.finally(() => {
+            setSelectedRows(new Set());
+        });
+    };
+
     const MobileList = () => (
         <div className="divide-y divide-gray-200 dark:divide-gray-700">
             {employees.map(emp => {
@@ -225,9 +266,21 @@ export const EmployeeListPage = ({ employees, isLoading, filters, setFilters, pa
         </div>
     );
 
-    // --- Component for Desktop Virtualized Table ---
     const DesktopTable = () => {
         const parentRef = useRef(null);
+        const [activeActionMenu, setActiveActionMenu] = useState(null);
+        const actionMenuRef = useRef(null);
+
+        useEffect(() => {
+            const handleClickOutside = (event) => {
+                if (actionMenuRef.current && !actionMenuRef.current.contains(event.target)) {
+                    setActiveActionMenu(null);
+                }
+            };
+            document.addEventListener('mousedown', handleClickOutside);
+            return () => document.removeEventListener('mousedown', handleClickOutside);
+        }, []);
+
         const rowVirtualizer = useVirtualizer({
             count: employees.length,
             getScrollElement: () => parentRef.current,
@@ -255,43 +308,54 @@ export const EmployeeListPage = ({ employees, isLoading, filters, setFilters, pa
                 <table className="min-w-full table-fixed">
                     <thead className="sticky top-0 bg-gray-50 dark:bg-gray-800 z-10">
                         <tr className="border-b border-gray-200 dark:border-gray-700">
+                            <th className="px-6 py-3 w-[5%] text-left text-xs uppercase text-gray-500">
+                                <input type="checkbox" onChange={handleSelectAll} checked={employees.length > 0 && selectedRows.size === employees.length} className="rounded" />
+                            </th>
                             <th className="px-6 py-3 w-[25%] text-left text-xs uppercase text-gray-500"><TableHeader columnKey="first_name">Employee</TableHeader></th>
                             <th className="px-6 py-3 w-[30%] text-left text-xs uppercase text-gray-500"><TableHeader columnKey="employee_email">Email</TableHeader></th>
-                            <th className="px-6 py-3 w-[25%] text-left text-xs uppercase text-gray-500"><TableHeader columnKey="position_name">Job Title</TableHeader></th>
+                            <th className="px-6 py-3 w-[20%] text-left text-xs uppercase text-gray-500"><TableHeader columnKey="position_name">Job Title</TableHeader></th>
                             <th className="px-6 py-3 w-[15%] text-left text-xs uppercase text-gray-500"><TableHeader columnKey="status">Status</TableHeader></th>
                             <th className="px-6 py-3 w-[5%] text-left text-xs uppercase text-gray-500"></th>
                         </tr>
                     </thead>
                     <tbody>
-                        {paddingTop > 0 && (
-                            <tr>
-                                <td style={{ height: `${paddingTop}px` }} />
-                            </tr>
-                        )}
+                        {paddingTop > 0 && (<tr><td colSpan={6} style={{ height: `${paddingTop}px` }} /></tr>)}
                         {virtualItems.map(virtualRow => {
                             const employee = employees[virtualRow.index];
                             const fullName = [employee.first_name, employee.middle_name, employee.last_name].filter(Boolean).join(' ');
                             return (
                                 <tr
                                     key={virtualRow.key}
-                                    onClick={() => navigate(`/employees/${employee.id}`)}
-                                    className="border-b border-gray-200 dark:border-gray-700 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50"
+                                    data-index={virtualRow.index}
+                                    ref={rowVirtualizer.measureElement}
+                                    className={`border-b border-gray-200 dark:border-gray-700 ${selectedRows.has(employee.id) ? 'bg-blue-50 dark:bg-blue-900/50' : 'hover:bg-gray-50 dark:hover:bg-gray-700/50'}`}
                                 >
-                                    <td className="px-6 py-4 whitespace-nowrap font-medium text-gray-900 dark:text-white">{fullName}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">{employee.employee_email}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">{employee.position_name}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap"><StatusBadge status={employee.status} /></td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-right">
-                                        <ChevronRight className="w-5 h-5 text-gray-400" />
+                                    <td className="px-6 py-4 whitespace-nowrap">
+                                        <input type="checkbox" onChange={() => handleSelectRow(employee.id)} checked={selectedRows.has(employee.id)} className="rounded" onClick={e => e.stopPropagation()} />
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap font-medium text-gray-900 dark:text-white" onClick={() => navigate(`/employees/${employee.id}`)}>{fullName}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300" onClick={() => navigate(`/employees/${employee.id}`)}>{employee.employee_email}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300" onClick={() => navigate(`/employees/${employee.id}`)}>{employee.position_name}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap" onClick={() => navigate(`/employees/${employee.id}`)}><StatusBadge status={employee.status} /></td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-center">
+                                        <div className="relative" ref={activeActionMenu === employee.id ? actionMenuRef : null}>
+                                            <button onClick={(e) => { e.stopPropagation(); setActiveActionMenu(prev => prev === employee.id ? null : employee.id); }} className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-600">
+                                                <MoreVertical className="w-4 h-4" />
+                                            </button>
+                                            {activeActionMenu === employee.id && (
+                                                <div className="absolute top-full right-0 mt-2 w-48 bg-white dark:bg-gray-800 border dark:border-gray-700 rounded-lg shadow-xl z-20">
+                                                    <ul>
+                                                        <li><button onClick={() => { onEdit(employee); setActiveActionMenu(null); }} className="w-full text-left flex items-center gap-3 px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700"><Edit className="w-4 h-4"/> Edit Employee</button></li>
+                                                        <li><button onClick={() => { onDeactivate(employee); setActiveActionMenu(null); }} className="w-full text-left flex items-center gap-3 px-4 py-2 text-sm text-red-500 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/50"><UserX className="w-4 h-4"/> Suspend Access</button></li>
+                                                    </ul>
+                                                </div>
+                                            )}
+                                        </div>
                                     </td>
                                 </tr>
                             );
                         })}
-                        {paddingBottom > 0 && (
-                             <tr>
-                                <td style={{ height: `${paddingBottom}px` }} />
-                            </tr>
-                        )}
+                        {paddingBottom > 0 && (<tr><td colSpan={6} style={{ height: `${paddingBottom}px` }} /></tr>)}
                     </tbody>
                 </table>
             </div>
@@ -299,9 +363,7 @@ export const EmployeeListPage = ({ employees, isLoading, filters, setFilters, pa
     };
 
 
-    if (isLoading && employees.length === 0) {
-        return <div className="p-6 text-center">Loading employees...</div>;
-    }
+    if (isLoading && employees.length === 0) { return <div className="p-6 text-center">Loading employees...</div>; }
 
     return (
         <div className="p-4 sm:p-6">
@@ -332,10 +394,16 @@ export const EmployeeListPage = ({ employees, isLoading, filters, setFilters, pa
                     </div>
                 </div>
             </div>
-
             <FilterPills filters={filters} setFilters={setFilters} setSearchInputValue={setSearchInputValue} options={filterOptions} />
-            
-            <div className="mt-2">
+            <div className="mt-2 relative">
+                {isDesktop && selectedRows.size > 0 && (
+                     <div className="absolute top-[-52px] left-1/2 -translate-x-1/2 bg-blue-600 text-white flex items-center justify-between px-4 py-2 rounded-lg shadow-lg z-20 animate-fade-in-down">
+                        <span className="font-semibold">{selectedRows.size} selected</span>
+                        <button onClick={handleBulkDeactivate} className="ml-4 px-4 py-1 bg-white text-blue-600 font-bold rounded-md hover:bg-blue-100">
+                            Deactivate Selected
+                        </button>
+                    </div>
+                )}
                 <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
                     <StatusQuickFilters currentStatus={filters.status} onStatusChange={(status) => { setFilters(prev => ({ ...prev, status })); setPagination(prev => ({...prev, currentPage: 1})); }}/>
                     

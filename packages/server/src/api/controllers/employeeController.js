@@ -70,13 +70,26 @@ const deactivateOnPlatforms = async (req, res, next) => {
     }
 };
 
+const bulkDeactivateOnPlatforms = async (req, res, next) => {
+    try {
+        const { employeeIds, platforms } = req.body;
+        if (!employeeIds || !platforms || !Array.isArray(employeeIds) || !Array.isArray(platforms)) {
+            return res.status(400).json({ message: 'Invalid request body. `employeeIds` and `platforms` must be arrays.' });
+        }
+        const result = await employeeService.bulkDeactivateOnPlatforms(employeeIds, platforms, req.user.id);
+        res.status(200).json(result);
+    } catch (error) {
+        next(error);
+    }
+};
+
 const logEmployeeView = async (req, res, next) => {
     try {
         const { targetEmployeeId } = req.body;
         if (!targetEmployeeId) {
             return res.status(400).json({ message: 'Target Employee ID is required.' });
         }
-        await logActivity(req.user.id, 'EMPLOYEE_PROFILE_VIEW', targetEmployeeId);
+        await logActivity(req.user.id, 'EMPLOYEE_PROFILE_VIEW', { targetEmployeeId });
         res.status(200).json({ message: 'View logged successfully.' });
     } catch (error) {
         next(error);
@@ -85,7 +98,6 @@ const logEmployeeView = async (req, res, next) => {
 
 const getEmployeeOptions = async (req, res, next) => {
     try {
-        // The parameter should match the route definition, e.g., /options/:tableName
         const tableName = req.params.table || req.params.tableName;
         if (!tableName) return res.status(400).json({ message: 'Table name parameter is missing.'});
 
@@ -123,6 +135,7 @@ const getUnifiedTimeline = async (req, res, next) => {
     }
 }
 
+
 module.exports = {
     listEmployees,
     getEmployee,
@@ -131,8 +144,9 @@ module.exports = {
     getJumpCloudLogs,
     deactivateOnPlatforms,
     logEmployeeView,
+    getEmployeeOptions,
     getGoogleLogs,
     getSlackLogs,
     getUnifiedTimeline,
-    getEmployeeOptions
+    bulkDeactivateOnPlatforms
 };

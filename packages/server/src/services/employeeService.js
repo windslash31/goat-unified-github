@@ -76,7 +76,6 @@ const getEmployees = async (filters) => {
         queryParams.push(statusTextMap[status]);
     }
     if (search) {
-        // --- FIX: Include middle_name in the search ---
         whereClauses.push(`(e.first_name || ' ' || e.middle_name || ' ' || e.last_name || ' ' || e.employee_email ILIKE $${paramIndex++})`);
         queryParams.push(`%${search}%`);
     }
@@ -242,8 +241,8 @@ const getJumpCloudLogs = async (employeeId) => {
     if (!findUserResponse.ok) throw new Error(`JumpCloud API Error: ${findUserResponse.status}.`);
     
     const { results: users } = await findUserResponse.json();
-    if (!users || users.length === 0) throw new Error('User not found in JumpCloud.');
-    if (!users[0].username) throw new Error('JumpCloud user missing "username".');
+    if (!users || users.length === 0) return []; // Return empty instead of throwing error if user not in JC
+    if (!users[0].username) return [];
 
     const eventsUrl = 'https://api.jumpcloud.com/insights/directory/v1/events';
     const startTime = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
@@ -254,6 +253,26 @@ const getJumpCloudLogs = async (employeeId) => {
     
     return eventsResponse.json();
 };
+
+
+const getGoogleLogs = async (employeeId) => {
+    const employeeRes = await db.query('SELECT employee_email FROM employees WHERE id = $1', [employeeId]);
+    if (employeeRes.rows.length === 0) throw new Error('Employee not found.');
+    const email = employeeRes.rows[0].employee_email;
+    return await googleWorkspaceService.getLoginEvents(email);
+};
+
+const getSlackLogs = async (employeeId) => {
+    const employeeRes = await db.query('SELECT employee_email FROM employees WHERE id = $1', [employeeId]);
+    if (employeeRes.rows.length === 0) throw new Error('Employee not found.');
+    const email = employeeRes.rows[0].employee_email;
+    return await slackService.getAuditLogs(email);
+};
+
+const getUnifiedTimeline = async (employeeId) => {
+    return [];
+}
+
 
 const deactivateOnPlatforms = async (employeeId, platforms, actorId) => {
     const employeeRes = await db.query('SELECT employee_email FROM employees WHERE id = $1', [employeeId]);
@@ -279,6 +298,20 @@ const deactivateOnPlatforms = async (employeeId, platforms, actorId) => {
     return { message: 'Suspension process completed.', results: deactivation_results };
 };
 
+const bulkDeactivateOnPlatforms = async (employeeIds, platforms, actorId) => {
+    const results = [];
+    for (const employeeId of employeeIds) {
+        try {
+            const result = await deactivateOnPlatforms(employeeId, platforms, actorId);
+            results.push({ employeeId, success: true, message: result.message });
+        } catch(error) {
+            results.push({ employeeId, success: false, message: error.message });
+        }
+    }
+    return { message: 'Bulk suspension process completed.', results };
+};
+
+
 const getEmployeeOptions = async (tableName) => {
     if (!/^[a-z_]+$/.test(tableName)) {
         throw new Error('Invalid table name.');
@@ -287,24 +320,6 @@ const getEmployeeOptions = async (tableName) => {
     return result.rows;
 };
 
-const getGoogleLogs = async (employeeId) => {
-    const employeeRes = await db.query('SELECT employee_email FROM employees WHERE id = $1', [employeeId]);
-    if (employeeRes.rows.length === 0) throw new Error('Employee not found.');
-    const email = employeeRes.rows[0].employee_email;
-    return await googleWorkspaceService.getLoginEvents(email);
-};
-
-const getSlackLogs = async (employeeId) => {
-    const employeeRes = await db.query('SELECT employee_email FROM employees WHERE id = $1', [employeeId]);
-    if (employeeRes.rows.length === 0) throw new Error('Employee not found.');
-    const email = employeeRes.rows[0].employee_email;
-    return await slackService.getAuditLogs(email);
-};
-
-const getUnifiedTimeline = async (employeeId) => {
-    // For now, we will return an empty array. We can build this service later.
-    return [];
-}
 
 module.exports = {
     getEmployeeById,
@@ -313,8 +328,9 @@ module.exports = {
     getPlatformStatuses,
     getJumpCloudLogs,
     deactivateOnPlatforms,
+    getEmployeeOptions,
     getGoogleLogs,
     getSlackLogs,
     getUnifiedTimeline,
-    getEmployeeOptions
+    bulkDeactivateOnPlatforms
 };
