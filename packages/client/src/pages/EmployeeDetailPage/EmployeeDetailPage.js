@@ -1,12 +1,15 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { UserSquare, LayoutGrid, HardDrive, AlertTriangle, ChevronDown } from 'lucide-react';
+import { UserSquare, LayoutGrid, HardDrive, AlertTriangle, ChevronDown, Bot, MessageSquare, Shield } from 'lucide-react';
 import { useBreadcrumb } from '../../context/BreadcrumbContext';
 import { EmployeeDetailHeader } from './EmployeeDetailHeader';
 import { EmployeeDetailsTab } from './EmployeeDetailsTab';
 import { EmployeeApplicationsTab } from './EmployeeApplicationsTab';
 import { JumpCloudLogPage } from './JumpcloudLogPage';
 import { JiraTicketModal } from '../../components/ui/JiraTicketModal';
+import { GoogleLogPage } from './GoogleLogPage';
+import { SlackLogPage } from './SlackLogPage';
+import { UnifiedTimelinePage } from './UnifiedTimelinePage';
 
 const Section = ({ id, title, children, icon }) => (
     <div id={id} className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 scroll-mt-24">
@@ -66,22 +69,22 @@ export const EmployeeDetailPage = ({ onEdit, onDeactivate, permissions, onLogout
     const [activeTab, setActiveTab] = useState('details');
     const [platformStatuses, setPlatformStatuses] = useState([]);
     const [isLoadingPlatforms, setIsLoadingPlatforms] = useState(true);
-    const [tabData, setTabData] = useState({ jumpcloud: { data: null, loading: false, error: null } });
+    
+    const [tabData, setTabData] = useState({
+        jumpcloud: { data: [], loading: false, error: null, fetched: false },
+        google: { data: [], loading: false, error: null, fetched: false },
+        slack: { data: [], loading: false, error: null, fetched: false },
+        timeline: { data: [], loading: false, error: null, fetched: false },
+    });
 
-    // State for managing the Jira Ticket Modal
     const [isJiraModalOpen, setIsJiraModalOpen] = useState(false);
     const [selectedTicketId, setSelectedTicketId] = useState(null);
 
-
-    const fetchAllData = useCallback(() => {
+    const fetchInitialData = useCallback(() => {
         const token = localStorage.getItem('accessToken');
-        if (!token) {
-            onLogout();
-            return;
-        }
+        if (!token) { onLogout(); return; }
 
         setLoading(true);
-        // Fetch essential employee data
         fetch(`${process.env.REACT_APP_API_BASE_URL}/api/employees/${employeeId}`, { headers: { 'Authorization': `Bearer ${token}` } })
             .then(res => {
                 if (res.status === 404) throw new Error('Employee not found.');
@@ -91,7 +94,6 @@ export const EmployeeDetailPage = ({ onEdit, onDeactivate, permissions, onLogout
             .then(empData => {
                 setEmployee(empData);
                 const fullName = [empData.first_name, empData.middle_name, empData.last_name].filter(Boolean).join(' ');
-                sessionStorage.setItem('currentEmployeeCrumb', JSON.stringify({ name: fullName, path: `/employees/${employeeId}` }));
                 setDynamicCrumbs([{ name: "Employees", path: "/employees" }, { name: fullName, path: `/employees/${employeeId}` }]);
             })
             .catch(err => {
@@ -100,38 +102,57 @@ export const EmployeeDetailPage = ({ onEdit, onDeactivate, permissions, onLogout
             })
             .finally(() => setLoading(false));
 
-        // Fetch non-essential platform statuses
         setIsLoadingPlatforms(true);
         fetch(`${process.env.REACT_APP_API_BASE_URL}/api/employees/${employeeId}/platform-statuses`, { headers: { 'Authorization': `Bearer ${token}` } })
             .then(res => res.ok ? res.json() : [])
             .then(statusData => setPlatformStatuses(statusData))
             .catch(err => console.error("Failed to fetch platform statuses:", err))
             .finally(() => setIsLoadingPlatforms(false));
-        
-        // Fetch non-essential JumpCloud logs
-        if (permissions.includes('log:read:platform')) {
-            setTabData(prev => ({ ...prev, jumpcloud: { data: [], loading: true, error: null } }));
-            fetch(`${process.env.REACT_APP_API_BASE_URL}/api/employees/${employeeId}/jumpcloud-logs`, { headers: { 'Authorization': `Bearer ${token}` } })
-                .then(res => {
-                    if (res.ok) return res.json();
-                    return res.json().then(errData => { throw new Error(errData.message || `Server responded with ${res.status}`) });
-                })
-                .then(jcData => {
-                    setTabData(prev => ({ ...prev, jumpcloud: { data: jcData, loading: false, error: null } }));
-                })
-                .catch(err => {
-                    console.warn(`Could not fetch JumpCloud logs: ${err.message}`);
-                    setTabData(prev => ({ ...prev, jumpcloud: { data: [], loading: false, error: err.message } }));
-                });
-        }
-    }, [employeeId, onLogout, setDynamicCrumbs, permissions]);
+
+    }, [employeeId, onLogout, setDynamicCrumbs]);
 
     useEffect(() => {
-        fetchAllData();
+        fetchInitialData();
         return () => {
             setDynamicCrumbs([]);
+        }
+    }, [fetchInitialData, setDynamicCrumbs]);
+    
+    const fetchLogData = useCallback((tabKey) => {
+        if (!permissions.includes('log:read:platform') || tabData[tabKey]?.fetched || tabData[tabKey]?.loading) {
+            return;
+        }
+
+        const token = localStorage.getItem('accessToken');
+        const logEndpoints = {
+            jumpcloud: `/api/employees/${employeeId}/jumpcloud-logs`,
+            google: `/api/employees/${employeeId}/google-logs`,
+            slack: `/api/employees/${employeeId}/slack-logs`,
+            timeline: `/api/employees/${employeeId}/unified-timeline`,
         };
-    }, [fetchAllData, setDynamicCrumbs]);
+        
+        const url = logEndpoints[tabKey];
+        if (!url) return;
+
+        setTabData(prev => ({ ...prev, [tabKey]: { ...prev[tabKey], loading: true } }));
+
+        fetch(`${process.env.REACT_APP_API_BASE_URL}${url}`, { headers: { 'Authorization': `Bearer ${token}` } })
+            .then(res => res.ok ? res.json() : res.json().then(err => Promise.reject(err)))
+            .then(data => {
+                setTabData(prev => ({ ...prev, [tabKey]: { data, loading: false, error: null, fetched: true } }));
+            })
+            .catch(err => {
+                setTabData(prev => ({ ...prev, [tabKey]: { data: [], loading: false, error: err.message, fetched: true } }));
+            });
+
+    }, [employeeId, permissions, tabData]);
+
+    const handleTabClick = (tabId) => {
+        setActiveTab(tabId);
+        if (['jumpcloud', 'google', 'slack', 'timeline'].includes(tabId)) {
+            fetchLogData(tabId);
+        }
+    };
 
     const handleTicketClick = (ticketId) => {
         if (ticketId) {
@@ -139,7 +160,7 @@ export const EmployeeDetailPage = ({ onEdit, onDeactivate, permissions, onLogout
             setIsJiraModalOpen(true);
         }
     };
-
+    
     const handleScrollToSection = (sectionId) => {
         const element = document.getElementById(sectionId);
         element?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -148,7 +169,10 @@ export const EmployeeDetailPage = ({ onEdit, onDeactivate, permissions, onLogout
     const pageSections = [
         { id: 'details-section', label: 'Details', icon: <UserSquare className="w-4 h-4"/>, permission: true },
         { id: 'apps-section', label: 'Apps & Platforms', icon: <LayoutGrid className="w-4 h-4"/>, permission: true },
-        { id: 'jumpcloud-section', label: 'JumpCloud Log', icon: <HardDrive className="w-4 h-4"/>, permission: permissions.includes('log:read:platform') }
+        { id: 'jumpcloud-section', label: 'JumpCloud Log', icon: <HardDrive className="w-4 h-4"/>, permission: permissions.includes('log:read:platform') },
+        { id: 'google-section', label: 'Google Workspace Log', icon: <Shield className="w-4 h-4"/>, permission: permissions.includes('log:read:platform') },
+        { id: 'slack-section', label: 'Slack Log', icon: <MessageSquare className="w-4 h-4"/>, permission: permissions.includes('log:read:platform') },
+        { id: 'timeline-section', label: 'Unified Timeline', icon: <Bot className="w-4 h-4"/>, permission: permissions.includes('log:read:platform') },
     ].filter(s => s.permission);
 
     if (loading) return <div className="p-6 text-center">Loading employee profile...</div>;
@@ -159,20 +183,18 @@ export const EmployeeDetailPage = ({ onEdit, onDeactivate, permissions, onLogout
             <p>{pageError}</p>
         </div>
     );
-    if (!employee) return null; // Should be handled by the error state above
+    if (!employee) return null;
 
-    const TabButton = ({ id, label, icon }) => ( <button onClick={() => setActiveTab(id)} className={`flex items-center gap-2 py-3 px-4 border-b-2 font-semibold text-sm transition-colors whitespace-nowrap ${ activeTab === id ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300' }`}> {icon} {label} </button> );
+    const TabButton = ({ id, label, icon }) => ( 
+        <button onClick={() => handleTabClick(id)} className={`flex items-center gap-2 py-3 px-4 border-b-2 font-semibold text-sm transition-colors whitespace-nowrap ${ activeTab === id ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300' }`}>
+            {icon} {label}
+        </button> 
+    );
     
     return (
         <>
             <div className="p-4 sm:p-6 space-y-6">
-                <EmployeeDetailHeader
-                    employee={employee}
-                    onEdit={onEdit}
-                    onDeactivate={onDeactivate}
-                    permissions={permissions}
-                    isOwnProfile={false}
-                />
+                <EmployeeDetailHeader employee={employee} onEdit={onEdit} onDeactivate={onDeactivate} permissions={permissions} isOwnProfile={false} />
                 
                 <InPageDropdownNav sections={pageSections} onScrollTo={handleScrollToSection} />
 
@@ -181,17 +203,23 @@ export const EmployeeDetailPage = ({ onEdit, onDeactivate, permissions, onLogout
                         <EmployeeDetailsTab employee={employee} navigate={navigate} permissions={permissions} onTicketClick={handleTicketClick} />
                     </Section>
                     <Section id="apps-section" title="Apps & Platforms" icon={<LayoutGrid className="w-5 h-5" />}>
-                        <EmployeeApplicationsTab
-                            applications={employee.applications || []}
-                            platformStatuses={platformStatuses}
-                            isLoading={isLoadingPlatforms}
-                            permissions={permissions}
-                        />
+                        <EmployeeApplicationsTab applications={employee.applications || []} platformStatuses={platformStatuses} isLoading={isLoadingPlatforms} permissions={permissions} />
                     </Section>
                     {permissions.includes('log:read:platform') && (
-                        <Section id="jumpcloud-section" title="JumpCloud Log" icon={<HardDrive className="w-5 h-5" />}>
-                            <JumpCloudLogPage logs={tabData.jumpcloud.data || []} loading={tabData.jumpcloud.loading} error={tabData.jumpcloud.error} />
-                        </Section>
+                        <>
+                            <Section id="jumpcloud-section" title="JumpCloud Log" icon={<HardDrive className="w-5 h-5" />}>
+                                <JumpCloudLogPage logs={tabData.jumpcloud.data} loading={tabData.jumpcloud.loading} error={tabData.jumpcloud.error} />
+                            </Section>
+                            <Section id="google-section" title="Google Workspace Log" icon={<Shield className="w-5 h-5" />}>
+                                <GoogleLogPage logs={tabData.google.data} loading={tabData.google.loading} error={tabData.google.error} />
+                            </Section>
+                             <Section id="slack-section" title="Slack Log" icon={<MessageSquare className="w-5 h-5" />}>
+                                <SlackLogPage logs={tabData.slack.data} loading={tabData.slack.loading} error={tabData.slack.error} />
+                            </Section>
+                            <Section id="timeline-section" title="Unified Timeline" icon={<Bot className="w-5 h-5" />}>
+                                <UnifiedTimelinePage events={tabData.timeline.data} loading={tabData.timeline.loading} error={tabData.timeline.error} />
+                            </Section>
+                        </>
                     )}
                 </div>
 
@@ -201,26 +229,37 @@ export const EmployeeDetailPage = ({ onEdit, onDeactivate, permissions, onLogout
                             <TabButton id="details" label="Details" icon={<UserSquare className="w-4 h-4"/>}/>
                             <TabButton id="platforms" label="Apps & Platforms" icon={<LayoutGrid className="w-4 h-4"/>}/>
                             {permissions.includes('log:read:platform') && (
-                                <TabButton id="jumpcloud" label="JumpCloud Log" icon={<HardDrive className="w-4 h-4"/>}/>
+                                <>
+                                    <TabButton id="jumpcloud" label="JumpCloud Log" icon={<HardDrive className="w-4 h-4"/>}/>
+                                    <TabButton id="google" label="Google Workspace" icon={<Shield className="w-4 h-4"/>}/>
+                                    <TabButton id="slack" label="Slack" icon={<MessageSquare className="w-4 h-4"/>}/>
+                                    <TabButton id="timeline" label="Unified Timeline" icon={<Bot className="w-4 h-4"/>}/>
+                                </>
                             )}
                         </nav>
                     </div>
                     <div className="mt-6">
                         <div style={{ display: activeTab === 'details' ? 'block' : 'none' }}>
-                            <EmployeeDetailsTab employee={employee} navigate={navigate} permissions={permissions} onTicketClick={handleTicketClick} />
+                             <EmployeeDetailsTab employee={employee} navigate={navigate} permissions={permissions} onTicketClick={handleTicketClick} />
                         </div>
                         <div style={{ display: activeTab === 'platforms' ? 'block' : 'none' }}>
-                            <EmployeeApplicationsTab
-                                applications={employee.applications || []}
-                                platformStatuses={platformStatuses}
-                                isLoading={isLoadingPlatforms}
-                                permissions={permissions}
-                            />
+                            <EmployeeApplicationsTab applications={employee.applications || []} platformStatuses={platformStatuses} isLoading={isLoadingPlatforms} permissions={permissions} />
                         </div>
                         {permissions.includes('log:read:platform') && (
-                            <div style={{ display: activeTab === 'jumpcloud' ? 'block' : 'none' }}>
-                                <JumpCloudLogPage logs={tabData.jumpcloud.data || []} loading={tabData.jumpcloud.loading} error={tabData.jumpcloud.error} />
-                            </div>
+                            <>
+                                <div style={{ display: activeTab === 'jumpcloud' ? 'block' : 'none' }}>
+                                    <JumpCloudLogPage logs={tabData.jumpcloud.data} loading={tabData.jumpcloud.loading} error={tabData.jumpcloud.error} />
+                                </div>
+                                <div style={{ display: activeTab === 'google' ? 'block' : 'none' }}>
+                                    <GoogleLogPage logs={tabData.google.data} loading={tabData.google.loading} error={tabData.google.error} />
+                                </div>
+                                <div style={{ display: activeTab === 'slack' ? 'block' : 'none' }}>
+                                    <SlackLogPage logs={tabData.slack.data} loading={tabData.slack.loading} error={tabData.slack.error} />
+                                </div>
+                                <div style={{ display: activeTab === 'timeline' ? 'block' : 'none' }}>
+                                    <UnifiedTimelinePage events={tabData.timeline.data} loading={tabData.timeline.loading} error={tabData.timeline.error} />
+                                </div>
+                            </>
                         )}
                     </div>
                 </div>

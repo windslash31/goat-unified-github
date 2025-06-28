@@ -100,8 +100,31 @@ const suspendUser = async (email) => {
     }
 };
 
+const getLoginEvents = async (email) => {
+    try {
+        const admin = await getAuthenticatedClient();
+        const reports = google.reports({
+            version: 'reports_v1',
+            auth: admin.auth,
+        });
+
+        const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+
+        const response = await reports.activities.list({
+            userKey: email,
+            applicationName: 'login',
+            startTime: thirtyDaysAgo,
+        });
+
+        return response.data.items || [];
+    } catch (error) {
+        console.error(`Failed to get Google Workspace login events for ${email}:`, error.message);
+        return []; // Return empty array on error
+    }
+};
 
 module.exports = {
     getUserStatus,
     suspendUser,
+    getLoginEvents, // Export the new function
 };

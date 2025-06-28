@@ -58,14 +58,13 @@ const getEmployees = async (filters) => {
     const { 
         status, search, jobTitle, manager, page = 1, limit = 20, sortBy = 'first_name', sortOrder = 'asc',
         legal_entity_id, office_location_id, employee_type_id, employee_sub_type_id,
-        application_id // New filter
+        application_id
     } = filters;
     
     const whereClauses = [];
     const queryParams = [];
     let paramIndex = 1;
 
-    // --- NEW: Add application filter ---
     if (application_id) {
         whereClauses.push(`e.id IN (SELECT employee_id FROM employee_application_access WHERE application_id = $${paramIndex++})`);
         queryParams.push(application_id);
@@ -77,7 +76,8 @@ const getEmployees = async (filters) => {
         queryParams.push(statusTextMap[status]);
     }
     if (search) {
-        whereClauses.push(`(e.first_name || ' ' || e.last_name || ' ' || e.employee_email ILIKE $${paramIndex++})`);
+        // --- FIX: Include middle_name in the search ---
+        whereClauses.push(`(e.first_name || ' ' || e.middle_name || ' ' || e.last_name || ' ' || e.employee_email ILIKE $${paramIndex++})`);
         queryParams.push(`%${search}%`);
     }
     if (jobTitle) {
@@ -195,7 +195,7 @@ const updateEmployee = async (employeeId, updatedData, actorId) => {
         for (const key in changes) {
             logChanges[key] = { from: originalEmployee[key], to: changes[key] };
         }
-        await logActivity(actorId, 'EMPLOYEE_UPDATE', employeeId, { changes: logChanges }, client);
+        await logActivity(actorId, 'EMPLOYEE_UPDATE', { targetEmployeeId: employeeId, changes: logChanges }, client);
 
         await client.query('COMMIT');
         
@@ -275,7 +275,7 @@ const deactivateOnPlatforms = async (employeeId, platforms, actorId) => {
         }
     }
     
-    await logActivity(actorId, 'MANUAL_PLATFORM_SUSPENSION', employeeId, { deactivation_results });
+    await logActivity(actorId, 'MANUAL_PLATFORM_SUSPENSION', { targetEmployeeId: employeeId, deactivation_results });
     return { message: 'Suspension process completed.', results: deactivation_results };
 };
 
@@ -287,6 +287,24 @@ const getEmployeeOptions = async (tableName) => {
     return result.rows;
 };
 
+const getGoogleLogs = async (employeeId) => {
+    const employeeRes = await db.query('SELECT employee_email FROM employees WHERE id = $1', [employeeId]);
+    if (employeeRes.rows.length === 0) throw new Error('Employee not found.');
+    const email = employeeRes.rows[0].employee_email;
+    return await googleWorkspaceService.getLoginEvents(email);
+};
+
+const getSlackLogs = async (employeeId) => {
+    const employeeRes = await db.query('SELECT employee_email FROM employees WHERE id = $1', [employeeId]);
+    if (employeeRes.rows.length === 0) throw new Error('Employee not found.');
+    const email = employeeRes.rows[0].employee_email;
+    return await slackService.getAuditLogs(email);
+};
+
+const getUnifiedTimeline = async (employeeId) => {
+    // For now, we will return an empty array. We can build this service later.
+    return [];
+}
 
 module.exports = {
     getEmployeeById,
@@ -295,5 +313,8 @@ module.exports = {
     getPlatformStatuses,
     getJumpCloudLogs,
     deactivateOnPlatforms,
+    getGoogleLogs,
+    getSlackLogs,
+    getUnifiedTimeline,
     getEmployeeOptions
 };

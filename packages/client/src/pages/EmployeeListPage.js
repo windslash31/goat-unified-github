@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Link } from 'react-router-dom';
-import { Search, Filter as FilterIcon, ChevronsUpDown, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, X } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { Search, Filter as FilterIcon, ChevronsUpDown, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, X, UserSearch } from 'lucide-react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { StatusBadge } from '../components/ui/StatusBadge';
 import { FilterPopover } from '../components/ui/FilterPopover';
 
+// A custom hook to delay the search input effect, reducing API calls.
 const useDebounce = (value, delay) => {
     const [debouncedValue, setDebouncedValue] = useState(value);
     useEffect(() => {
@@ -13,10 +15,10 @@ const useDebounce = (value, delay) => {
     return debouncedValue;
 };
 
-const useFetchFilterOptions = (endpoint) => {
+// A custom hook to fetch options for the filter dropdowns.
+const useFetchFilterOptions = (endpoint, token) => {
     const [options, setOptions] = useState([]);
     useEffect(() => {
-        const token = localStorage.getItem('accessToken');
         if (!endpoint || !token) return;
         const fetchOptions = async () => {
             try {
@@ -28,10 +30,24 @@ const useFetchFilterOptions = (endpoint) => {
             }
         };
         fetchOptions();
-    }, [endpoint]);
+    }, [endpoint, token]);
     return options;
 };
 
+// A custom hook to detect screen size for responsive rendering.
+const useMediaQuery = (query) => {
+    const [matches, setMatches] = useState(window.matchMedia(query).matches);
+    useEffect(() => {
+        const media = window.matchMedia(query);
+        const listener = () => setMatches(media.matches);
+        media.addEventListener('change', listener);
+        return () => media.removeEventListener('change', listener);
+    }, [query]);
+    return matches;
+};
+
+
+// --- UI Sub-components ---
 
 const Pagination = ({ pagination, setPagination }) => {
     const { currentPage, totalPages, totalCount, limit } = pagination;
@@ -40,14 +56,14 @@ const Pagination = ({ pagination, setPagination }) => {
     const to = Math.min(currentPage * limit, totalCount);
 
     return (
-        <div className="flex flex-col sm:flex-row items-center justify-between px-6 py-3 bg-gray-50 dark:bg-gray-700/50 border-t border-gray-200 dark:border-gray-700">
+        <div className="flex flex-col sm:flex-row items-center justify-between px-6 py-3 bg-gray-50 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
             <span className="text-sm text-gray-700 dark:text-gray-300 mb-2 sm:mb-0">
                 Showing <span className="font-semibold">{from}</span> to <span className="font-semibold">{to}</span> of <span className="font-semibold">{totalCount}</span> results
             </span>
             <div className="flex items-center gap-2">
-                <button onClick={() => setPagination(prev => ({ ...prev, currentPage: prev.currentPage - 1 }))} disabled={currentPage === 1} className="p-2 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-200 dark:hover:bg-gray-600"><ChevronLeft className="w-5 h-5" /></button>
+                <button onClick={() => setPagination(prev => ({ ...prev, currentPage: prev.currentPage - 1 }))} disabled={currentPage === 1} className="p-2 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-200 dark:hover:bg-gray-700"><ChevronLeft className="w-5 h-5" /></button>
                 <span className="text-sm">Page {currentPage} of {totalPages}</span>
-                <button onClick={() => setPagination(prev => ({ ...prev, currentPage: prev.currentPage + 1 }))} disabled={currentPage === totalPages} className="p-2 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-200 dark:hover:bg-gray-600"><ChevronRight className="w-5 h-5" /></button>
+                <button onClick={() => setPagination(prev => ({ ...prev, currentPage: prev.currentPage + 1 }))} disabled={currentPage === totalPages} className="p-2 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-200 dark:hover:bg-gray-700"><ChevronRight className="w-5 h-5" /></button>
             </div>
         </div>
     );
@@ -63,7 +79,7 @@ const StatusQuickFilters = ({ currentStatus, onStatusChange }) => {
                 <button
                     key={status}
                     onClick={() => onStatusChange(status)}
-                    className={`px-4 py-2 text-sm font-semibold transition-colors -mb-px border-b-2 whitespace-nowrap ${
+                    className={`px-4 py-3 text-sm font-semibold transition-colors -mb-px border-b-2 whitespace-nowrap ${
                         currentStatus === status
                         ? 'border-blue-600 text-blue-600'
                         : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
@@ -86,20 +102,13 @@ const FilterPills = ({ filters, setFilters, setSearchInputValue, options }) => {
     };
     
     const filterLabels = {
-        jobTitle: "Job Title",
-        manager: "Manager",
-        legal_entity_id: "Legal Entity",
-        office_location_id: "Office",
-        employee_type_id: "Type",
-        employee_sub_type_id: "Sub-Type",
-        application_id: "Application"
+        jobTitle: "Job Title", manager: "Manager", legal_entity_id: "Legal Entity", office_location_id: "Office",
+        employee_type_id: "Type", employee_sub_type_id: "Sub-Type", application_id: "Application"
     };
 
     const optionsMap = {
-        legal_entity_id: options.legalEntities,
-        office_location_id: options.officeLocations,
-        employee_type_id: options.employeeTypes,
-        employee_sub_type_id: options.employeeSubTypes,
+        legal_entity_id: options.legalEntities, office_location_id: options.officeLocations,
+        employee_type_id: options.employeeTypes, employee_sub_type_id: options.employeeSubTypes,
         application_id: options.applications
     };
     
@@ -129,24 +138,37 @@ const FilterPills = ({ filters, setFilters, setSearchInputValue, options }) => {
     );
 };
 
-export const EmployeeListPage = ({ employees, filters, setFilters, pagination, setPagination, sorting, setSorting }) => {
+const EmptyState = () => (
+    <div className="text-center py-16 text-gray-500 dark:text-gray-400">
+        <UserSearch className="mx-auto w-12 h-12 text-gray-400" />
+        <p className="font-semibold mt-4">No Employees Found</p>
+        <p className="text-sm mt-1">Try adjusting your search or filter criteria.</p>
+    </div>
+);
+
+
+// --- MAIN PAGE COMPONENT ---
+export const EmployeeListPage = ({ employees, isLoading, filters, setFilters, pagination, setPagination, sorting, setSorting }) => {
     const [isFilterPopoverOpen, setIsFilterPopoverOpen] = useState(false);
     const [searchInputValue, setSearchInputValue] = useState(filters.search);
     const debouncedSearchTerm = useDebounce(searchInputValue, 500);
     const filterButtonRef = useRef(null);
     const popoverRef = useRef(null);
+    const token = localStorage.getItem('accessToken');
+    const navigate = useNavigate();
+    
+    const isDesktop = useMediaQuery('(min-width: 768px)');
     
     const filterOptions = {
-        legalEntities: useFetchFilterOptions('employees/options/legal_entities'),
-        officeLocations: useFetchFilterOptions('employees/options/office_locations'),
-        employeeTypes: useFetchFilterOptions('employees/options/employee_types'),
-        employeeSubTypes: useFetchFilterOptions('employees/options/employee_sub_types'),
-        applications: useFetchFilterOptions('applications'),
+        legalEntities: useFetchFilterOptions('employees/options/legal_entities', token),
+        officeLocations: useFetchFilterOptions('employees/options/office_locations', token),
+        employeeTypes: useFetchFilterOptions('employees/options/employee_types', token),
+        employeeSubTypes: useFetchFilterOptions('employees/options/employee_sub_types', token),
+        applications: useFetchFilterOptions('applications', token),
     };
     
     useEffect(() => {
         setFilters(prev => ({ ...prev, search: debouncedSearchTerm }));
-        // --- FIX: Added missing dependency ---
         if (pagination.currentPage !== 1) {
             setPagination(prev => ({ ...prev, currentPage: 1 }));
         }
@@ -180,20 +202,106 @@ export const EmployeeListPage = ({ employees, filters, setFilters, pagination, s
         });
     }, [filters]);
 
-    const TableHeader = ({ children, columnKey }) => {
-        const isSorted = sorting.sortBy === columnKey;
-        const handleSort = () => {
-            setSorting(prev => ({ sortBy: columnKey, sortOrder: isSorted && prev.sortOrder === 'asc' ? 'desc' : 'asc' }));
-        };
-        return (
-            <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                <button onClick={handleSort} className="flex items-center w-full text-left">
+    // --- Component for Mobile Card View ---
+    const MobileList = () => (
+        <div className="divide-y divide-gray-200 dark:divide-gray-700">
+            {employees.map(emp => {
+                const fullName = [emp.first_name, emp.middle_name, emp.last_name].filter(Boolean).join(' ');
+                return (
+                    <Link to={`/employees/${emp.id}`} key={emp.id} className="block p-4 hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                        <div className="flex justify-between items-start">
+                            <div>
+                                <p className="font-bold text-gray-900 dark:text-white">{fullName}</p>
+                                <p className="text-sm text-gray-500 dark:text-gray-400">{emp.employee_email}</p>
+                            </div>
+                            <StatusBadge status={emp.status} />
+                        </div>
+                        <div className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                            <p>{emp.position_name || 'No position specified'}</p>
+                        </div>
+                    </Link>
+                );
+            })}
+        </div>
+    );
+
+    // --- Component for Desktop Virtualized Table ---
+    const DesktopTable = () => {
+        const parentRef = useRef(null);
+        const rowVirtualizer = useVirtualizer({
+            count: employees.length,
+            getScrollElement: () => parentRef.current,
+            estimateSize: () => 65,
+            overscan: 10,
+        });
+
+        const TableHeader = ({ children, columnKey }) => {
+            const isSorted = sorting.sortBy === columnKey;
+            const handleSort = () => setSorting(prev => ({ sortBy: columnKey, sortOrder: isSorted && prev.sortOrder === 'asc' ? 'desc' : 'asc' }));
+            return (
+                <button onClick={handleSort} className="flex items-center gap-2 w-full text-left font-bold">
                     <span>{children}</span>
-                    <span className="ml-1.5">{isSorted ? (sorting.sortOrder === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />) : (<ChevronsUpDown className="w-4 h-4 opacity-30" />)}</span>
+                    <span className="text-gray-400">{isSorted ? (sorting.sortOrder === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />) : (<ChevronsUpDown className="w-4 h-4 opacity-50" />)}</span>
                 </button>
-            </th>
+            );
+        };
+
+        const virtualItems = rowVirtualizer.getVirtualItems();
+        const paddingTop = virtualItems.length > 0 ? virtualItems[0]?.start ?? 0 : 0;
+        const paddingBottom = virtualItems.length > 0 ? rowVirtualizer.getTotalSize() - (virtualItems[virtualItems.length - 1]?.end ?? 0) : 0;
+
+        return (
+            <div ref={parentRef} className="h-[600px] overflow-auto">
+                <table className="min-w-full table-fixed">
+                    <thead className="sticky top-0 bg-gray-50 dark:bg-gray-800 z-10">
+                        <tr className="border-b border-gray-200 dark:border-gray-700">
+                            <th className="px-6 py-3 w-[25%] text-left text-xs uppercase text-gray-500"><TableHeader columnKey="first_name">Employee</TableHeader></th>
+                            <th className="px-6 py-3 w-[30%] text-left text-xs uppercase text-gray-500"><TableHeader columnKey="employee_email">Email</TableHeader></th>
+                            <th className="px-6 py-3 w-[25%] text-left text-xs uppercase text-gray-500"><TableHeader columnKey="position_name">Job Title</TableHeader></th>
+                            <th className="px-6 py-3 w-[15%] text-left text-xs uppercase text-gray-500"><TableHeader columnKey="status">Status</TableHeader></th>
+                            <th className="px-6 py-3 w-[5%] text-left text-xs uppercase text-gray-500"></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {paddingTop > 0 && (
+                            <tr>
+                                <td style={{ height: `${paddingTop}px` }} />
+                            </tr>
+                        )}
+                        {virtualItems.map(virtualRow => {
+                            const employee = employees[virtualRow.index];
+                            const fullName = [employee.first_name, employee.middle_name, employee.last_name].filter(Boolean).join(' ');
+                            return (
+                                <tr
+                                    key={virtualRow.key}
+                                    onClick={() => navigate(`/employees/${employee.id}`)}
+                                    className="border-b border-gray-200 dark:border-gray-700 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50"
+                                >
+                                    <td className="px-6 py-4 whitespace-nowrap font-medium text-gray-900 dark:text-white">{fullName}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">{employee.employee_email}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">{employee.position_name}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap"><StatusBadge status={employee.status} /></td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-right">
+                                        <ChevronRight className="w-5 h-5 text-gray-400" />
+                                    </td>
+                                </tr>
+                            );
+                        })}
+                        {paddingBottom > 0 && (
+                             <tr>
+                                <td style={{ height: `${paddingBottom}px` }} />
+                            </tr>
+                        )}
+                    </tbody>
+                </table>
+            </div>
         );
     };
+
+
+    if (isLoading && employees.length === 0) {
+        return <div className="p-6 text-center">Loading employees...</div>;
+    }
 
     return (
         <div className="p-4 sm:p-6">
@@ -231,73 +339,13 @@ export const EmployeeListPage = ({ employees, filters, setFilters, pagination, s
                 <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
                     <StatusQuickFilters currentStatus={filters.status} onStatusChange={(status) => { setFilters(prev => ({ ...prev, status })); setPagination(prev => ({...prev, currentPage: 1})); }}/>
                     
-                    {/* --- FIX: Restored the Mobile Card View --- */}
-                    <div className="md:hidden">
-                        {employees.length > 0 ? (
-                            <div className="divide-y divide-gray-200 dark:divide-gray-700">
-                                {employees.map(emp => {
-                                    const fullName = [emp.first_name, emp.middle_name, emp.last_name].filter(Boolean).join(' ');
-                                    return (
-                                        <div key={emp.id} className="p-4">
-                                            <div className="flex justify-between items-start">
-                                                <div>
-                                                    <p className="font-bold text-gray-900 dark:text-white">{fullName}</p>
-                                                    <p className="text-sm text-gray-500 dark:text-gray-400">{emp.employee_email}</p>
-                                                </div>
-                                                <StatusBadge status={emp.status} />
-                                            </div>
-                                            <div className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-                                                <p>{emp.position_name}</p>
-                                            </div>
-                                            <div className="mt-3">
-                                                <Link to={`/employees/${emp.id}`} className="text-sm font-semibold text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300">
-                                                    View Profile →
-                                                </Link>
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        ) : (
-                            <div className="text-center py-16 text-gray-500 dark:text-gray-400"><p className="font-semibold">No employees found</p><p className="text-sm mt-1">Try adjusting your search or filter criteria.</p></div>
-                        )}
-                    </div>
+                    {employees.length > 0 ? (
+                        isDesktop ? <DesktopTable /> : <MobileList />
+                    ) : (
+                        <EmptyState />
+                    )}
 
-                    {/* --- FIX: Ensured the Desktop Table is hidden on mobile --- */}
-                    <div className="hidden md:block overflow-x-auto">
-                        <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                            <thead className="bg-gray-50 dark:bg-gray-700/50">
-                                <tr>
-                                    <TableHeader columnKey="first_name">Employee</TableHeader>
-                                    <TableHeader columnKey="employee_email">Email</TableHeader>
-                                    <TableHeader columnKey="position_name">Job Title</TableHeader>
-                                    <TableHeader columnKey="status">Status</TableHeader>
-                                    <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                                {employees.length > 0 ? employees.map(emp => {
-                                    const fullName = [emp.first_name, emp.middle_name, emp.last_name].filter(Boolean).join(' ');
-                                    return (
-                                        <tr key={emp.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                                            <td className="px-6 py-4 whitespace-nowrap"><div className="font-medium text-gray-900 dark:text-white">{fullName}</div></td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">{emp.employee_email}</td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">{emp.position_name}</td>
-                                            <td className="px-6 py-4 whitespace-nowrap"><StatusBadge status={emp.status} /></td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                                <Link to={`/employees/${emp.id}`} className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300">
-                                                    View Profile
-                                                </Link>
-                                            </td>
-                                        </tr>
-                                    );
-                                }) : (
-                                    <tr><td colSpan="5" className="text-center py-16 text-gray-500 dark:text-gray-400"><p className="font-semibold">No employees found</p><p className="text-sm mt-1">Try adjusting your search or filter criteria.</p></td></tr>
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
-                    <Pagination pagination={pagination} setPagination={setPagination} />
+                    {employees.length > 0 && <Pagination pagination={pagination} setPagination={setPagination} />}
                 </div>
             </div>
         </div>

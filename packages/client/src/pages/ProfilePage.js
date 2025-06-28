@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { UserSquare, LayoutGrid, HardDrive, ChevronDown } from 'lucide-react';
+import { UserSquare, LayoutGrid, HardDrive, ChevronDown, Bot, MessageSquare, Shield } from 'lucide-react';
 import { EmployeeDetailHeader } from './EmployeeDetailPage/EmployeeDetailHeader';
 import { EmployeeDetailsTab } from './EmployeeDetailPage/EmployeeDetailsTab';
 import { EmployeeApplicationsTab } from './EmployeeDetailPage/EmployeeApplicationsTab';
@@ -7,6 +7,10 @@ import { JumpCloudLogPage } from './EmployeeDetailPage/JumpcloudLogPage';
 import { JiraTicketModal } from '../components/ui/JiraTicketModal';
 import { WelcomePage } from '../components/ui/WelcomePage';
 import { AccessDeniedPage } from '../components/ui/AccessDeniedPage';
+import { GoogleLogPage } from './EmployeeDetailPage/GoogleLogPage';
+import { SlackLogPage } from './EmployeeDetailPage/SlackLogPage';
+import { UnifiedTimelinePage } from './EmployeeDetailPage/UnifiedTimelinePage';
+
 
 const Section = ({ id, title, children, icon }) => (
     <div id={id} className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 scroll-mt-24">
@@ -56,23 +60,26 @@ const InPageDropdownNav = ({ sections, onScrollTo }) => {
     );
 };
 
+
 export const ProfilePage = ({ employee, permissions, onEdit, onDeactivate, onLogout, user }) => {
     const [activeTab, setActiveTab] = useState('details');
     const [platformStatuses, setPlatformStatuses] = useState([]);
     const [isLoadingPlatforms, setIsLoadingPlatforms] = useState(true);
-    const [tabData, setTabData] = useState({ jumpcloud: { data: null, loading: false, error: null } });
     
-    // State for managing the Jira Ticket Modal
+    const [tabData, setTabData] = useState({
+        jumpcloud: { data: null, loading: false, error: null, fetched: false },
+        google: { data: null, loading: false, error: null, fetched: false },
+        slack: { data: null, loading: false, error: null, fetched: false },
+        timeline: { data: null, loading: false, error: null, fetched: false },
+    });
+
     const [isJiraModalOpen, setIsJiraModalOpen] = useState(false);
     const [selectedTicketId, setSelectedTicketId] = useState(null);
 
-    const fetchSecondaryData = useCallback(() => {
+    const fetchInitialData = useCallback(() => {
         if (!employee) return;
         const token = localStorage.getItem('accessToken');
-        if (!token) {
-            onLogout();
-            return;
-        }
+        if (!token) { onLogout(); return; }
 
         setIsLoadingPlatforms(true);
         fetch(`${process.env.REACT_APP_API_BASE_URL}/api/employees/${employee.id}/platform-statuses`, { headers: { 'Authorization': `Bearer ${token}` } })
@@ -80,36 +87,49 @@ export const ProfilePage = ({ employee, permissions, onEdit, onDeactivate, onLog
             .then(statusData => setPlatformStatuses(statusData))
             .catch(err => console.error("Failed to fetch platform statuses:", err))
             .finally(() => setIsLoadingPlatforms(false));
-
-        if (permissions.includes('log:read:platform')) {
-            setTabData(prev => ({ ...prev, jumpcloud: { ...prev.jumpcloud, loading: true, error: null } }));
-            fetch(`${process.env.REACT_APP_API_BASE_URL}/api/employees/${employee.id}/jumpcloud-logs`, { headers: { 'Authorization': `Bearer ${token}` } })
-                .then(res => {
-                    if (res.ok) {
-                        return res.json().then(jcData => {
-                            setTabData(prev => ({ ...prev, jumpcloud: { data: jcData, loading: false, error: null } }));
-                        });
-                    }
-                    return res.json().then(errData => {
-                        const errorMessage = errData.message || 'User not found or failed to fetch logs.';
-                        console.warn(`Could not fetch JumpCloud logs: ${errorMessage}`);
-                        setTabData(prev => ({ ...prev, jumpcloud: { data: [], loading: false, error: errorMessage } }));
-                    });
-                })
-                .catch(err => {
-                    console.error("Failed to fetch JumpCloud logs:", err);
-                    setTabData(prev => ({ ...prev, jumpcloud: { data: [], loading: false, error: err.message } }));
-                });
-        }
-    }, [employee, onLogout, permissions]);
+    }, [employee, onLogout]);
 
     useEffect(() => {
         if (employee) {
-            fetchSecondaryData();
+            fetchInitialData();
         }
-    }, [employee, fetchSecondaryData]);
+    }, [employee, fetchInitialData]);
 
-    // Handler to open the Jira modal
+    const fetchLogData = useCallback((tabKey) => {
+        if (!employee || !permissions.includes('log:read:platform') || tabData[tabKey]?.fetched || tabData[tabKey]?.loading) {
+            return;
+        }
+
+        const token = localStorage.getItem('accessToken');
+        const logEndpoints = {
+            jumpcloud: `/api/employees/${employee.id}/jumpcloud-logs`,
+            google: `/api/employees/${employee.id}/google-logs`,
+            slack: `/api/employees/${employee.id}/slack-logs`,
+            timeline: `/api/employees/${employee.id}/unified-timeline`,
+        };
+        
+        const url = logEndpoints[tabKey];
+        if (!url) return;
+
+        setTabData(prev => ({ ...prev, [tabKey]: { ...prev[tabKey], loading: true } }));
+
+        fetch(`${process.env.REACT_APP_API_BASE_URL}${url}`, { headers: { 'Authorization': `Bearer ${token}` } })
+            .then(res => res.ok ? res.json() : res.json().then(err => Promise.reject(err)))
+            .then(data => {
+                setTabData(prev => ({ ...prev, [tabKey]: { data, loading: false, error: null, fetched: true } }));
+            })
+            .catch(err => {
+                setTabData(prev => ({ ...prev, [tabKey]: { data: [], loading: false, error: err.message, fetched: true } }));
+            });
+    }, [employee, permissions, tabData]);
+
+    const handleTabClick = (tabId) => {
+        setActiveTab(tabId);
+        if (['jumpcloud', 'google', 'slack', 'timeline'].includes(tabId)) {
+            fetchLogData(tabId);
+        }
+    };
+
     const handleTicketClick = (ticketId) => {
         if (ticketId) {
             setSelectedTicketId(ticketId);
@@ -120,12 +140,25 @@ export const ProfilePage = ({ employee, permissions, onEdit, onDeactivate, onLog
     const handleScrollToSection = (sectionId) => {
         const element = document.getElementById(sectionId);
         element?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        // Also switch tab for mobile sections
+        const tabMap = {
+            'profile-jumpcloud-section': 'jumpcloud',
+            'profile-google-section': 'google',
+            'profile-slack-section': 'slack',
+            'profile-timeline-section': 'timeline',
+        };
+        if(tabMap[sectionId]) {
+            handleTabClick(tabMap[sectionId]);
+        }
     };
 
     const pageSections = [
         { id: 'profile-details-section', label: 'Details', icon: <UserSquare className="w-4 h-4"/>, permission: true },
         { id: 'profile-apps-section', label: 'Apps & Platforms', icon: <LayoutGrid className="w-4 h-4"/>, permission: true },
-        { id: 'profile-jumpcloud-section', label: 'JumpCloud Log', icon: <HardDrive className="w-4 h-4"/>, permission: permissions.includes('log:read:platform') }
+        { id: 'profile-jumpcloud-section', label: 'JumpCloud Log', icon: <HardDrive className="w-4 h-4"/>, permission: permissions.includes('log:read:platform') },
+        { id: 'profile-google-section', label: 'Google Workspace Log', icon: <Shield className="w-4 h-4"/>, permission: permissions.includes('log:read:platform') },
+        { id: 'profile-slack-section', label: 'Slack Log', icon: <MessageSquare className="w-4 h-4"/>, permission: permissions.includes('log:read:platform') },
+        { id: 'profile-timeline-section', label: 'Unified Timeline', icon: <Bot className="w-4 h-4"/>, permission: permissions.includes('log:read:platform') },
     ].filter(s => s.permission);
 
     if (!permissions.includes('profile:read:own')) {
@@ -135,7 +168,7 @@ export const ProfilePage = ({ employee, permissions, onEdit, onDeactivate, onLog
         return <WelcomePage user={user} />;
     }
 
-    const TabButton = ({ id, label, icon }) => ( <button onClick={() => setActiveTab(id)} className={`flex items-center gap-2 py-3 px-4 border-b-2 font-semibold text-sm transition-colors whitespace-nowrap ${ activeTab === id ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300' }`}> {icon} {label} </button> );
+    const TabButton = ({ id, label, icon }) => ( <button onClick={() => handleTabClick(id)} className={`flex items-center gap-2 py-3 px-4 border-b-2 font-semibold text-sm transition-colors whitespace-nowrap ${ activeTab === id ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300' }`}> {icon} {label} </button> );
 
     return (
         <>
@@ -168,9 +201,20 @@ export const ProfilePage = ({ employee, permissions, onEdit, onDeactivate, onLog
                             />
                         </Section>
                         {permissions.includes('log:read:platform') && (
-                            <Section id="profile-jumpcloud-section" title="JumpCloud Log" icon={<HardDrive className="w-5 h-5" />}>
-                                <JumpCloudLogPage logs={tabData.jumpcloud.data || []} loading={tabData.jumpcloud.loading} error={tabData.jumpcloud.error} />
-                            </Section>
+                            <>
+                                <Section id="profile-jumpcloud-section" title="JumpCloud Log" icon={<HardDrive className="w-5 h-5" />}>
+                                    <JumpCloudLogPage logs={tabData.jumpcloud.data} loading={tabData.jumpcloud.loading} error={tabData.jumpcloud.error} />
+                                </Section>
+                                <Section id="profile-google-section" title="Google Workspace Log" icon={<Shield className="w-5 h-5" />}>
+                                    <GoogleLogPage logs={tabData.google.data} loading={tabData.google.loading} error={tabData.google.error} />
+                                </Section>
+                                <Section id="profile-slack-section" title="Slack Log" icon={<MessageSquare className="w-5 h-5" />}>
+                                    <SlackLogPage logs={tabData.slack.data} loading={tabData.slack.loading} error={tabData.slack.error} />
+                                </Section>
+                                <Section id="profile-timeline-section" title="Unified Timeline" icon={<Bot className="w-5 h-5" />}>
+                                    <UnifiedTimelinePage events={tabData.timeline.data} loading={tabData.timeline.loading} error={tabData.timeline.error} />
+                                </Section>
+                            </>
                         )}
                     </div>
 
@@ -181,7 +225,12 @@ export const ProfilePage = ({ employee, permissions, onEdit, onDeactivate, onLog
                                 <TabButton id="platforms" label="Apps & Platforms" icon={<LayoutGrid className="w-4 h-4"/>}/>
                                 
                                 {permissions.includes('log:read:platform') && (
-                                    <TabButton id="jumpcloud" label="JumpCloud Log" icon={<HardDrive className="w-4 h-4"/>}/>
+                                    <>
+                                        <TabButton id="jumpcloud" label="JumpCloud Log" icon={<HardDrive className="w-4 h-4"/>}/>
+                                        <TabButton id="google" label="Google Workspace" icon={<Shield className="w-4 h-4"/>}/>
+                                        <TabButton id="slack" label="Slack" icon={<MessageSquare className="w-4 h-4"/>}/>
+                                        <TabButton id="timeline" label="Unified Timeline" icon={<Bot className="w-4 h-4"/>}/>
+                                    </>
                                 )}
                             </nav>
                         </div>
@@ -199,15 +248,25 @@ export const ProfilePage = ({ employee, permissions, onEdit, onDeactivate, onLog
                                 />
                             </div>
                             {permissions.includes('log:read:platform') && (
-                                <div style={{ display: activeTab === 'jumpcloud' ? 'block' : 'none' }}>
-                                    <JumpCloudLogPage logs={tabData.jumpcloud.data || []} loading={tabData.jumpcloud.loading} error={tabData.jumpcloud.error} />
-                                </div>
+                                <>
+                                    <div style={{ display: activeTab === 'jumpcloud' ? 'block' : 'none' }}>
+                                        <JumpCloudLogPage logs={tabData.jumpcloud.data} loading={tabData.jumpcloud.loading} error={tabData.jumpcloud.error} />
+                                    </div>
+                                    <div style={{ display: activeTab === 'google' ? 'block' : 'none' }}>
+                                        <GoogleLogPage logs={tabData.google.data} loading={tabData.google.loading} error={tabData.google.error} />
+                                    </div>
+                                    <div style={{ display: activeTab === 'slack' ? 'block' : 'none' }}>
+                                        <SlackLogPage logs={tabData.slack.data} loading={tabData.slack.loading} error={tabData.slack.error} />
+                                    </div>
+                                    <div style={{ display: activeTab === 'timeline' ? 'block' : 'none' }}>
+                                        <UnifiedTimelinePage events={tabData.timeline.data} loading={tabData.timeline.loading} error={tabData.timeline.error} />
+                                    </div>
+                                </>
                             )}
                         </div>
                     </div>
                 </div>
             </div>
-
             {isJiraModalOpen && <JiraTicketModal ticketId={selectedTicketId} onClose={() => setIsJiraModalOpen(false)} />}
         </>
     );

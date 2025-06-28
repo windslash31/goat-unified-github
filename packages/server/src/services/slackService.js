@@ -49,7 +49,28 @@ const deactivateUser = async (email) => {
     }
 };
 
+const getAuditLogs = async (email) => {
+    // This is a placeholder implementation.
+    try {
+        const userResult = await web.users.lookupByEmail({ email });
+        if (userResult.ok && userResult.user) {
+            // const logResult = await web.admin.audit.v1.logs({ action: 'user_login', actors: result.user.id });
+            // For this example, we return mock data based on your UI.
+            console.warn("Slack audit log fetching is mocked. Requires Enterprise Grid for real data.");
+            return [
+                { id: 'slack1', action: 'user_joined_channel', date_create: Date.now() / 1000 - 3600, entity: { channel: { name: '#project-owl' } } },
+                { id: 'slack2', action: 'message_posted', date_create: Date.now() / 1000 - 7200, entity: { channel: { name: '#engineering-team' } } },
+            ];
+        }
+        return [];
+    } catch (error) {
+        console.error(`Failed to get Slack logs for ${email}:`, error.message);
+        return [];
+    }
+};
+
 module.exports = {
     getUserStatus,
     deactivateUser,
+    getAuditLogs, // Export the new function
 };

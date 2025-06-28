@@ -96,6 +96,32 @@ const getEmployeeOptions = async (req, res, next) => {
     }
 };
 
+const getGoogleLogs = async (req, res, next) => {
+    try {
+        const logs = await employeeService.getGoogleLogs(req.params.id);
+        res.json(logs);
+    } catch (error) {
+        next(error);
+    }
+};
+
+const getSlackLogs = async (req, res, next) => {
+    try {
+        const logs = await employeeService.getSlackLogs(req.params.id);
+        res.json(logs);
+    } catch (error) {
+        next(error);
+    }
+};
+
+const getUnifiedTimeline = async (req, res, next) => {
+    try {
+        const events = await employeeService.getUnifiedTimeline(req.params.id);
+        res.json(events);
+    } catch(error) {
+        next(error);
+    }
+}
 
 module.exports = {
     listEmployees,
@@ -105,5 +131,8 @@ module.exports = {
     getJumpCloudLogs,
     deactivateOnPlatforms,
     logEmployeeView,
+    getGoogleLogs,
+    getSlackLogs,
+    getUnifiedTimeline,
     getEmployeeOptions
 };

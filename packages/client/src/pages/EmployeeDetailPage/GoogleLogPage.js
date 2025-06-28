@@ -1,5 +1,5 @@
 import React from 'react';
-import { Shield, MapPin, Monitor, Server } from 'lucide-react';
+import { Shield, Server } from 'lucide-react';
 
 export const GoogleLogPage = ({ logs, loading, error }) => {
     const getEventIcon = (eventName) => {
@@ -10,7 +10,7 @@ export const GoogleLogPage = ({ logs, loading, error }) => {
 
     if (loading) return <div className="text-center p-8">Loading Google Workspace logs...</div>;
     if (error) return <div className="text-center p-8 text-red-500">Error: {error}</div>;
-    if (!logs || logs.length === 0) return <div className="text-center p-8">No Google Workspace login logs found for this user in the last 180 days.</div>;
+    if (!logs || logs.length === 0) return <div className="text-center p-8 text-gray-500">No Google Workspace login logs found for this user in the last 30 days.</div>;
 
     return (
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 divide-y divide-gray-200 dark:divide-gray-700">

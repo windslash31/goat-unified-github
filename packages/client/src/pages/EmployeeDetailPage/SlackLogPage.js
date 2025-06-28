@@ -11,7 +11,7 @@ export const SlackLogPage = ({ logs, loading, error }) => {
 
     if (loading) return <div className="text-center p-8">Loading Slack logs...</div>;
     if (error) return <div className="text-center p-8 text-red-500">Error: {error}</div>;
-    if (!logs || logs.length === 0) return <div className="text-center p-8">No Slack audit logs found for this user (Note: Requires Enterprise Grid plan).</div>;
+    if (!logs || logs.length === 0) return <div className="text-center p-8 text-gray-500">No Slack audit logs found for this user (Note: Requires Enterprise Grid plan).</div>;
 
     return (
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 divide-y divide-gray-200 dark:divide-gray-700">
@@ -22,7 +22,7 @@ export const SlackLogPage = ({ logs, loading, error }) => {
                         <span className="font-semibold capitalize">{log.action.replace(/_/g, ' ')}</span>
                     </div>
                     <div className="flex-1 text-sm text-gray-600 dark:text-gray-400">
-                        <p>Entity: {log.entity.type} ({log.entity.user?.name || log.entity.channel?.name || ''})</p>
+                        <p>Entity: {log.entity.channel?.name || ''}</p>
                     </div>
                     <div className="w-full md:w-auto text-left md:text-right text-sm text-gray-500 dark:text-gray-300">
                         {new Date(log.date_create * 1000).toLocaleString()}

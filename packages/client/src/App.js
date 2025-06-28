@@ -1,20 +1,22 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, Suspense, lazy } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { BrowserRouter, Routes, Route, useLocation, Navigate } from 'react-router-dom';
-import { BreadcrumbProvider } from './context/BreadcrumbContext'; // No need for the hook here
+import { BreadcrumbProvider, useBreadcrumb } from './context/BreadcrumbContext';
 import { ThemeProvider } from './context/ThemeContext';
-
 import { MainLayout } from './components/layout/MainLayout';
 import { EditEmployeeModal } from './components/ui/EditEmployeeModal';
 import { DeactivateEmployeeModal } from './components/ui/DeactivateEmployeeModal';
 import { AccessDeniedPage } from './components/ui/AccessDeniedPage';
-import { LoginPage } from './pages/LoginPage';
-import { EmployeeListPage } from './pages/EmployeeListPage';
-import { EmployeeDetailPage } from './pages/EmployeeDetailPage/EmployeeDetailPage';
-import { ProfilePage } from './pages/ProfilePage';
-import { ActivityLogPage } from './pages/ActivityLogPage';
-import { UserManagementPage } from './pages/UserManagementPage';
-import { RoleManagementPage } from './pages/RoleManagementPage';
+
+// --- FIX: Adjust lazy imports to work with named exports ---
+const LoginPage = lazy(() => import('./pages/LoginPage').then(module => ({ default: module.LoginPage })));
+const EmployeeListPage = lazy(() => import('./pages/EmployeeListPage').then(module => ({ default: module.EmployeeListPage })));
+const EmployeeDetailPage = lazy(() => import('./pages/EmployeeDetailPage/EmployeeDetailPage').then(module => ({ default: module.EmployeeDetailPage })));
+const ProfilePage = lazy(() => import('./pages/ProfilePage').then(module => ({ default: module.ProfilePage })));
+const ActivityLogPage = lazy(() => import('./pages/ActivityLogPage').then(module => ({ default: module.ActivityLogPage })));
+const UserManagementPage = lazy(() => import('./pages/UserManagementPage').then(module => ({ default: module.UserManagementPage })));
+const RoleManagementPage = lazy(() => import('./pages/RoleManagementPage').then(module => ({ default: module.RoleManagementPage })));
+
 
 const fetchMe = async (token) => {
     if (!token) throw new Error("No token provided");
@@ -65,6 +67,8 @@ const AppContent = () => {
 
     const location = useLocation();
     const queryClient = useQueryClient();
+    const { dynamicCrumbs, setDynamicCrumbs } = useBreadcrumb();
+
 
     const handleOpenEditModal = (employee) => { setEmployeeToEdit(employee); setIsEditModalOpen(true); };
     const handleCloseEditModal = () => { setIsEditModalOpen(false); setEmployeeToEdit(null); };
@@ -129,6 +133,13 @@ const AppContent = () => {
             handleLogout();
         }
     }, [meError, employeesError, handleLogout, location.pathname]);
+
+    useEffect(() => {
+        const nonDynamicPaths = ['/profile', '/employees', '/logs/activity', '/users', '/roles', '/access-denied', '/'];
+        if (nonDynamicPaths.includes(location.pathname)) {
+            setDynamicCrumbs([]);
+        }
+    }, [location.pathname, setDynamicCrumbs]);
     
     const handleUpdateEmployee = (updatedEmployee) => {
         queryClient.invalidateQueries({ queryKey: ['employees'] });
@@ -171,12 +182,12 @@ const AppContent = () => {
             if(part === 'activity' && pathParts[index-1] === 'logs') {
                 return { name: "Activity Log", path: "/logs/activity" };
             }
-            // For dynamic employee IDs, we can't generate the breadcrumb here easily.
-            // This is better handled within the EmployeeDetailPage itself using a context.
             return null;
         });
+
+        const finalCrumbs = dynamicCrumbs.length > 0 ? [homeCrumb, ...dynamicCrumbs] : [homeCrumb, ...crumbs.filter(Boolean)];
     
-        return [homeCrumb, ...crumbs.filter(Boolean)];
+        return finalCrumbs;
     };
 
 
@@ -232,7 +243,9 @@ export default function App() {
         <ThemeProvider>
             <BrowserRouter>
                 <BreadcrumbProvider>
-                    <AppContent />
+                    <Suspense fallback={<div className="flex h-screen w-screen items-center justify-center text-lg">Loading Page...</div>}>
+                        <AppContent />
+                    </Suspense>
                 </BreadcrumbProvider>
             </BrowserRouter>
         </ThemeProvider>
