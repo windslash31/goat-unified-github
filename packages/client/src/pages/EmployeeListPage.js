@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Search, Filter as FilterIcon, ChevronsUpDown, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, X, UserSearch, MoreVertical, Edit, UserX } from 'lucide-react';
+import { Search, Filter as FilterIcon, ChevronsUpDown, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, X, UserSearch, MoreVertical, Edit, UserX, Trash2 } from 'lucide-react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { StatusBadge } from '../components/ui/StatusBadge';
 import { FilterPopover } from '../components/ui/FilterPopover';
@@ -158,6 +158,7 @@ export const EmployeeListPage = ({ employees, isLoading, filters, setFilters, pa
     const navigate = useNavigate();
     
     const [selectedRows, setSelectedRows] = useState(new Set());
+    const [isBulkActionMenuOpen, setIsBulkActionMenuOpen] = useState(false);
     
     const isDesktop = useMediaQuery('(min-width: 768px)');
     
@@ -367,43 +368,66 @@ export const EmployeeListPage = ({ employees, isLoading, filters, setFilters, pa
 
     return (
         <div className="p-4 sm:p-6">
-            <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mb-2">
-                <h1 className="text-2xl font-bold text-gray-900 dark:text-white self-start sm:self-center">Employees</h1>
-                <div className="flex items-center gap-4 w-full sm:w-auto">
-                    <div className="relative flex-grow">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                        <input type="text" placeholder="Search employees..." value={searchInputValue} onChange={e => setSearchInputValue(e.target.value)} className="w-full sm:w-64 pl-10 pr-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:outline-none"/>
-                    </div>
-                    <div className="relative">
-                        <button ref={filterButtonRef} onClick={() => setIsFilterPopoverOpen(!isFilterPopoverOpen)} className={`flex items-center gap-2 px-4 py-2 border rounded-md text-sm font-medium transition-colors ${areAdvancedFiltersActive || isFilterPopoverOpen ? 'bg-blue-100 dark:bg-blue-900/50 border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300' : 'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700'}`}>
-                            <FilterIcon size={16} />
-                            <span>Advanced</span>
-                            {areAdvancedFiltersActive && <div className="w-2 h-2 bg-orange-500 rounded-full"></div>}
-                        </button>
-                        <div ref={popoverRef}>
-                            {isFilterPopoverOpen && (
-                                <FilterPopover 
-                                    initialFilters={filters} 
-                                    onApply={setFilters} 
-                                    onClear={handleClearFilters} 
-                                    onClose={() => setIsFilterPopoverOpen(false)}
-                                    options={filterOptions}
-                                />
+            <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mb-2 min-h-[40px]">
+                {isDesktop && selectedRows.size > 0 ? (
+                    <div className="w-full flex justify-between items-center bg-blue-50 dark:bg-blue-900/50 p-2 rounded-lg">
+                        <div className="flex items-center gap-2">
+                             <button onClick={() => setSelectedRows(new Set())} className="p-2 text-gray-500 hover:bg-blue-100 dark:hover:bg-blue-800 rounded-full">
+                                <X className="w-5 h-5" />
+                            </button>
+                            <span className="font-semibold text-blue-800 dark:text-blue-200">{selectedRows.size} selected</span>
+                        </div>
+                        <div className="relative">
+                            <button onClick={() => setIsBulkActionMenuOpen(prev => !prev)} className="px-4 py-2 bg-blue-600 text-white font-semibold rounded-md shadow-sm hover:bg-blue-700">
+                                Actions
+                            </button>
+                             {isBulkActionMenuOpen && (
+                                <div className="absolute top-full right-0 mt-2 w-56 bg-white dark:bg-gray-800 border dark:border-gray-700 rounded-lg shadow-xl z-20">
+                                    <ul>
+                                        <li>
+                                            <button onClick={handleBulkDeactivate} className="w-full text-left flex items-center gap-3 px-4 py-2 text-sm text-red-500 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/50">
+                                                <Trash2 className="w-4 h-4" /> Deactivate Selected
+                                            </button>
+                                        </li>
+                                    </ul>
+                                </div>
                             )}
                         </div>
                     </div>
-                </div>
-            </div>
-            <FilterPills filters={filters} setFilters={setFilters} setSearchInputValue={setSearchInputValue} options={filterOptions} />
-            <div className="mt-2 relative">
-                {isDesktop && selectedRows.size > 0 && (
-                     <div className="absolute top-[-52px] left-1/2 -translate-x-1/2 bg-blue-600 text-white flex items-center justify-between px-4 py-2 rounded-lg shadow-lg z-20 animate-fade-in-down">
-                        <span className="font-semibold">{selectedRows.size} selected</span>
-                        <button onClick={handleBulkDeactivate} className="ml-4 px-4 py-1 bg-white text-blue-600 font-bold rounded-md hover:bg-blue-100">
-                            Deactivate Selected
-                        </button>
-                    </div>
+                ) : (
+                    <>
+                        <h1 className="text-2xl font-bold text-gray-900 dark:text-white self-start sm:self-center">Employees</h1>
+                        <div className="flex items-center gap-4 w-full sm:w-auto">
+                            <div className="relative flex-grow">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                                <input type="text" placeholder="Search employees..." value={searchInputValue} onChange={e => setSearchInputValue(e.target.value)} className="w-full sm:w-64 pl-10 pr-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:outline-none"/>
+                            </div>
+                            <div className="relative">
+                                <button ref={filterButtonRef} onClick={() => setIsFilterPopoverOpen(!isFilterPopoverOpen)} className={`flex items-center gap-2 px-4 py-2 border rounded-md text-sm font-medium transition-colors ${areAdvancedFiltersActive || isFilterPopoverOpen ? 'bg-blue-100 dark:bg-blue-900/50 border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300' : 'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700'}`}>
+                                    <FilterIcon size={16} />
+                                    <span>Advanced</span>
+                                    {areAdvancedFiltersActive && <div className="w-2 h-2 bg-orange-500 rounded-full"></div>}
+                                </button>
+                                <div ref={popoverRef}>
+                                    {isFilterPopoverOpen && (
+                                        <FilterPopover 
+                                            initialFilters={filters} 
+                                            onApply={setFilters} 
+                                            onClear={handleClearFilters} 
+                                            onClose={() => setIsFilterPopoverOpen(false)}
+                                            options={filterOptions}
+                                        />
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </>
                 )}
+            </div>
+
+            <FilterPills filters={filters} setFilters={setFilters} setSearchInputValue={setSearchInputValue} options={filterOptions} />
+            
+            <div className="mt-2">
                 <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
                     <StatusQuickFilters currentStatus={filters.status} onStatusChange={(status) => { setFilters(prev => ({ ...prev, status })); setPagination(prev => ({...prev, currentPage: 1})); }}/>
                     
