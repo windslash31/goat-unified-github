@@ -60,15 +60,26 @@ const updateUserRole = async (userId, newRoleId, actorId, reqContext) => {
     const client = await db.pool.connect();
     try {
         await client.query('BEGIN');
+        
+        // Step 1: Get the name of the new role being assigned
+        const newRoleResult = await client.query(`SELECT name FROM roles WHERE id = $1`, [newRoleId]);
+        if (newRoleResult.rows.length === 0) {
+            throw new Error('Role not found.');
+        }
+        const newRoleName = newRoleResult.rows[0].name;
+
+        // --- NEW SECURITY CHECK ---
+        // Step 2: Prevent anyone from assigning the "admin" role.
+        if (newRoleName === 'admin') {
+            throw new Error('Assigning the super admin role is not permitted.');
+        }
+
         const userResult = await client.query('SELECT u.email, r.name as role_name FROM users u LEFT JOIN roles r ON u.role_id = r.id WHERE u.id = $1', [userId]);
         if(userResult.rows.length === 0) throw new Error('User not found');
         const oldRoleName = userResult.rows[0]?.role_name || 'none';
         
         await client.query('UPDATE users SET role_id = $1 WHERE id = $2', [newRoleId, userId]);
         
-        const newRoleResult = await client.query(`SELECT name FROM roles WHERE id = $1`, [newRoleId]);
-        const newRoleName = newRoleResult.rows[0].name;
-
         await logActivity(
             actorId, 
             'USER_ROLE_UPDATE', 
