@@ -31,31 +31,33 @@ const InPageDropdownNav = ({ sections, onScrollTo }) => {
         setIsOpen(false);
     };
     return (
-        <div className="md:hidden relative px-4">
-            <button
-                onClick={() => setIsOpen(!isOpen)}
-                className="w-full flex items-center justify-between px-4 py-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm text-sm font-medium"
-            >
-                <span>Jump to section...</span>
-                <ChevronDown className={`w-5 h-5 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
-            </button>
-            {isOpen && (
-                <div className="absolute top-full left-0 right-0 mt-2 mx-4 bg-white dark:bg-gray-800 border dark:border-gray-700 rounded-lg shadow-lg z-20">
-                    <ul className="divide-y divide-gray-200 dark:divide-gray-700">
-                        {sections.map(section => (
-                            <li key={section.id}>
-                                <button
-                                    onClick={() => handleSelect(section.id)}
-                                    className="w-full flex items-center gap-3 text-left px-4 py-3 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
-                                >
-                                    {section.icon}
-                                    {section.label}
-                                </button>
-                            </li>
-                        ))}
-                    </ul>
-                </div>
-            )}
+        <div className="md:hidden sticky top-0 z-20 bg-gray-50 dark:bg-gray-900 py-2 -mx-4 px-4 border-b border-gray-200 dark:border-gray-700">
+            <div className="relative">
+                <button
+                    onClick={() => setIsOpen(!isOpen)}
+                    className="w-full flex items-center justify-between px-4 py-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm text-sm font-medium"
+                >
+                    <span>Jump to section...</span>
+                    <ChevronDown className={`w-5 h-5 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                </button>
+                {isOpen && (
+                    <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-gray-800 border dark:border-gray-700 rounded-lg shadow-lg z-20">
+                        <ul className="divide-y divide-gray-200 dark:divide-gray-700">
+                            {sections.map(section => (
+                                <li key={section.id}>
+                                    <button
+                                        onClick={() => handleSelect(section.id)}
+                                        className="w-full flex items-center gap-3 text-left px-4 py-3 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+                                    >
+                                        {section.icon}
+                                        {section.label}
+                                    </button>
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                )}
+            </div>
         </div>
     );
 };
