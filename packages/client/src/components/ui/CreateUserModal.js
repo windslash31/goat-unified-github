@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import toast from 'react-hot-toast';
+import { Button } from './Button';
 
 export const CreateUserModal = ({ roles, onClose, onUserCreated }) => {
     const [formData, setFormData] = useState({
@@ -71,12 +72,12 @@ export const CreateUserModal = ({ roles, onClose, onUserCreated }) => {
                         </div>
                     </div>
                     <div className="bg-gray-50 dark:bg-gray-700/50 px-6 py-3 flex justify-end gap-3">
-                        <button type="button" onClick={onClose} disabled={isSubmitting} className="px-4 py-2 text-sm font-semibold rounded-md border">
+                        <Button type="button" onClick={onClose} disabled={isSubmitting} className="px-4 py-2 text-sm font-semibold rounded-md border">
                             Cancel
-                        </button>
-                        <button type="submit" disabled={isSubmitting} className="px-4 py-2 text-sm font-semibold text-white bg-blue-600 rounded-md disabled:opacity-50">
+                        </Button>
+                        <Button type="submit" disabled={isSubmitting} className="px-4 py-2 text-sm font-semibold text-white bg-blue-600 rounded-md disabled:opacity-50">
                             {isSubmitting ? 'Creating...' : 'Create User'}
-                        </button>
+                        </Button>
                     </div>
                 </form>
             </div>

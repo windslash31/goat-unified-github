@@ -5,6 +5,7 @@ import { CreateUserModal } from '../components/ui/CreateUserModal';
 import { ConfirmationModal } from '../components/ui/ConfirmationModal';
 import { Portal } from '../components/ui/Portal';
 import { TemporaryPasswordModal } from '../components/ui/TemporaryPasswordModal';
+import { Button } from '../components/ui/Button';
 
 
 export const UserManagementPage = ({ onLogout }) => {
@@ -102,9 +103,9 @@ export const UserManagementPage = ({ onLogout }) => {
                         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">User Management</h1>
                         <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">Create, delete, and assign roles to users.</p>
                     </div>
-                    <button onClick={() => setIsCreateModalOpen(true)} className="w-full mt-4 sm:mt-0 sm:w-auto flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700">
+                    <Button onClick={() => setIsCreateModalOpen(true)} className="w-full mt-4 sm:mt-0 sm:w-auto">
                         <PlusCircle className="w-5 h-5" /> Create User
-                    </button>
+                    </Button>
                 </div>
                 
                 {/* Mobile View */}

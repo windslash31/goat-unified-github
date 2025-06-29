@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Edit, UserX, MoreVertical } from 'lucide-react';
 import { StatusBadge } from '../../components/ui/StatusBadge'; 
+import { Button } from '../../components/ui/Button';
 
 export const EmployeeDetailHeader = ({ employee, onEdit, onDeactivate, permissions, isOwnProfile }) => {
     const fullName = [employee.first_name, employee.middle_name, employee.last_name].filter(Boolean).join(' ');
@@ -34,9 +35,9 @@ export const EmployeeDetailHeader = ({ employee, onEdit, onDeactivate, permissio
             {/* Desktop Buttons */}
             <div className="hidden md:flex self-start items-center gap-2">
                  {permissions.includes('employee:update') && (
-                    <button onClick={() => onEdit(employee)} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 transition-colors">
+                    <Button onClick={() => onEdit(employee)} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 transition-colors">
                         <Edit className="w-4 h-4"/> Edit
-                    </button>
+                    </Button>
                 )}
                 {permissions.includes('employee:deactivate') && !isOwnProfile && (
                     <button 

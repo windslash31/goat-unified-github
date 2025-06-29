@@ -253,9 +253,31 @@ export const ActivityLogPage = ({ onLogout }) => {
             <h1 className="text-2xl font-bold">Activity Log</h1>
             <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">Recent events recorded in the system.</p>
 
-            {/* Mobile View remains the same */}
             <div className="mt-4 space-y-4 md:hidden">
-                {/* ... */}
+                {loading ? <p>Loading logs...</p> : logs.map(log => (
+                    <div key={log.id} className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+                        <div className="flex justify-between items-start">
+                            <div className={`font-semibold text-base ${getActionTypeStyles(log.action_type)}`}>
+                                {log.action_type.replace(/_/g, ' ')}
+                            </div>
+                            {hasDetails(log) && (
+                                <button onClick={() => toggleRowExpansion(log.id)} className="p-1 -mr-1 text-gray-400">
+                                    <ChevronRight className={`w-5 h-5 transition-transform ${expandedLogRowId === log.id ? 'rotate-90' : ''}`}/>
+                                </button>
+                            )}
+                        </div>
+                        <div className="mt-2 text-sm text-gray-600 dark:text-gray-400 space-y-1">
+                            <p><strong className="font-medium text-gray-800 dark:text-gray-200">Actor:</strong> {log.actor_email || 'System (or Deleted User)'}</p>
+                            <p><strong className="font-medium text-gray-800 dark:text-gray-200">Target:</strong> {getTargetDisplayName(log)}</p>
+                            <p className="text-xs pt-1">{new Date(log.timestamp).toLocaleString()}</p>
+                        </div>
+                        {expandedLogRowId === log.id && (
+                            <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+                                <LogDetailComponent log={log} />
+                            </div>
+                        )}
+                    </div>
+                ))}
             </div>
 
             <div className="mt-4 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden hidden md:block">

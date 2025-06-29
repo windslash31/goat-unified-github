@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
+import { Button } from '../../components/ui/Button';
 
 // A helper to fetch data for our dropdowns
 const useFetchOptions = (tableName, token) => {
@@ -223,19 +224,19 @@ export const EditEmployeeModal = ({ employee, onClose, onSave }) => {
                         </Section>
                     </div>
                     <div className="bg-gray-50 dark:bg-gray-900/50 px-6 py-4 flex justify-end gap-3 border-t border-gray-200 dark:border-gray-700">
-                         <button
+                         <Button
                             type="button"
                             onClick={onClose}
                             className={`${baseButtonStyles} ${secondaryButtonStyles}`}
                         >
                             Cancel
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                             type="submit"
                             className={`${baseButtonStyles} ${primaryButtonStyles}`}
                         >
                             Save Changes
-                        </button>
+                        </Button>
                     </div>
                 </form>
             </div>

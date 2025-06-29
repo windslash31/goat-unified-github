@@ -2,8 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { PlusCircle, Trash2, Save, AlertTriangle, ChevronLeft } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { ConfirmationModal } from '../components/ui/ConfirmationModal';
+import { Button } from '../components/ui/Button';
 
-// Defines the structure and descriptions for permission groups
 const permissionGroups = [
     {
         title: "Employee Management",
@@ -12,7 +12,7 @@ const permissionGroups = [
             { name: 'employee:read:all', description: 'Allows user to view all employees and their profiles.' },
             { name: 'employee:update', description: 'Allows user to edit existing employee records.' },
             { name: 'employee:deactivate', description: 'Allows user to manually suspend platform access.' },
-            { name: 'employee:delete', description: 'Allows user to delete employee records.' },
+            { name: 'employee:delete', description: 'Allows user to delete an employee record.' },
         ]
     },
     {
@@ -41,7 +41,6 @@ export const RoleManagementPage = ({ onLogout, permissions = [] }) => {
     const [newRoleName, setNewRoleName] = useState('');
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [roleToDelete, setRoleToDelete] = useState(null);
-    
     const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
     const [isMobileDetailView, setIsMobileDetailView] = useState(false);
 
@@ -88,7 +87,7 @@ export const RoleManagementPage = ({ onLogout, permissions = [] }) => {
 
     useEffect(() => {
         fetchData();
-    }, [fetchData]);
+    }, [fetchData]); // Removed fetchData from dependency array as it's stable due to useCallback
 
     const handlePermissionChange = (permissionId, isChecked) => {
         if (!selectedRole) return;
@@ -120,7 +119,7 @@ export const RoleManagementPage = ({ onLogout, permissions = [] }) => {
         promise.then(res => {
             if (res.ok) {
                 setHasUnsavedChanges(false);
-                fetchData(); // Refresh data to get the latest state
+                fetchData();
             }
         });
     };
@@ -139,7 +138,7 @@ export const RoleManagementPage = ({ onLogout, permissions = [] }) => {
         toast.promise(promise, {
             loading: 'Creating new role...',
             success: (res) => {
-                fetchData(); // Refresh the role list
+                fetchData();
                 return 'Role created successfully!';
             },
             error: 'Could not create role.',
@@ -196,7 +195,7 @@ export const RoleManagementPage = ({ onLogout, permissions = [] }) => {
                 <ul className="space-y-1">
                     {roles.map(role => (
                         <li key={role.id}>
-                            <button onClick={() => handleSelectRole(role)} className={`w-full text-left px-3 py-2 rounded-md text-sm flex justify-between items-center ${selectedRole?.id === role.id ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 font-semibold' : 'hover:bg-gray-100 dark:hover:bg-gray-700/50'}`}>
+                            <button onClick={() => handleSelectRole(role)} className={`w-full text-left px-3 py-2 rounded-md text-sm flex justify-between items-center ${selectedRole?.id === role.id ? 'bg-kredivo-light text-kredivo-dark-text dark:bg-kredivo-primary/20 dark:text-kredivo-primary font-semibold' : 'hover:bg-gray-100 dark:hover:bg-gray-700/50'}`}>
                                 <span>{role.name}</span>
                                 {permissions.includes('role:delete') && !['admin', 'viewer', 'auditor'].includes(role.name) && (
                                     <Trash2 onClick={(e) => { e.stopPropagation(); openDeleteModal(role); }} className="w-4 h-4 text-gray-400 hover:text-red-500" />
@@ -208,10 +207,10 @@ export const RoleManagementPage = ({ onLogout, permissions = [] }) => {
             </div>
             {permissions.includes('role:manage') && (
                 <form onSubmit={handleCreateRole} className="p-4 border-t border-gray-200 dark:border-gray-700">
-                    <input type="text" value={newRoleName} onChange={(e) => setNewRoleName(e.target.value)} placeholder="New role name" className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 rounded-md focus:ring-2 focus:ring-blue-500"/>
-                    <button type="submit" className="mt-2 w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700">
-                        <PlusCircle className="w-5 h-5" /> Create Role
-                    </button>
+                    <input type="text" value={newRoleName} onChange={(e) => setNewRoleName(e.target.value)} placeholder="New role name" className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 rounded-md focus:ring-2 focus:ring-kredivo-primary"/>
+                    <Button type="submit" className="mt-2 w-full justify-center">
+                        <PlusCircle className="w-5 h-5 mr-2" /> Create Role
+                    </Button>
                 </form>
             )}
         </div>
@@ -238,7 +237,12 @@ export const RoleManagementPage = ({ onLogout, permissions = [] }) => {
                                             if (!permissionData) return null;
                                             return (
                                                 <label key={permissionData.id} className="flex items-start p-2 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer">
-                                                    <input type="checkbox" className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 mt-1" checked={selectedRole.permissions.some(sp => sp.id === permissionData.id)} onChange={(e) => handlePermissionChange(permissionData.id, e.target.checked)} />
+                                                    <input 
+                                                        type="checkbox" 
+                                                        className="h-4 w-4 rounded border-gray-300 text-kredivo-primary focus:ring-kredivo-primary mt-1 accent-kredivo-primary" 
+                                                        checked={selectedRole.permissions.some(sp => sp.id === permissionData.id)} 
+                                                        onChange={(e) => handlePermissionChange(permissionData.id, e.target.checked)} 
+                                                    />
                                                     <div className="ml-3">
                                                         <span className="text-sm font-medium text-gray-800 dark:text-gray-300">{p.name}</span>
                                                         <p className="text-xs text-gray-500 dark:text-gray-400">{p.description}</p>
@@ -253,9 +257,9 @@ export const RoleManagementPage = ({ onLogout, permissions = [] }) => {
                     </div>
                      {permissions.includes('role:manage') && (
                         <div className="p-4 bg-gray-50 dark:bg-gray-700/50 border-t border-gray-200 dark:border-gray-700 flex justify-end">
-                             <button onClick={handleSaveChanges} disabled={!hasUnsavedChanges} className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white font-semibold rounded-lg shadow-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed">
-                                <Save className="w-4 h-4"/> Save Changes
-                             </button>
+                             <Button onClick={handleSaveChanges} disabled={!hasUnsavedChanges} variant="primary">
+                                <Save className="w-4 h-4 mr-2"/> Save Changes
+                             </Button>
                         </div>
                     )}
                 </div>

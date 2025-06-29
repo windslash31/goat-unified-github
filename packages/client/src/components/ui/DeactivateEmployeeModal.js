@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import toast from 'react-hot-toast';
 import { ShieldAlert } from 'lucide-react';
+import { Button } from './Button'; 
 
 const PlatformIcon = ({ platform }) => {
     const icons = { google: 'G', slack: 'S', jumpcloud: 'J', atlassian: 'A' };
@@ -100,12 +101,12 @@ export const DeactivateEmployeeModal = ({ employee, onClose, onDeactivateSuccess
                 </div>
                 {/* FIXED: Buttons now stack vertically on mobile and are horizontal on larger screens */}
                 <div className="bg-gray-50 dark:bg-gray-700/50 px-4 py-3 sm:px-6 flex flex-col-reverse sm:flex-row sm:justify-end">
-                    <button type="button" onClick={onClose} disabled={isSubmitting} className="w-full mt-3 sm:mt-0 sm:w-auto inline-flex justify-center rounded-md border border-gray-300 dark:border-gray-500 shadow-sm px-4 py-2 bg-white dark:bg-gray-600 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-500 focus:outline-none">
+                    <Button type="button" onClick={onClose} disabled={isSubmitting} className="w-full mt-3 sm:mt-0 sm:w-auto inline-flex justify-center rounded-md border border-gray-300 dark:border-gray-500 shadow-sm px-4 py-2 bg-white dark:bg-gray-600 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-500 focus:outline-none">
                         Cancel
-                    </button>
-                    <button type="button" onClick={handleSubmit} disabled={isSubmitting || selectedPlatforms.length === 0} className="w-full sm:w-auto sm:ml-3 inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed">
+                    </Button>
+                    <Button type="button" onClick={handleSubmit} disabled={isSubmitting || selectedPlatforms.length === 0} className="w-full sm:w-auto sm:ml-3 inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed">
                         {isSubmitting ? 'Suspending...' : `Confirm Suspension (${selectedPlatforms.length})`}
-                    </button>
+                    </Button>
                 </div>
             </div>
         </div>

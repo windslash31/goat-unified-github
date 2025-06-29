@@ -10,7 +10,6 @@ export const Sidebar = ({ onLogout, permissions, isMobileOpen, setMobileOpen, is
       audit: location.pathname.startsWith('/logs')
     });
 
-    // --- FIX: Updated paths to match the routes in App.js ---
     const navItems = [
         { id: 'profile', path: '/profile', label: 'Profile', icon: User, permission: 'profile:read:own' },
         { id: 'employees', path: '/employees', label: 'Employees', icon: Users, permission: 'employee:read:all' },
@@ -41,9 +40,10 @@ export const Sidebar = ({ onLogout, permissions, isMobileOpen, setMobileOpen, is
 
         const isDropdownOpen = openDropdowns[item.id] && !isCollapsed;
 
+        // --- Use new brand colors for active link ---
         const linkClasses = `flex items-center w-full px-4 py-2.5 text-sm font-medium rounded-lg transition-colors group ${
             isActive
-            ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300'
+            ? 'bg-kredivo-light text-kredivo-dark-text dark:bg-kredivo-primary/20 dark:text-kredivo-primary'
             : 'text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700'
         }`;
 
@@ -52,7 +52,7 @@ export const Sidebar = ({ onLogout, permissions, isMobileOpen, setMobileOpen, is
                 <div>
                     <button onClick={() => handleDropdownToggle(item.id)} className={`${linkClasses} justify-between`}>
                         <div className="flex items-center">
-                            {item.icon && <item.icon className="w-5 h-5 mr-3 flex-shrink-0" />}
+                            {item.icon && <item.icon className={`w-5 h-5 mr-3 flex-shrink-0 ${isActive ? 'text-kredivo-primary' : ''}`} />}
                             <span className={`${isCollapsed ? 'md:hidden' : ''}`}>{item.label}</span>
                         </div>
                         <ChevronDown className={`w-4 h-4 transition-transform ${isDropdownOpen ? 'rotate-180' : ''} ${isCollapsed ? 'md:hidden' : ''}`} />
@@ -68,7 +68,7 @@ export const Sidebar = ({ onLogout, permissions, isMobileOpen, setMobileOpen, is
 
         return (
             <NavLink to={item.path} className={linkClasses} onClick={handleNavLinkClick}>
-                {item.icon && <item.icon className="w-5 h-5 mr-3 flex-shrink-0" />}
+                {item.icon && <item.icon className={`w-5 h-5 mr-3 flex-shrink-0 ${isActive ? 'text-kredivo-primary' : ''}`} />}
                 <span className={`${isCollapsed ? 'md:hidden' : ''}`}>{item.label}</span>
             </NavLink>
         );
@@ -83,7 +83,7 @@ export const Sidebar = ({ onLogout, permissions, isMobileOpen, setMobileOpen, is
             
             <div className={`h-16 flex items-center border-b border-gray-200 dark:border-gray-700 flex-shrink-0 ${isCollapsed ? 'justify-center' : 'justify-between'} px-4`}>
                 <div className="flex items-center overflow-hidden">
-                    <ShieldCheck className="w-8 h-8 text-blue-600 flex-shrink-0" />
+                    <ShieldCheck className="w-8 h-8 text-kredivo-primary flex-shrink-0" />
                     <div className={`ml-2 whitespace-nowrap ${isCollapsed ? 'md:hidden' : ''}`}>
                         <h1 className="text-lg font-bold text-gray-900 dark:text-white">Owl</h1>
                         <p className="text-xs text-gray-500 dark:text-gray-400">Kredivo</p>
