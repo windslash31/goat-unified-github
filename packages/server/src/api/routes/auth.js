@@ -15,7 +15,7 @@ const loginLimiter = rateLimit({
 
 router.post('/login', loginLimiter, authController.login);
 router.post('/refresh', authController.refreshToken); // New route for token refresh
-router.post('/logout', authenticateToken, authController.logout);
+router.post('/logout', authController.logout); // Logout does not need authenticateToken
 router.get('/me', authenticateToken, authorize('profile:read:own'), authController.getMe);
 
 module.exports = router;

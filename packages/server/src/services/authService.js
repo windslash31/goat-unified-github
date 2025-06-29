@@ -129,13 +129,21 @@ const refreshAccessToken = async (token) => {
     }
 };
 
-const logout = async (token, reqContext) => {
+const logout = async (accessToken, reqContext) => {
     // Invalidate the JWT access token by adding its JTI to the denylist
-    const decoded = jwt.decode(token);
-    if (decoded && decoded.jti && decoded.exp) {
-        const jti = decoded.jti;
-        const exp = new Date(decoded.exp * 1000);
-        await db.query('INSERT INTO token_denylist (jti, exp) VALUES ($1, $2) ON CONFLICT (jti) DO NOTHING', [jti, exp]);
+    let decodedAccessToken = null;
+    if (accessToken) {
+        try {
+            decodedAccessToken = jwt.decode(accessToken);
+            if (decodedAccessToken && decodedAccessToken.jti && decodedAccessToken.exp) {
+                const jti = decodedAccessToken.jti;
+                const exp = new Date(decodedAccessToken.exp * 1000);
+                await db.query('INSERT INTO token_denylist (jti, exp) VALUES ($1, $2) ON CONFLICT (jti) DO NOTHING', [jti, exp]);
+            }
+        } catch (err) {
+            console.warn('Could not decode access token for denylist during logout:', err.message);
+            // Continue with refresh token invalidation even if access token is malformed
+        }
     }
     
     // Invalidate the refresh token by deleting it from the database
@@ -144,8 +152,8 @@ const logout = async (token, reqContext) => {
         await db.query('DELETE FROM refresh_tokens WHERE token = $1', [refreshToken]);
     }
 
-    if(decoded) {
-        await logActivity(decoded.id, 'USER_LOGOUT_SUCCESS', {}, reqContext);
+    if(decodedAccessToken) {
+        await logActivity(decodedAccessToken.id, 'USER_LOGOUT_SUCCESS', {}, reqContext);
     }
 };
 

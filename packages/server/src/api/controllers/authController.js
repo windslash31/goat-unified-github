@@ -21,11 +21,12 @@ const login = async (req, res, next) => {
 const logout = async (req, res, next) => {
     try {
         const authHeader = req.headers['authorization'];
-        const token = authHeader && authHeader.split(' ')[1];
+        const accessToken = authHeader && authHeader.split(' ')[1];
         const { refreshToken } = req.body; // Expect refresh token in the body for invalidation
-        const reqContext = { ip: req.ip, userAgent: req.headers['user-agent'], refreshToken };
-        await authService.logout(token, reqContext);
-        res.status(200).json({ message: 'Logout successful.' });
+        const reqContext = { ip: req.ip, userAgent: req.headers['user-agent'], refreshToken }; // Pass refreshToken in reqContext
+        // The authService.logout will now handle decoding the accessToken and invalidating both tokens
+        await authService.logout(accessToken, reqContext); 
+        res.status(204).send(); // 204 No Content is appropriate for successful logout
     } catch (error) {
         next(error);
     }

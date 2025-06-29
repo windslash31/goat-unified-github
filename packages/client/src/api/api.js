@@ -25,7 +25,10 @@ api.interceptors.response.use(
     (response) => response,
     async (error) => {
         const originalRequest = error.config;
-        if (error.response.status === 401 && !originalRequest._retry) {
+        // Do not retry login requests or requests that already failed once
+        if (error.response.status === 401 && !originalRequest._retry &&
+         !originalRequest.url.includes('/api/login') // Do not retry login requests
+        ) {
             originalRequest._retry = true;
             try {
                 const refreshToken = useAuthStore.getState().refreshToken;
