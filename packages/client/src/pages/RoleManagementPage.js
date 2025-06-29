@@ -8,8 +8,10 @@ import api from '../api/api';
 
 const permissionGroups = [
     {
-        title: "Page Access",
+        title: "Application Access",
         permissions: [
+            { name: 'dashboard:view', description: 'Allows viewing the main dashboard page.' },
+            { name: 'profile:read:own', description: 'Allows user to view their own profile page.' },
             { name: 'admin:view_users', description: 'Allows viewing the User Management page.' },
             { name: 'admin:view_roles', description: 'Allows viewing the Roles & Permissions page.' },
         ]
@@ -25,32 +27,20 @@ const permissionGroups = [
         ]
     },
     {
-        title: "User Actions",
+        title: "User & Role Management",
         permissions: [
             { name: 'user:create', description: 'Allows creating a new user account.' },
             { name: 'user:update:role', description: 'Allows assigning a role to a user on the User Management page.' },
             { name: 'user:delete', description: 'Allows deleting a user account.' },
-            { name: 'user:reset_password', description: 'Allows an admin to reset another user\'s password.' }
-        ]
-    },
-    {
-        title: "Role & Permission Actions",
-        permissions: [
+            { name: 'user:reset_password', description: 'Allows an admin to reset another user\'s password.' },
             { name: 'role:manage', description: 'Allows creating, deleting, and changing the permissions for a role.' },
         ]
     },
     {
-        title: "Auditing & Profile",
+        title: "Auditing",
         permissions: [
             { name: 'log:read', description: 'Allows user to view the main activity log.' },
             { name: 'log:read:platform', description: 'Allows user to view external platform logs (e.g., JumpCloud).' },
-            { name: 'profile:read:own', description: 'Allows user to view their own profile page.' },
-        ]
-    },
-    {
-        title: "Dashboard",
-        permissions: [
-            { name: 'dashboard:view', description: 'Allows viewing the main dashboard page.' }
         ]
     }
 ];
@@ -83,7 +73,7 @@ const RoleList = ({ roles, selectedRole, handleSelectRole, permissions, openDele
     </div>
 );
 
-const PermissionDetails = ({ selectedRole, allPermissions, setIsMobileDetailView, handlePermissionChange, handleSaveChanges, hasUnsavedChanges }) => {
+const PermissionDetails = ({ selectedRole, allPermissions, setIsMobileDetailView, handlePermissionChange, handleSaveChanges, hasUnsavedChanges, handleSelectAllGroup }) => {
     const { user: currentUser } = useAuthStore();
     const permissions = currentUser?.permissions || [];
     
@@ -99,10 +89,25 @@ const PermissionDetails = ({ selectedRole, allPermissions, setIsMobileDetailView
                     {permissionGroups.map(group => {
                         const availablePermissionsInGroup = group.permissions.filter(p => allPermissions.some(ap => ap.name === p.name));
                         if (availablePermissionsInGroup.length === 0) return null;
+
+                        const groupPermissionIds = availablePermissionsInGroup.map(p => allPermissions.find(ap => ap.name === p.name)?.id).filter(Boolean);
+                        const isAllSelected = groupPermissionIds.every(id => selectedRole.permissions.some(sp => sp.id === id));
+
                         return (
                             <div key={group.title}>
-                                <h3 className="text-md font-semibold text-gray-800 dark:text-gray-200 mb-3">{group.title}</h3>
-                                <div className="space-y-3">
+                                <div className="flex justify-between items-center mb-3">
+                                    <h3 className="text-md font-semibold text-gray-800 dark:text-gray-200">{group.title}</h3>
+                                    <label className="flex items-center text-sm">
+                                        <input 
+                                            type="checkbox" 
+                                            onChange={() => handleSelectAllGroup(groupPermissionIds, !isAllSelected)}
+                                            checked={isAllSelected}
+                                            className="h-4 w-4 rounded border-gray-300 text-kredivo-primary focus:ring-kredivo-primary accent-kredivo-primary"
+                                        />
+                                        <span className="ml-2">Select All</span>
+                                    </label>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3">
                                     {availablePermissionsInGroup.map(p => {
                                         const permissionData = allPermissions.find(ap => ap.name === p.name);
                                         if (!permissionData) return null;
@@ -206,6 +211,21 @@ export const RoleManagementPage = ({ onLogout }) => {
         setSelectedRole({ ...selectedRole, permissions: updatedPermissions });
     };
 
+    const handleSelectAllGroup = (groupPermissionIds, isSelected) => {
+        if (!selectedRole) return;
+        setHasUnsavedChanges(true);
+
+        const currentPermissionIds = new Set(selectedRole.permissions.map(p => p.id));
+        if (isSelected) {
+            groupPermissionIds.forEach(id => currentPermissionIds.add(id));
+        } else {
+            groupPermissionIds.forEach(id => currentPermissionIds.delete(id));
+        }
+
+        const updatedPermissions = allPermissions.filter(p => currentPermissionIds.has(p.id));
+        setSelectedRole({ ...selectedRole, permissions: updatedPermissions });
+    };
+
     const handleSaveChanges = async () => {
         if (!selectedRole || !hasUnsavedChanges) return;
 
@@ -291,6 +311,7 @@ export const RoleManagementPage = ({ onLogout }) => {
                          handlePermissionChange={handlePermissionChange}
                          handleSaveChanges={handleSaveChanges}
                          hasUnsavedChanges={hasUnsavedChanges}
+                         handleSelectAllGroup={handleSelectAllGroup}
                     />
                 </div>
             </div>
