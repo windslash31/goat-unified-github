@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { UserSquare, LayoutGrid, HardDrive, ChevronDown, Bot, MessageSquare, Shield } from 'lucide-react';
+import { UserSquare, LayoutGrid, HardDrive, ChevronDown, Bot, MessageSquare, Shield, KeyRound } from 'lucide-react';
 import { EmployeeDetailHeader } from './EmployeeDetailPage/EmployeeDetailHeader';
 import { EmployeeDetailsTab } from './EmployeeDetailPage/EmployeeDetailsTab';
 import { EmployeeApplicationsTab } from './EmployeeDetailPage/EmployeeApplicationsTab';
@@ -10,7 +10,8 @@ import { AccessDeniedPage } from '../components/ui/AccessDeniedPage';
 import { GoogleLogPage } from './EmployeeDetailPage/GoogleLogPage';
 import { SlackLogPage } from './EmployeeDetailPage/SlackLogPage';
 import { UnifiedTimelinePage } from './EmployeeDetailPage/UnifiedTimelinePage';
-
+import { Button } from '../components/ui/Button';
+import { ChangePasswordModal } from '../components/ui/ChangePasswordModal';
 
 const Section = ({ id, title, children, icon }) => (
     <div id={id} className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 scroll-mt-24">
@@ -67,6 +68,7 @@ export const ProfilePage = ({ employee, permissions, onEdit, onDeactivate, onLog
     const [activeTab, setActiveTab] = useState('details');
     const [platformStatuses, setPlatformStatuses] = useState([]);
     const [isLoadingPlatforms, setIsLoadingPlatforms] = useState(true);
+    const [isChangePasswordModalOpen, setIsChangePasswordModalOpen] = useState(false);
     
     const [tabData, setTabData] = useState({
         jumpcloud: { data: null, loading: false, error: null, fetched: false },
@@ -142,7 +144,6 @@ export const ProfilePage = ({ employee, permissions, onEdit, onDeactivate, onLog
     const handleScrollToSection = (sectionId) => {
         const element = document.getElementById(sectionId);
         element?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        // Also switch tab for mobile sections
         const tabMap = {
             'profile-jumpcloud-section': 'jumpcloud',
             'profile-google-section': 'google',
@@ -175,9 +176,15 @@ export const ProfilePage = ({ employee, permissions, onEdit, onDeactivate, onLog
     return (
         <>
             <div>
-                <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-                    <h1 className="text-2xl font-bold text-gray-900 dark:text-white">My Profile</h1>
-                    <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">This is your personal employee record and application access list.</p>
+                <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex flex-col md:flex-row justify-between md:items-center">
+                    <div>
+                        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">My Profile</h1>
+                        <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">This is your personal employee record and application access list.</p>
+                    </div>
+                    <Button onClick={() => setIsChangePasswordModalOpen(true)} variant="secondary" className="mt-4 md:mt-0">
+                        <KeyRound className="w-4 h-4 mr-2" />
+                        Change Password
+                    </Button>
                 </div>
                 <div className="p-4 sm:p-6 space-y-6">
                     <EmployeeDetailHeader
@@ -270,6 +277,7 @@ export const ProfilePage = ({ employee, permissions, onEdit, onDeactivate, onLog
                 </div>
             </div>
             {isJiraModalOpen && <JiraTicketModal ticketId={selectedTicketId} onClose={() => setIsJiraModalOpen(false)} />}
+            {isChangePasswordModalOpen && <ChangePasswordModal onClose={() => setIsChangePasswordModalOpen(false)} />}
         </>
     );
 };

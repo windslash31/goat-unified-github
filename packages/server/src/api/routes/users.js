@@ -3,13 +3,14 @@ const router = express.Router();
 const userController = require('../controllers/userController');
 const { authenticateToken, authorize } = require('../middleware/authMiddleware');
 
-// Protect all user management routes
-router.use(authenticateToken);
-router.use(authorize('role:manage'));
+router.post('/change-password', authenticateToken, userController.changePassword);
 
-router.get('/', userController.listUsers);
-router.post('/', userController.createUser); // New route to create a user
-router.put('/:id/role', userController.updateUserRole);
-router.delete('/:id', userController.deleteUser); // New route to delete a user
+router.post('/:id/reset-password', authenticateToken, authorize('user:reset_password'), userController.resetPassword);
+
+// Apply middleware individually to each route for clarity and safety
+router.get('/', authenticateToken, authorize('role:manage'), userController.listUsers);
+router.post('/', authenticateToken, authorize('user:create'), userController.createUser);
+router.put('/:id/role', authenticateToken, authorize('user:update:role'), userController.updateUserRole);
+router.delete('/:id', authenticateToken, authorize('user:delete'), userController.deleteUser);
 
 module.exports = router;

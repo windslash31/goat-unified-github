@@ -20,6 +20,10 @@ const permissionGroups = [
         permissions: [
             { name: 'role:manage', description: 'Allows user to create, edit, and assign roles.' },
             { name: 'role:delete', description: 'Allows user to delete a role.' },
+            { name: 'user:create', description: 'Allows creating a new user account.' },
+            { name: 'user:update:role', description: 'Allows changing the role assigned to a user.' },
+            { name: 'user:delete', description: 'Allows deleting a user account.' },
+            { name: 'user:reset_password', description: 'Allows an admin to reset another user\'s password.' }
         ]
     },
     {

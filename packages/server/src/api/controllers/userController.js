@@ -31,6 +31,12 @@ const updateUserRole = async (req, res, next) => {
         const result = await userService.updateUserRole(id, roleId, req.user.id, reqContext);
         res.status(200).json(result);
     } catch (error) {
+        if (error.message.includes('not permitted')) {
+            return res.status(403).json({ message: error.message });
+        }
+        if (error.message.includes('not found')) {
+            return res.status(404).json({ message: error.message });
+        }
         next(error);
     }
 };
@@ -52,9 +58,51 @@ const deleteUser = async (req, res, next) => {
     }
 };
 
+const changePassword = async (req, res, next) => {
+    try {
+        const { oldPassword, newPassword } = req.body;
+        const userId = req.user.id;
+        const reqContext = { ip: req.ip, userAgent: req.headers['user-agent'] };
+
+        if (!oldPassword || !newPassword) {
+            return res.status(400).json({ message: 'Old and new passwords are required.' });
+        }
+
+        const result = await userService.changePassword(userId, oldPassword, newPassword, reqContext);
+        res.status(200).json(result);
+    } catch (error) {
+        res.status(400).json({ message: error.message });
+    }
+};
+
+const resetPassword = async (req, res, next) => {
+    try {
+        const { id: targetUserId } = req.params;
+        const actorId = req.user.id;
+        const reqContext = { ip: req.ip, userAgent: req.headers['user-agent'] };
+
+        if (parseInt(targetUserId, 10) === actorId) {
+            return res.status(403).json({ message: "You cannot reset your own password from this panel." });
+        }
+
+        const result = await userService.resetPassword(targetUserId, actorId, reqContext);
+        res.status(200).json(result);
+    } catch (error) {
+        if (error.message.includes('not permitted') || error.message.includes('super admin')) {
+            return res.status(403).json({ message: error.message });
+        }
+        if (error.message.includes('not found')) {
+            return res.status(404).json({ message: error.message });
+        }
+        next(error);
+    }
+};
+
 module.exports = {
     listUsers,
     createUser,
     updateUserRole,
     deleteUser,
+    changePassword,
+    resetPassword,
 };

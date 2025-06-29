@@ -1,6 +1,7 @@
 const db = require('../config/db');
 const { logActivity } = require('./logService');
 const bcrypt = require('bcrypt');
+const { validatePassword } = require('../utils/passwordValidator');
 
 const getUsers = async () => {
     const usersQuery = `
@@ -61,15 +62,12 @@ const updateUserRole = async (userId, newRoleId, actorId, reqContext) => {
     try {
         await client.query('BEGIN');
         
-        // Step 1: Get the name of the new role being assigned
         const newRoleResult = await client.query(`SELECT name FROM roles WHERE id = $1`, [newRoleId]);
         if (newRoleResult.rows.length === 0) {
             throw new Error('Role not found.');
         }
         const newRoleName = newRoleResult.rows[0].name;
 
-        // --- NEW SECURITY CHECK ---
-        // Step 2: Prevent anyone from assigning the "admin" role.
         if (newRoleName === 'admin') {
             throw new Error('Assigning the super admin role is not permitted.');
         }
@@ -131,9 +129,48 @@ const deleteUser = async (userId, actorId, reqContext) => {
     }
 };
 
+const changePassword = async (userId, oldPassword, newPassword, reqContext) => {
+    const userResult = await db.query('SELECT password_hash FROM users WHERE id = $1', [userId]);
+    if (userResult.rows.length === 0) throw new Error('User not found.');
+
+    const user = userResult.rows[0];
+    const isPasswordCorrect = await bcrypt.compare(oldPassword, user.password_hash);
+    if (!isPasswordCorrect) throw new Error('Incorrect old password.');
+    
+    const complexityCheck = validatePassword(newPassword);
+    if (!complexityCheck.valid) throw new Error(complexityCheck.issues.join(', '));
+
+    const newPasswordHash = await bcrypt.hash(newPassword, 10);
+    await db.query('UPDATE users SET password_hash = $1 WHERE id = $2', [newPasswordHash, userId]);
+
+    await logActivity(userId, 'USER_PASSWORD_CHANGE_SUCCESS', {}, reqContext);
+
+    return { message: 'Password changed successfully.' };
+};
+
+const resetPassword = async (targetUserId, actorId, reqContext) => {
+    const targetUserResult = await db.query('SELECT r.name as role_name, u.email FROM users u JOIN roles r ON u.role_id = r.id WHERE u.id = $1', [targetUserId]);
+    if (targetUserResult.rows.length === 0) throw new Error('Target user not found.');
+
+    if (targetUserResult.rows[0].role_name === 'admin') {
+        throw new Error('Cannot reset the password of a super admin.');
+    }
+
+    const temporaryPassword = Math.random().toString(36).slice(-10);
+    const newPasswordHash = await bcrypt.hash(temporaryPassword, 10);
+
+    await db.query('UPDATE users SET password_hash = $1 WHERE id = $2', [newPasswordHash, targetUserId]);
+
+    await logActivity(actorId, 'ADMIN_PASSWORD_RESET', { targetUserEmail: targetUserResult.rows[0].email }, reqContext);
+    
+    return { temporaryPassword };
+};
+
 module.exports = {
     getUsers,
     createUser,
     updateUserRole,
     deleteUser,
+    changePassword,
+    resetPassword,
 };

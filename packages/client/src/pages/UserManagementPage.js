@@ -1,42 +1,45 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import toast from 'react-hot-toast';
-import { PlusCircle, Trash2 } from 'lucide-react';
+import { PlusCircle, Trash2, KeyRound } from 'lucide-react';
 import { CreateUserModal } from '../components/ui/CreateUserModal';
 import { ConfirmationModal } from '../components/ui/ConfirmationModal';
 import { Portal } from '../components/ui/Portal';
 import { TemporaryPasswordModal } from '../components/ui/TemporaryPasswordModal';
 import { Button } from '../components/ui/Button';
-import { CustomSelect } from '../components/ui/CustomSelect';
+import { CustomSelect } from '../components/ui/CustomSelect'; 
+import { useAuthStore } from '../stores/authStore';
+import api from '../api/api';
 
-export const UserManagementPage = ({ onLogout, currentUser }) => {
+export const UserManagementPage = ({ onLogout }) => {
     const [users, setUsers] = useState([]);
     const [roles, setRoles] = useState([]);
     const [loading, setLoading] = useState(true);
+    const { user: currentUser } = useAuthStore();
+    const permissions = currentUser?.permissions || [];
 
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [userToDelete, setUserToDelete] = useState(null);
+    const [isResetModalOpen, setIsResetModalOpen] = useState(false);
+    const [userToReset, setUserToReset] = useState(null);
     const [newPassword, setNewPassword] = useState(null);
 
     const fetchData = useCallback(async () => {
         setLoading(true);
-        const token = localStorage.getItem('accessToken');
-        if (!token) { onLogout(); return; }
         try {
             const [usersRes, rolesRes] = await Promise.all([
-                fetch(`${process.env.REACT_APP_API_BASE_URL}/api/users`, { headers: { 'Authorization': `Bearer ${token}` } }),
-                fetch(`${process.env.REACT_APP_API_BASE_URL}/api/roles`, { headers: { 'Authorization': `Bearer ${token}` } })
+                api.get('/api/users'),
+                api.get('/api/roles')
             ]);
-            if (!usersRes.ok || !rolesRes.ok) throw new Error('Failed to fetch data');
-            setUsers(await usersRes.json());
-            setRoles(await rolesRes.json());
+            setUsers(usersRes.data);
+            setRoles(rolesRes.data);
         } catch (err) {
             console.error(err);
             toast.error('Could not load user data.');
         } finally {
             setLoading(false);
         }
-    }, [onLogout]);
+    }, []);
 
     useEffect(() => {
         fetchData();
@@ -49,15 +52,10 @@ export const UserManagementPage = ({ onLogout, currentUser }) => {
         setUsers(newUsers);
 
         try {
-            const response = await fetch(`${process.env.REACT_APP_API_BASE_URL}/api/users/${userId}/role`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify({ roleId: newRoleId })
-            });
-            if (!response.ok) throw new Error('Failed to update role');
+            const response = await api.put(`/api/users/${userId}/role`, { roleId: newRoleId });
             toast.success('User role updated!');
         } catch (err) {
-            toast.error(err.message || 'Could not update role.');
+            toast.error(err.response?.data?.message || 'Could not update role.');
             setUsers(originalUsers);
         }
     };
@@ -69,27 +67,37 @@ export const UserManagementPage = ({ onLogout, currentUser }) => {
 
     const handleDeleteUser = async () => {
         if (!userToDelete) return;
-        const token = localStorage.getItem('accessToken');
+        
+        try {
+            await api.delete(`/api/users/${userToDelete.id}`);
+            toast.success('User deleted successfully!');
+            fetchData(); // Refresh list on success
+        } catch (error) {
+            toast.error(error.response?.data?.message || 'Could not delete user.');
+        } finally {
+            setIsDeleteModalOpen(false);
+            setUserToDelete(null);
+        }
+    };
+    
+    const openResetModal = (user) => {
+        setUserToReset(user);
+        setIsResetModalOpen(true);
+    };
 
-        toast.promise(
-            fetch(`${process.env.REACT_APP_API_BASE_URL}/api/users/${userToDelete.id}`, {
-                method: 'DELETE',
-                headers: { 'Authorization': `Bearer ${token}` }
-            }).then(res => {
-                if (!res.ok) return res.json().then(err => { throw new Error(err.message) });
-                return res.json();
-            }),
-            {
-                loading: 'Deleting user...',
-                success: () => {
-                    fetchData(); // Refresh list on success
-                    return 'User deleted successfully!';
-                },
-                error: (err) => err.message || 'Could not delete user.',
-            }
-        );
-        setIsDeleteModalOpen(false);
-        setUserToDelete(null);
+    const handleResetPassword = async () => {
+        if (!userToReset) return;
+        
+        try {
+            const response = await api.post(`/api/users/${userToReset.id}/reset-password`);
+            setNewPassword(response.data.temporaryPassword);
+            toast.success(`Password for ${userToReset.full_name} has been reset.`);
+        } catch (error) {
+            toast.error(error.response?.data?.message || 'Failed to reset password.');
+        } finally {
+            setIsResetModalOpen(false);
+            setUserToReset(null);
+        }
     };
 
     if (loading) return <div className="p-6">Loading...</div>;
@@ -104,9 +112,11 @@ export const UserManagementPage = ({ onLogout, currentUser }) => {
                         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">User Management</h1>
                         <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">Create, delete, and assign roles to users.</p>
                     </div>
-                    <Button onClick={() => setIsCreateModalOpen(true)} className="w-full mt-4 sm:mt-0 sm:w-auto justify-center">
-                        <PlusCircle className="w-5 h-5 mr-2" /> Create User
-                    </Button>
+                    {permissions.includes('user:create') && (
+                        <Button onClick={() => setIsCreateModalOpen(true)} className="w-full mt-4 sm:mt-0 sm:w-auto justify-center">
+                            <PlusCircle className="w-5 h-5 mr-2" /> Create User
+                        </Button>
+                    )}
                 </div>
                 
                 {/* Mobile View */}
@@ -118,7 +128,20 @@ export const UserManagementPage = ({ onLogout, currentUser }) => {
                                     <p className="font-bold text-gray-900 dark:text-white">{user.full_name}</p>
                                     <p className="text-sm text-gray-500 dark:text-gray-400">{user.email}</p>
                                 </div>
-                                <button onClick={() => openDeleteModal(user)} disabled={user.id === currentUser.id} className="p-1 text-gray-400 hover:text-red-500 disabled:opacity-50 disabled:cursor-not-allowed"><Trash2 className="w-4 h-4" /></button>
+                                <div className="flex items-center">
+                                    {permissions.includes('user:reset_password') && (
+                                        <button 
+                                            onClick={() => openResetModal(user)} 
+                                            disabled={user.id === currentUser.id || user.role_name === 'admin'}
+                                            className="p-1 text-gray-400 hover:text-yellow-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                            <KeyRound className="w-4 h-4" />
+                                        </button>
+                                    )}
+                                    {permissions.includes('user:delete') && (
+                                        <button onClick={() => openDeleteModal(user)} disabled={user.id === currentUser.id} className="p-1 text-gray-400 hover:text-red-500 disabled:opacity-50 disabled:cursor-not-allowed"><Trash2 className="w-4 h-4" /></button>
+                                    )}
+                                </div>
                             </div>
                             <div className="mt-3">
                                 <label htmlFor={`role-select-${user.id}`} className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Role</label>
@@ -128,6 +151,7 @@ export const UserManagementPage = ({ onLogout, currentUser }) => {
                                     options={roleOptions}
                                     onChange={(newRoleId) => handleRoleChange(user.id, newRoleId)}
                                     placeholder="No Role"
+                                    disabled={!permissions.includes('user:update:role')}
                                 />
                             </div>
                         </div>
@@ -157,10 +181,27 @@ export const UserManagementPage = ({ onLogout, currentUser }) => {
                                                 options={roleOptions}
                                                 onChange={(newRoleId) => handleRoleChange(user.id, newRoleId)}
                                                 placeholder="No Role"
+                                                disabled={!permissions.includes('user:update:role')}
                                             />
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
-                                            <button onClick={() => openDeleteModal(user)} disabled={user.id === currentUser.id} className="p-2 text-gray-500 hover:text-red-600 rounded-full hover:bg-red-100 dark:hover:bg-red-900/20 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"><Trash2 className="w-4 h-4"/></button>
+                                            <div className="flex items-center gap-2">
+                                                {permissions.includes('user:reset_password') && (
+                                                    <button 
+                                                        onClick={() => openResetModal(user)} 
+                                                        disabled={user.id === currentUser.id || user.role_name === 'admin'}
+                                                        className="p-2 text-gray-500 hover:text-yellow-600 rounded-full hover:bg-yellow-100 dark:hover:bg-yellow-900/20 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                                                        title="Reset Password"
+                                                    >
+                                                        <KeyRound className="w-4 h-4"/>
+                                                    </button>
+                                                )}
+                                                {permissions.includes('user:delete') && (
+                                                    <button onClick={() => openDeleteModal(user)} disabled={user.id === currentUser.id} className="p-2 text-gray-500 hover:text-red-600 rounded-full hover:bg-red-100 dark:hover:bg-red-900/20 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent" title="Delete User">
+                                                        <Trash2 className="w-4 h-4"/>
+                                                    </button>
+                                                )}
+                                            </div>
                                         </td>
                                     </tr>
                                 ))}
@@ -173,6 +214,7 @@ export const UserManagementPage = ({ onLogout, currentUser }) => {
             <Portal>
                 {isCreateModalOpen && <CreateUserModal roles={roles} onClose={() => setIsCreateModalOpen(false)} onUserCreated={(password) => { setIsCreateModalOpen(false); fetchData(); setNewPassword(password); }} />}
                 {isDeleteModalOpen && <ConfirmationModal isOpen={isDeleteModalOpen} onClose={() => setIsDeleteModalOpen(false)} onConfirm={handleDeleteUser} title="Delete User" message={`Are you sure you want to delete the user "${userToDelete?.full_name}"? This will permanently revoke their access.`} />}
+                {isResetModalOpen && <ConfirmationModal isOpen={isResetModalOpen} onClose={() => setIsResetModalOpen(false)} onConfirm={handleResetPassword} title="Reset Password" message={`Are you sure you want to reset the password for "${userToReset?.full_name}"? Their old password will no longer work.`} />}
                 {newPassword && <TemporaryPasswordModal password={newPassword} onClose={() => setNewPassword(null)} />}
             </Portal>
         </>

@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { ChevronRight, Plus, Minus, Edit, AlertCircle, CheckCircle, XCircle, UserPlus, UserX, Info, LogIn, Eye } from 'lucide-react';
+import { ChevronRight, Plus, Minus, Edit, AlertCircle, CheckCircle, XCircle, UserPlus, UserX, Info, LogIn, Eye, Download } from 'lucide-react';
+import { Button } from '../components/ui/Button';
+import api from '../api/api';
 
 const formatValue = (value) => {
     if (value === null || typeof value === 'undefined') return '""';
@@ -178,18 +180,13 @@ export const ActivityLogPage = ({ onLogout }) => {
     useEffect(() => {
         const fetchData = async () => {
             setLoading(true);
-            const token = localStorage.getItem('accessToken');
-            if (!token) { onLogout(); return; }
             try {
                 const [logsRes, rolesRes] = await Promise.all([
-                    fetch(`${process.env.REACT_APP_API_BASE_URL}/api/logs/activity`, { headers: { 'Authorization': `Bearer ${token}` } }),
-                    fetch(`${process.env.REACT_APP_API_BASE_URL}/api/roles`, { headers: { 'Authorization': `Bearer ${token}` } })
+                    api.get('/api/logs/activity'),
+                    api.get('/api/roles')
                 ]);
-                if (!logsRes.ok) throw new Error('Failed to fetch logs');
-                if (!rolesRes.ok) throw new Error('Failed to fetch roles');
-                
-                setLogs(await logsRes.json());
-                setRoles(await rolesRes.json());
+                setLogs(logsRes.data);
+                setRoles(rolesRes.data);
             } catch (error) {
                 console.error(error);
             } finally {
@@ -197,14 +194,28 @@ export const ActivityLogPage = ({ onLogout }) => {
             }
         };
         fetchData();
-    }, [onLogout]);
+    }, []);
+    
+    const handleExport = async () => {
+        try {
+            const response = await api.get('/api/logs/activity/export', { responseType: 'blob' });
+            const url = window.URL.createObjectURL(new Blob([response.data]));
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', 'activity-log.csv');
+            document.body.appendChild(link);
+            link.click();
+            link.parentNode.removeChild(link);
+        } catch (error) {
+            console.error("Failed to export logs:", error);
+        }
+    };
     
     const toggleRowExpansion = (logId) => {
         setExpandedLogRowId(expandedLogRowId === logId ? null : logId);
     };
     
     const getTargetDisplayName = (log) => {
-        // --- FIX: Correctly identify target for profile views ---
         if (log.action_type === 'EMPLOYEE_PROFILE_VIEW') return log.target_employee_email || 'N/A';
         if (log.action_type.startsWith('USER_')) return log.target_user_email || log.details?.targetUserEmail || 'N/A';
         if (log.action_type.startsWith('EMPLOYEE_')) return log.target_employee_email || 'N/A';
@@ -216,8 +227,6 @@ export const ActivityLogPage = ({ onLogout }) => {
 
     const renderLogDetails = (log) => {
         if (!hasDetails(log)) return null;
-        
-        // --- FIX: Add cases for the new log types ---
         switch (log.action_type) {
             case 'USER_LOGIN_SUCCESS': return <UserLoginSuccessDetail details={log.details} />;
             case 'EMPLOYEE_PROFILE_VIEW': return <EmployeeProfileViewDetail targetUser={log.target_employee_email} />;
@@ -250,8 +259,16 @@ export const ActivityLogPage = ({ onLogout }) => {
 
     return (
         <div className="p-4 sm:p-6">
-            <h1 className="text-2xl font-bold">Activity Log</h1>
-            <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">Recent events recorded in the system.</p>
+            <div className="flex flex-col sm:flex-row justify-between sm:items-center mb-4">
+                <div>
+                    <h1 className="text-2xl font-bold">Activity Log</h1>
+                    <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">Recent events recorded in the system.</p>
+                </div>
+                <Button onClick={handleExport} variant="secondary">
+                    <Download className="w-4 h-4 mr-2" />
+                    Export to CSV
+                </Button>
+            </div>
 
             <div className="mt-4 space-y-4 md:hidden">
                 {loading ? <p>Loading logs...</p> : logs.map(log => (

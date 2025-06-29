@@ -18,7 +18,6 @@ const sanitizeObject = (obj) => {
     return sanitizedObj;
 };
 
-// --- FIX: Expanded to accept a request context object ---
 const logActivity = async (actorUserId, actionType, details = {}, reqContext = {}, client = db) => {
     try {
         let actorEmail = null;
@@ -36,7 +35,6 @@ const logActivity = async (actorUserId, actionType, details = {}, reqContext = {
         const targetEmployeeId = details.targetEmployeeId || null;
         const targetUserEmail = details.targetUserEmail || null;
 
-        // --- ADDED: Merge request context into the details JSONB field ---
         const finalDetails = {
             ...sanitizedDetails,
             context: {
@@ -51,7 +49,6 @@ const logActivity = async (actorUserId, actionType, details = {}, reqContext = {
             VALUES ($1, $2, $3, $4, $5, $6, $7)
         `;
         
-        // Use the passed-in client for the query, which defaults to the global 'db' object
         await client.query(logQuery, [actorUserId, actorEmail, actorFullName, actionType, targetEmployeeId, targetUserEmail, JSON.stringify(finalDetails)]);
 
     } catch (err) {
@@ -60,7 +57,7 @@ const logActivity = async (actorUserId, actionType, details = {}, reqContext = {
     }
 };
 
-const getActivityLogs = async () => {
+const getActivityLogs = async (limit = 100) => {
     const logsQuery = `
         SELECT 
             al.id, al.timestamp, al.action_type, al.details, 
@@ -70,9 +67,9 @@ const getActivityLogs = async () => {
         FROM activity_logs al 
         LEFT JOIN employees e ON al.target_employee_id = e.id 
         ORDER BY al.timestamp DESC 
-        LIMIT 100
+        LIMIT $1
     `;
-    const result = await db.query(logsQuery);
+    const result = await db.query(logsQuery, [limit]);
     return result.rows;
 };
 
