@@ -192,7 +192,17 @@ const updateEmployee = async (employeeId, updatedData, actorId, reqContext) => {
 
         const logChanges = {};
         for (const key in changes) {
-            logChanges[key] = { from: originalEmployee[key], to: changes[key] };
+            let fromValue = originalEmployee[key];
+            let toValue = changes[key];
+
+            if (fromValue instanceof Date) {
+                fromValue = fromValue.toISOString().split('T')[0];
+            }
+            if (toValue instanceof Date) {
+                toValue = toValue.toISOString().split('T')[0];
+            }
+            
+            logChanges[key] = { from: fromValue, to: toValue };
         }
         await logActivity(actorId, 'EMPLOYEE_UPDATE', { targetEmployeeId: employeeId, changes: logChanges }, reqContext, client);
 
