@@ -36,8 +36,6 @@ export const MainLayout = ({
                     permissions={permissions} 
                     isMobileOpen={isMobileSidebarOpen}
                     setMobileOpen={setIsMobileSidebarOpen}
-                    isCollapsed={isSidebarCollapsed}
-                    // We no longer need to pass the setter function
                 />
                 
                 {/* Floating Collapse/Expand Button for Desktop */}

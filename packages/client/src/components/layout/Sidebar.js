@@ -9,7 +9,7 @@ export const Sidebar = ({ onLogout, isMobileOpen, setMobileOpen }) => {
     const location = useLocation();
     const { user } = useAuthStore();
     const permissions = user?.permissions || [];
-    const { isCollapsed, toggleSidebar } = useUIStore();
+    const isCollapsed = useUIStore((state) => state.isSidebarCollapsed);
 
     const [openDropdowns, setOpenDropdowns] = useState({
       settings: location.pathname.startsWith('/users') || location.pathname.startsWith('/roles'),
