@@ -1,155 +1,19 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Search, Filter as FilterIcon, ChevronsUpDown, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, X, UserSearch, MoreVertical, Edit, UserX, Trash2 } from 'lucide-react';
+import { Search, Filter as FilterIcon, MoreVertical, Edit, UserX, Trash2, ChevronUp, ChevronDown, ChevronsUpDown, X } from 'lucide-react';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { StatusBadge } from '../components/ui/StatusBadge';
-import { FilterPopover } from '../components/ui/FilterPopover';
 import toast from 'react-hot-toast';
 import { Button } from '../components/ui/Button';
+import { StatusBadge } from '../components/ui/StatusBadge';
+import { FilterPopover } from '../components/ui/FilterPopover';
+import { Pagination } from '../components/ui/Pagination';
+import { StatusQuickFilters } from '../components/ui/StatusQuickFilters';
+import { FilterPills } from '../components/ui/FilterPills';
+import { EmptyState } from '../components/ui/EmptyState';
+import { useDebounce } from '../hooks/useDebounce';
+import { useFetchFilterOptions } from '../hooks/useFetchFilterOptions';
+import { useMediaQuery } from '../hooks/useMediaQuery';
 
-// A custom hook to delay the search input effect, reducing API calls.
-const useDebounce = (value, delay) => {
-    const [debouncedValue, setDebouncedValue] = useState(value);
-    useEffect(() => {
-        const handler = setTimeout(() => { setDebouncedValue(value); }, delay);
-        return () => { clearTimeout(handler); };
-    }, [value, delay]);
-    return debouncedValue;
-};
-
-// A custom hook to fetch options for the filter dropdowns.
-const useFetchFilterOptions = (endpoint, token) => {
-    const [options, setOptions] = useState([]);
-    useEffect(() => {
-        if (!endpoint || !token) return;
-        const fetchOptions = async () => {
-            try {
-                const url = `${process.env.REACT_APP_API_BASE_URL}/api/${endpoint}`;
-                const response = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
-                if (response.ok) setOptions(await response.json());
-            } catch (error) {
-                console.error(`Failed to fetch filter options for ${endpoint}:`, error);
-            }
-        };
-        fetchOptions();
-    }, [endpoint, token]);
-    return options;
-};
-
-// A custom hook to detect screen size for responsive rendering.
-const useMediaQuery = (query) => {
-    const [matches, setMatches] = useState(window.matchMedia(query).matches);
-    useEffect(() => {
-        const media = window.matchMedia(query);
-        const listener = () => setMatches(media.matches);
-        media.addEventListener('change', listener);
-        return () => media.removeEventListener('change', listener);
-    }, [query]);
-    return matches;
-};
-
-// --- UI Sub-components ---
-
-const Pagination = ({ pagination, setPagination }) => {
-    const { currentPage, totalPages, totalCount, limit } = pagination;
-    if (totalCount === 0) return null;
-    const from = (currentPage - 1) * limit + 1;
-    const to = Math.min(currentPage * limit, totalCount);
-
-    return (
-        <div className="flex flex-col sm:flex-row items-center justify-between px-6 py-3 bg-gray-50 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
-            <span className="text-sm text-gray-700 dark:text-gray-300 mb-2 sm:mb-0">
-                Showing <span className="font-semibold">{from}</span> to <span className="font-semibold">{to}</span> of <span className="font-semibold">{totalCount}</span> results
-            </span>
-            <div className="flex items-center gap-2">
-                <button onClick={() => setPagination(prev => ({ ...prev, currentPage: prev.currentPage - 1 }))} disabled={currentPage === 1} className="p-2 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-200 dark:hover:bg-gray-700"><ChevronLeft className="w-5 h-5" /></button>
-                <span className="text-sm">Page {currentPage} of {totalPages}</span>
-                <button onClick={() => setPagination(prev => ({ ...prev, currentPage: prev.currentPage + 1 }))} disabled={currentPage === totalPages} className="p-2 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-200 dark:hover:bg-gray-700"><ChevronRight className="w-5 h-5" /></button>
-            </div>
-        </div>
-    );
-};
-
-const StatusQuickFilters = ({ currentStatus, onStatusChange }) => {
-    const statuses = ['all', 'active', 'escalation', 'inactive'];
-    const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1);
-
-    return (
-        <div className="flex items-center border-b border-gray-200 dark:border-gray-700 overflow-x-auto">
-            {statuses.map(status => (
-                <button
-                    key={status}
-                    onClick={() => onStatusChange(status)}
-                    className={`px-4 py-3 text-sm font-semibold transition-colors -mb-px border-b-2 whitespace-nowrap ${
-                        currentStatus === status
-                        ? 'border-kredivo-primary text-kredivo-primary'
-                        : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
-                    }`}
-                >
-                    {capitalize(status).replace('_', ' ')}
-                </button>
-            ))}
-        </div>
-    );
-};
-
-const FilterPills = ({ filters, setFilters, setSearchInputValue, options, onClear }) => {
-    const removeFilter = (key) => {
-        if (key === 'search') setSearchInputValue('');
-        const newFilters = { ...filters };
-        delete newFilters[key];
-        if (key === 'status') newFilters.status = 'all';
-        setFilters(newFilters);
-    };
-    
-    const filterLabels = {
-        jobTitle: "Job Title", manager: "Manager", legal_entity_id: "Legal Entity", office_location_id: "Office",
-        employee_type_id: "Type", employee_sub_type_id: "Sub-Type", application_id: "Application"
-    };
-
-    const optionsMap = {
-        legal_entity_id: options.legalEntities, office_location_id: options.officeLocations,
-        employee_type_id: options.employeeTypes, employee_sub_type_id: options.employeeSubTypes,
-        application_id: options.applications
-    };
-    
-    const activeFilters = Object.entries(filters)
-        .filter(([key, value]) => value && value !== 'all' && key !== 'status' && key !== 'search')
-        .map(([key, value]) => {
-            let displayValue = value;
-            if (optionsMap[key]) {
-                const foundOption = optionsMap[key]?.find(opt => String(opt.id) === String(value));
-                if (foundOption) displayValue = foundOption.name;
-            }
-            return { key, label: filterLabels[key] || key, value: displayValue };
-        });
-
-    if (activeFilters.length === 0) return <div className="h-8"></div>;
-
-    return (
-        <div className="flex items-center gap-2 h-auto flex-wrap py-2">
-            <span className="text-sm font-medium">Active Filters:</span>
-            {activeFilters.map(({ key, label, value }) => (
-                <span key={key} className="inline-flex items-center gap-x-1.5 py-1.5 px-3 rounded-full text-xs font-medium bg-kredivo-light text-kredivo-dark-text dark:bg-kredivo-primary/20 dark:text-kredivo-light">
-                    {label}: {String(value).substring(0, 20)}
-                    <button onClick={() => removeFilter(key)} className="ml-1 -mr-1 h-4 w-4 rounded-full inline-flex items-center justify-center text-kredivo-primary hover:bg-kredivo-primary/20 dark:text-kredivo-light dark:hover:bg-kredivo-primary/40"><X className="w-3 h-3"/></button>
-                </span>
-            ))}
-            <button onClick={onClear} className="text-sm font-medium text-kredivo-primary hover:underline">Clear All</button>
-        </div>
-    );
-};
-
-const EmptyState = () => (
-    <div className="text-center py-16 text-gray-500 dark:text-gray-400">
-        <UserSearch className="mx-auto w-12 h-12 text-gray-400" />
-        <p className="font-semibold mt-4">No Employees Found</p>
-        <p className="text-sm mt-1">Try adjusting your search or filter criteria.</p>
-    </div>
-);
-
-
-// --- MAIN PAGE COMPONENT ---
 export const EmployeeListPage = ({ employees, isLoading, filters, setFilters, pagination, setPagination, sorting, setSorting, onEdit, onDeactivate }) => {
     const [isFilterPopoverOpen, setIsFilterPopoverOpen] = useState(false);
     const [searchInputValue, setSearchInputValue] = useState(filters.search);
