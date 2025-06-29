@@ -1,6 +1,6 @@
 import React, { memo } from 'react';
 import { Ticket } from 'lucide-react';
-
+import { PLATFORM_CONFIG } from '../../config/platforms';
 const PlatformStatusBadge = ({ status }) => {
     const styles = {
         'Active': 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300',
@@ -29,14 +29,6 @@ const PlatformRowSkeleton = () => (
 );
 
 export const EmployeeApplicationsTab = memo(({ applications, platformStatuses, isLoading, onTicketClick }) => {
-    
-    const platformLogos = {
-        'Google Workspace': 'https://upload.wikimedia.org/wikipedia/commons/a/a8/Google_Workspace_Logo.png',
-        'Slack': 'https://a.slack-edge.com/80588/img/slack_api_logo.png',
-        'JumpCloud': 'https://www.jumpcloud.com/wp-content/uploads/2021/08/cropped-favicon-32x32.png',
-        'Atlassian': 'https://wac-cdn.atlassian.com/assets/img/favicons/atlassian/favicon-32x32.png'
-    };
-
     return (
         <div className="space-y-8">
             <div className="p-6 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
@@ -53,7 +45,7 @@ export const EmployeeApplicationsTab = memo(({ applications, platformStatuses, i
                         platformStatuses.map(platform => (
                             <div key={platform.platform} className="flex items-center justify-between p-4 rounded-lg bg-gray-50 dark:bg-gray-900/50">
                                 <div className="flex items-center gap-4 min-w-0">
-                                    <img src={platformLogos[platform.platform] || ''} alt={`${platform.platform} Logo`} className="w-8 h-8 flex-shrink-0"/>
+                                    <img src={PLATFORM_CONFIG[platform.platform]?.logo || PLATFORM_CONFIG.Default.logo} alt={`${platform.platform} Logo`} className="w-8 h-8"/>
                                     <div className="min-w-0">
                                         <p className="font-semibold text-gray-800 dark:text-gray-200 truncate">{platform.platform}</p>
                                         <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{platform.email || 'N/A'}</p>
