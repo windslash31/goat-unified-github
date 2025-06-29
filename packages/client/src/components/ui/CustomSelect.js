@@ -1,26 +1,26 @@
 import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import { ChevronDown, Check } from 'lucide-react';
-import { Portal } from './Portal'; // Import the Portal component
+import { Portal } from './Portal';
 
-export const CustomSelect = ({ options, value, onChange, placeholder = "Select...", id = null }) => {
+export const CustomSelect = ({ options, value, onChange, placeholder = "Select...", id = null, disabled = false }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [position, setPosition] = useState({ top: 0, left: 0, width: 0 });
-  const buttonRef = useRef(null); // A ref to the button to get its position
+  const buttonRef = useRef(null);
   
   const selectedOption = options.find(opt => opt.id === value);
 
-  // Effect to handle closing the dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (buttonRef.current && !buttonRef.current.contains(event.target)) {
         setIsOpen(false);
       }
     };
-    document.addEventListener("mousedown", handleClickOutside);
+    if (isOpen) {
+        document.addEventListener("mousedown", handleClickOutside);
+    }
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+  }, [isOpen]);
   
-  // Effect to calculate the position of the dropdown when it opens
   useLayoutEffect(() => {
     if (isOpen && buttonRef.current) {
       const rect = buttonRef.current.getBoundingClientRect();
@@ -35,7 +35,7 @@ export const CustomSelect = ({ options, value, onChange, placeholder = "Select..
   const DropdownList = (
     <ul 
       style={{ 
-        position: 'absolute', // Use absolute positioning in the portal
+        position: 'absolute',
         top: `${position.top}px`, 
         left: `${position.left}px`,
         width: `${position.width}px`,
@@ -68,18 +68,17 @@ export const CustomSelect = ({ options, value, onChange, placeholder = "Select..
 
   return (
     <div className="relative w-full" ref={buttonRef}>
-      {/* The main button that shows the selected value */}
       <button
         id={id}
         type="button"
-        onClick={() => setIsOpen(prev => !prev)} // Toggle on click
-        className="w-full bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm py-2 px-3 flex items-center justify-between text-left focus:ring-kredivo-primary focus:border-kredivo-primary focus:outline-none"
+        onClick={() => !disabled && setIsOpen(prev => !prev)}
+        disabled={disabled}
+        className="w-full bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm py-2 px-3 flex items-center justify-between text-left focus:ring-kredivo-primary focus:border-kredivo-primary focus:outline-none disabled:bg-gray-100 dark:disabled:bg-gray-800 disabled:cursor-not-allowed"
       >
-        <span className="truncate">{selectedOption ? selectedOption.name : placeholder}</span>
+        <span className={`truncate ${disabled ? 'text-gray-400 dark:text-gray-500' : ''}`}>{selectedOption ? selectedOption.name : placeholder}</span>
         <ChevronDown className={`w-4 h-4 ml-2 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
       </button>
 
-      {/* Render the dropdown list inside a Portal when it's open */}
       {isOpen && <Portal>{DropdownList}</Portal>}
     </div>
   );

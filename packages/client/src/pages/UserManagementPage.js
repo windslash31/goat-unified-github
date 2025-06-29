@@ -6,7 +6,7 @@ import { ConfirmationModal } from '../components/ui/ConfirmationModal';
 import { Portal } from '../components/ui/Portal';
 import { TemporaryPasswordModal } from '../components/ui/TemporaryPasswordModal';
 import { Button } from '../components/ui/Button';
-import { CustomSelect } from '../components/ui/CustomSelect'; 
+import { CustomSelect } from '../components/ui/CustomSelect';
 import { useAuthStore } from '../stores/authStore';
 import api from '../api/api';
 
@@ -46,13 +46,12 @@ export const UserManagementPage = ({ onLogout }) => {
     }, [fetchData]);
 
     const handleRoleChange = async (userId, newRoleId) => {
-        const token = localStorage.getItem('accessToken');
         const originalUsers = [...users];
         const newUsers = users.map(u => u.id === userId ? { ...u, role_id: newRoleId, role_name: roles.find(r => r.id === newRoleId)?.name } : u);
         setUsers(newUsers);
 
         try {
-            const response = await api.put(`/api/users/${userId}/role`, { roleId: newRoleId });
+            await api.put(`/api/users/${userId}/role`, { roleId: newRoleId });
             toast.success('User role updated!');
         } catch (err) {
             toast.error(err.response?.data?.message || 'Could not update role.');
@@ -71,7 +70,7 @@ export const UserManagementPage = ({ onLogout }) => {
         try {
             await api.delete(`/api/users/${userToDelete.id}`);
             toast.success('User deleted successfully!');
-            fetchData(); // Refresh list on success
+            fetchData();
         } catch (error) {
             toast.error(error.response?.data?.message || 'Could not delete user.');
         } finally {

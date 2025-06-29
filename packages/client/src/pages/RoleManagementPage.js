@@ -3,8 +3,17 @@ import { PlusCircle, Trash2, Save, AlertTriangle, ChevronLeft } from 'lucide-rea
 import toast from 'react-hot-toast';
 import { ConfirmationModal } from '../components/ui/ConfirmationModal';
 import { Button } from '../components/ui/Button';
+import { useAuthStore } from '../stores/authStore';
+import api from '../api/api';
 
 const permissionGroups = [
+    {
+        title: "Page Access",
+        permissions: [
+            { name: 'admin:view_users', description: 'Allows viewing the User Management page.' },
+            { name: 'admin:view_roles', description: 'Allows viewing the Roles & Permissions page.' },
+        ]
+    },
     {
         title: "Employee Management",
         permissions: [
@@ -16,14 +25,18 @@ const permissionGroups = [
         ]
     },
     {
-        title: "User & Role Management",
+        title: "User Actions",
         permissions: [
-            { name: 'role:manage', description: 'Allows user to create, edit, and assign roles.' },
-            { name: 'role:delete', description: 'Allows user to delete a role.' },
             { name: 'user:create', description: 'Allows creating a new user account.' },
-            { name: 'user:update:role', description: 'Allows changing the role assigned to a user.' },
+            { name: 'user:update:role', description: 'Allows assigning a role to a user on the User Management page.' },
             { name: 'user:delete', description: 'Allows deleting a user account.' },
             { name: 'user:reset_password', description: 'Allows an admin to reset another user\'s password.' }
+        ]
+    },
+    {
+        title: "Role & Permission Actions",
+        permissions: [
+            { name: 'role:manage', description: 'Allows creating, deleting, and changing the permissions for a role.' },
         ]
     },
     {
@@ -36,7 +49,9 @@ const permissionGroups = [
     }
 ];
 
-export const RoleManagementPage = ({ onLogout, permissions = [] }) => {
+export const RoleManagementPage = ({ onLogout }) => {
+    const { user: currentUser } = useAuthStore();
+    const permissions = currentUser?.permissions || [];
     const [roles, setRoles] = useState([]);
     const [allPermissions, setAllPermissions] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -64,21 +79,16 @@ export const RoleManagementPage = ({ onLogout, permissions = [] }) => {
 
     const fetchData = useCallback(async () => {
         setLoading(true);
-        const token = localStorage.getItem('accessToken');
-        if (!token) { onLogout(); return; }
         try {
             const [rolesRes, permsRes] = await Promise.all([
-                fetch(`${process.env.REACT_APP_API_BASE_URL}/api/roles/with-permissions`, { headers: { 'Authorization': `Bearer ${token}` } }),
-                fetch(`${process.env.REACT_APP_API_BASE_URL}/api/roles/permissions`, { headers: { 'Authorization': `Bearer ${token}` } })
+                api.get('/api/roles/with-permissions'),
+                api.get('/api/roles/permissions')
             ]);
-            if (!rolesRes.ok || !permsRes.ok) throw new Error(`Failed to fetch data`);
-            const rolesData = await rolesRes.json();
-            const permsData = await permsRes.json();
-            setRoles(rolesData);
-            setAllPermissions(permsData);
+            setRoles(rolesRes.data);
+            setAllPermissions(permsRes.data);
 
-            if (rolesData.length > 0) {
-                const currentSelected = rolesData.find(r => r.id === selectedRole?.id) || rolesData[0];
+            if (rolesRes.data.length > 0) {
+                const currentSelected = rolesRes.data.find(r => r.id === selectedRole?.id) || rolesRes.data[0];
                 setSelectedRole(currentSelected);
             }
         } catch (err) {
@@ -87,7 +97,7 @@ export const RoleManagementPage = ({ onLogout, permissions = [] }) => {
         } finally {
             setLoading(false);
         }
-    }, [onLogout, selectedRole?.id]);
+    }, [selectedRole?.id]);
 
     useEffect(() => {
         fetchData();
@@ -105,50 +115,30 @@ export const RoleManagementPage = ({ onLogout, permissions = [] }) => {
     const handleSaveChanges = async () => {
         if (!selectedRole || !hasUnsavedChanges) return;
 
-        const token = localStorage.getItem('accessToken');
         const permissionIds = selectedRole.permissions.map(p => p.id);
         
-        const promise = fetch(`${process.env.REACT_APP_API_BASE_URL}/api/roles/${selectedRole.id}/permissions`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-            body: JSON.stringify({ permissionIds })
-        });
-
-        toast.promise(promise, {
-            loading: 'Saving permissions...',
-            success: 'Permissions saved successfully!',
-            error: 'Could not save permissions.',
-        });
-
-        promise.then(res => {
-            if (res.ok) {
-                setHasUnsavedChanges(false);
-                fetchData();
-            }
-        });
+        try {
+            await api.put(`/api/roles/${selectedRole.id}/permissions`, { permissionIds });
+            toast.success('Permissions saved successfully!');
+            setHasUnsavedChanges(false);
+            fetchData();
+        } catch (error) {
+            toast.error('Could not save permissions.');
+        }
     };
     
     const handleCreateRole = async (e) => {
         e.preventDefault();
         if (!newRoleName.trim()) return;
-        const token = localStorage.getItem('accessToken');
-        
-        const promise = fetch(`${process.env.REACT_APP_API_BASE_URL}/api/roles`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-            body: JSON.stringify({ name: newRoleName.trim() })
-        });
-        
-        toast.promise(promise, {
-            loading: 'Creating new role...',
-            success: (res) => {
-                fetchData();
-                return 'Role created successfully!';
-            },
-            error: 'Could not create role.',
-        });
 
-        setNewRoleName('');
+        try {
+            await api.post('/api/roles', { name: newRoleName.trim() });
+            toast.success('Role created successfully!');
+            setNewRoleName('');
+            fetchData();
+        } catch (error) {
+            toast.error('Could not create role.');
+        }
     };
 
     const openDeleteModal = (role) => {
@@ -158,34 +148,21 @@ export const RoleManagementPage = ({ onLogout, permissions = [] }) => {
 
     const handleDeleteRole = async () => {
         if (!roleToDelete) return;
-        const token = localStorage.getItem('accessToken');
         
-        const promise = fetch(`${process.env.REACT_APP_API_BASE_URL}/api/roles/${roleToDelete.id}`, {
-            method: 'DELETE',
-            headers: { 'Authorization': `Bearer ${token}` },
-        }).then(res => {
-            if (!res.ok) return res.json().then(err => { throw new Error(err.message) });
-            return res.json();
-        });
-
-        toast.promise(promise, {
-            loading: 'Deleting role...',
-            success: 'Role deleted successfully!',
-            error: (err) => err.message || 'Could not delete role.',
-        });
-
-        promise.then(() => {
+        try {
+            await api.delete(`/api/roles/${roleToDelete.id}`);
+            toast.success('Role deleted successfully!');
             if (selectedRole?.id === roleToDelete.id) {
                 setSelectedRole(null);
                 setIsMobileDetailView(false);
             }
             fetchData();
-        }).catch(err => {
-            toast.error(err.message);
-        }).finally(() => {
+        } catch (error) {
+            toast.error(error.response?.data?.message || 'Could not delete role.');
+        } finally {
             setIsDeleteModalOpen(false);
             setRoleToDelete(null);
-        });
+        }
     };
 
     if (loading) return <div className="p-6 text-center">Loading Roles & Permissions...</div>;
@@ -200,7 +177,7 @@ export const RoleManagementPage = ({ onLogout, permissions = [] }) => {
                         <li key={role.id}>
                             <button onClick={() => handleSelectRole(role)} className={`w-full text-left px-3 py-2 rounded-md text-sm flex justify-between items-center ${selectedRole?.id === role.id ? 'bg-kredivo-light text-kredivo-dark-text dark:bg-kredivo-primary/20 dark:text-kredivo-primary font-semibold' : 'hover:bg-gray-100 dark:hover:bg-gray-700/50'}`}>
                                 <span>{role.name}</span>
-                                {permissions.includes('role:delete') && !['admin', 'viewer', 'auditor'].includes(role.name) && (
+                                {permissions.includes('role:manage') && !['admin', 'viewer', 'auditor'].includes(role.name) && (
                                     <Trash2 onClick={(e) => { e.stopPropagation(); openDeleteModal(role); }} className="w-4 h-4 text-gray-400 hover:text-red-500" />
                                 )}
                             </button>

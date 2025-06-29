@@ -2,22 +2,31 @@ import React, { useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { LogOut, ShieldCheck, User, Settings, FileText, Users, ChevronDown, X } from 'lucide-react';
 import { ThemeSwitcher } from '../ui/ThemeSwitcher';
+import { useAuthStore } from '../../stores/authStore';
+import { useUIStore } from '../../stores/uiStore';
 
-export const Sidebar = ({ onLogout, permissions, isMobileOpen, setMobileOpen, isCollapsed, setCollapsed }) => {
+export const Sidebar = ({ onLogout, isMobileOpen, setMobileOpen }) => {
     const location = useLocation();
+    const { user } = useAuthStore();
+    const permissions = user?.permissions || [];
+    const { isCollapsed, toggleSidebar } = useUIStore();
+
     const [openDropdowns, setOpenDropdowns] = useState({
       settings: location.pathname.startsWith('/users') || location.pathname.startsWith('/roles'),
       audit: location.pathname.startsWith('/logs')
     });
+    
+    const hasSettingsAccess = permissions.includes('admin:view_users') || permissions.includes('admin:view_roles');
+    const hasAuditAccess = permissions.includes('log:read');
 
     const navItems = [
-        { id: 'profile', path: '/profile', label: 'Profile', icon: User, permission: 'profile:read:own' },
-        { id: 'employees', path: '/employees', label: 'Employees', icon: Users, permission: 'employee:read:all' },
-        { id: 'settings', label: 'Settings', icon: Settings, permission: 'role:manage', subItems: [
-            { id: 'user_management', path: '/users', label: 'User Management', permission: 'role:manage' },
-            { id: 'role_management', path: '/roles', label: 'Roles & Permissions', permission: 'role:manage' }
+        { id: 'profile', path: '/profile', label: 'Profile', icon: User, permission: 'profile:read:own', visible: permissions.includes('profile:read:own') },
+        { id: 'employees', path: '/employees', label: 'Employees', icon: Users, permission: 'employee:read:all', visible: permissions.includes('employee:read:all') },
+        { id: 'settings', label: 'Settings', icon: Settings, visible: hasSettingsAccess, subItems: [
+            { id: 'user_management', path: '/users', label: 'User Management', permission: 'admin:view_users' },
+            { id: 'role_management', path: '/roles', label: 'Roles & Permissions', permission: 'admin:view_roles' }
         ]},
-        { id: 'audit', label: 'Audit', icon: FileText, permission: 'log:read', subItems: [
+        { id: 'audit', label: 'Audit', icon: FileText, visible: hasAuditAccess, subItems: [
             { id: 'activity_log', path: '/logs/activity', label: 'Activity Log', permission: 'log:read' }
         ]},
     ];
@@ -33,6 +42,8 @@ export const Sidebar = ({ onLogout, permissions, isMobileOpen, setMobileOpen, is
     };
 
     const NavItem = ({ item }) => {
+        if (!item.visible) return null;
+
         const hasSubItems = item.subItems && item.subItems.length > 0;
         const isActive = hasSubItems 
             ? item.subItems.some(sub => location.pathname.startsWith(sub.path))
@@ -40,7 +51,6 @@ export const Sidebar = ({ onLogout, permissions, isMobileOpen, setMobileOpen, is
 
         const isDropdownOpen = openDropdowns[item.id] && !isCollapsed;
 
-        // --- Use new brand colors for active link ---
         const linkClasses = `flex items-center w-full px-4 py-2.5 text-sm font-medium rounded-lg transition-colors group ${
             isActive
             ? 'bg-kredivo-light text-kredivo-dark-text dark:bg-kredivo-primary/20 dark:text-kredivo-primary'
@@ -59,7 +69,7 @@ export const Sidebar = ({ onLogout, permissions, isMobileOpen, setMobileOpen, is
                     </button>
                     {isDropdownOpen && (
                         <div className="mt-1 space-y-1 pl-8">
-                            {item.subItems.filter(sub => permissions.includes(sub.permission)).map(sub => <NavItem key={sub.id} item={sub} />)}
+                            {item.subItems.filter(sub => permissions.includes(sub.permission)).map(sub => <NavItem key={sub.id} item={{...sub, visible: true}} />)}
                         </div>
                     )}
                 </div>
@@ -100,9 +110,7 @@ export const Sidebar = ({ onLogout, permissions, isMobileOpen, setMobileOpen, is
             </div>
             
             <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
-                {navItems.filter(item => permissions.includes(item.permission) || (item.subItems && item.subItems.some(sub => permissions.includes(sub.permission)))).map(item => (
-                    <NavItem key={item.id} item={item} />
-                ))}
+                {navItems.map(item => <NavItem key={item.id} item={item} />)}
             </nav>
 
             <div className="p-4 mt-auto border-t border-gray-200 dark:border-gray-700 space-y-4">
