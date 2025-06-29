@@ -13,8 +13,8 @@ const getUsers = async () => {
     return result.rows;
 };
 
-// --- FIX: The function now accepts actorId ---
-const createUser = async (userData, actorId) => {
+// --- FIX: Accept reqContext and pass it to logActivity ---
+const createUser = async (userData, actorId, reqContext) => {
     const { email, fullName, roleId } = userData;
     const client = await db.pool.connect();
     try {
@@ -25,14 +25,12 @@ const createUser = async (userData, actorId) => {
             throw new Error('A user with this email already exists.');
         }
 
-        // --- ADDED: Look for a matching employee ---
         const employeeResult = await client.query('SELECT id FROM employees WHERE employee_email = $1', [email]);
         const employeeId = employeeResult.rows.length > 0 ? employeeResult.rows[0].id : null;
 
         const temporaryPassword = Math.random().toString(36).slice(-10);
         const passwordHash = await bcrypt.hash(temporaryPassword, 10);
 
-        // --- MODIFIED: Include employee_id in the insert query ---
         const result = await client.query(
             'INSERT INTO users (full_name, email, password_hash, role_id, employee_id) VALUES ($1, $2, $3, $4, $5) RETURNING id, full_name, email, role_id',
             [fullName, email, passwordHash, roleId, employeeId]
@@ -43,6 +41,7 @@ const createUser = async (userData, actorId) => {
             actorId,
             'USER_CREATE', 
             { targetUserEmail: newUser.email, createdUser: { fullName, email, roleId } }, 
+            reqContext,
             client
         );
         
@@ -58,7 +57,7 @@ const createUser = async (userData, actorId) => {
 };
 
 
-const updateUserRole = async (userId, newRoleId, actorId) => {
+const updateUserRole = async (userId, newRoleId, actorId, reqContext) => {
     const client = await db.pool.connect();
     try {
         await client.query('BEGIN');
@@ -75,6 +74,7 @@ const updateUserRole = async (userId, newRoleId, actorId) => {
             actorId, 
             'USER_ROLE_UPDATE', 
             { changes: { role: { from: oldRoleName, to: newRoleName } }, targetUserEmail: userResult.rows[0]?.email }, 
+            reqContext,
             client
         );
         
@@ -88,7 +88,7 @@ const updateUserRole = async (userId, newRoleId, actorId) => {
     }
 };
 
-const deleteUser = async (userId, actorId) => {
+const deleteUser = async (userId, actorId, reqContext) => {
     const client = await db.pool.connect();
     try {
         await client.query('BEGIN');
@@ -107,6 +107,7 @@ const deleteUser = async (userId, actorId) => {
             actorId, 
             'USER_DELETE', 
             { targetUserEmail: deletedUserEmail, details: `Deleted user ${deletedUserEmail}` }, 
+            reqContext,
             client
         );
         

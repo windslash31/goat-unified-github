@@ -25,7 +25,9 @@ const getEmployee = async (req, res, next) => {
 const updateEmployee = async (req, res, next) => {
     try {
         const { id } = req.params;
-        const result = await employeeService.updateEmployee(id, req.body, req.user.id);
+        // --- FIX: Pass request context to the service ---
+        const reqContext = { ip: req.ip, userAgent: req.headers['user-agent'] };
+        const result = await employeeService.updateEmployee(id, req.body, req.user.id, reqContext);
         res.status(200).json(result);
     } catch (error) {
         if(error.message.includes('not found')){
@@ -55,43 +57,6 @@ const getJumpCloudLogs = async (req, res, next) => {
         if(error.message.includes('API Error')){
             return res.status(502).json({ message: error.message });
         }
-        next(error);
-    }
-};
-
-const deactivateOnPlatforms = async (req, res, next) => {
-    try {
-        const { id } = req.params;
-        const { platforms } = req.body;
-        const result = await employeeService.deactivateOnPlatforms(id, platforms, req.user.id);
-        res.status(200).json(result);
-    } catch (error) {
-        next(error);
-    }
-};
-
-const bulkDeactivateOnPlatforms = async (req, res, next) => {
-    try {
-        const { employeeIds, platforms } = req.body;
-        if (!employeeIds || !platforms || !Array.isArray(employeeIds) || !Array.isArray(platforms)) {
-            return res.status(400).json({ message: 'Invalid request body. `employeeIds` and `platforms` must be arrays.' });
-        }
-        const result = await employeeService.bulkDeactivateOnPlatforms(employeeIds, platforms, req.user.id);
-        res.status(200).json(result);
-    } catch (error) {
-        next(error);
-    }
-};
-
-const logEmployeeView = async (req, res, next) => {
-    try {
-        const { targetEmployeeId } = req.body;
-        if (!targetEmployeeId) {
-            return res.status(400).json({ message: 'Target Employee ID is required.' });
-        }
-        await logActivity(req.user.id, 'EMPLOYEE_PROFILE_VIEW', { targetEmployeeId });
-        res.status(200).json({ message: 'View logged successfully.' });
-    } catch (error) {
         next(error);
     }
 };
@@ -134,6 +99,48 @@ const getUnifiedTimeline = async (req, res, next) => {
         next(error);
     }
 }
+
+const deactivateOnPlatforms = async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const { platforms } = req.body;
+        // --- FIX: Pass request context to the service ---
+        const reqContext = { ip: req.ip, userAgent: req.headers['user-agent'] };
+        const result = await employeeService.deactivateOnPlatforms(id, platforms, req.user.id, reqContext);
+        res.status(200).json(result);
+    } catch (error) {
+        next(error);
+    }
+};
+
+const bulkDeactivateOnPlatforms = async (req, res, next) => {
+    try {
+        const { employeeIds, platforms } = req.body;
+        if (!employeeIds || !platforms || !Array.isArray(employeeIds) || !Array.isArray(platforms)) {
+            return res.status(400).json({ message: 'Invalid request body. `employeeIds` and `platforms` must be arrays.' });
+        }
+        // --- FIX: Pass request context to the service ---
+        const reqContext = { ip: req.ip, userAgent: req.headers['user-agent'] };
+        const result = await employeeService.bulkDeactivateOnPlatforms(employeeIds, platforms, req.user.id, reqContext);
+        res.status(200).json(result);
+    } catch (error) {
+        next(error);
+    }
+};
+
+const logEmployeeView = async (req, res, next) => {
+    try {
+        const { targetEmployeeId } = req.body;
+        if (!targetEmployeeId) {
+            return res.status(400).json({ message: 'Target Employee ID is required.' });
+        }
+        const reqContext = { ip: req.ip, userAgent: req.headers['user-agent'] };
+        await logActivity(req.user.id, 'EMPLOYEE_PROFILE_VIEW', { targetEmployeeId }, reqContext);
+        res.status(200).json({ message: 'View logged successfully.' });
+    } catch (error) {
+        next(error);
+    }
+};
 
 
 module.exports = {

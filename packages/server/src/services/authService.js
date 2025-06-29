@@ -4,7 +4,8 @@ const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
 const { logActivity } = require('./logService');
 
-const login = async (email, password) => {
+// --- FIX: Accept reqContext and pass it to logActivity ---
+const login = async (email, password, reqContext) => {
     const userQuery = `
         SELECT u.id, u.employee_id, u.email, u.full_name, u.password_hash, u.role_id, r.name AS role_name 
         FROM users u 
@@ -14,28 +15,24 @@ const login = async (email, password) => {
     const userResult = await db.query(userQuery, [email]);
 
     if (userResult.rows.length === 0) {
-        // --- FIX: Pass the details object as the third argument ---
-        await logActivity(null, 'USER_LOGIN_FAIL', { reason: 'User not found', emailAttempt: email });
+        await logActivity(null, 'USER_LOGIN_FAIL', { reason: 'User not found', emailAttempt: email }, reqContext);
         throw new Error('Invalid credentials.');
     }
 
     const user = userResult.rows[0];
     if (!user.password_hash) {
-        // --- FIX: Pass the details object as the third argument ---
-        await logActivity(user.id, 'USER_LOGIN_FAIL', { reason: 'Account not fully set up', emailAttempt: email });
+        await logActivity(user.id, 'USER_LOGIN_FAIL', { reason: 'Account not fully set up', emailAttempt: email }, reqContext);
         throw new Error('Account credentials are not set up.');
     }
 
     const isPasswordCorrect = await bcrypt.compare(password, user.password_hash);
     if (!isPasswordCorrect) {
-        // --- FIX: Pass the details object as the third argument ---
-        await logActivity(user.id, 'USER_LOGIN_FAIL', { reason: 'Incorrect password', emailAttempt: email });
+        await logActivity(user.id, 'USER_LOGIN_FAIL', { reason: 'Incorrect password', emailAttempt: email }, reqContext);
         throw new Error('Invalid credentials.');
     }
     
     if (!user.role_name) {
-        // --- FIX: Pass the details object as the third argument ---
-        await logActivity(user.id, 'USER_LOGIN_FAIL', { reason: 'User has no role assigned' });
+        await logActivity(user.id, 'USER_LOGIN_FAIL', { reason: 'User has no role assigned' }, reqContext);
         throw new Error('Your account has no role assigned.');
     }
 
@@ -44,13 +41,11 @@ const login = async (email, password) => {
     const permissions = permissionsResult.rows.map(row => row.name);
 
     if (permissions.length === 0) {
-        // --- FIX: Pass the details object as the third argument ---
-        await logActivity(user.id, 'USER_LOGIN_FAIL', { reason: 'Role has no permissions' });
+        await logActivity(user.id, 'USER_LOGIN_FAIL', { reason: 'Role has no permissions' }, reqContext);
         throw new Error('Your assigned role has no permissions.');
     }
 
-    // --- FIX: Pass the details object as the third argument ---
-    await logActivity(user.id, 'USER_LOGIN_SUCCESS', { targetUserEmail: user.email });
+    await logActivity(user.id, 'USER_LOGIN_SUCCESS', { targetUserEmail: user.email }, reqContext);
 
     const jwtPayload = { 
         id: user.id, 
@@ -66,14 +61,15 @@ const login = async (email, password) => {
     return { accessToken };
 };
 
-const logout = async (token) => {
+// --- FIX: Accept reqContext and pass it to logActivity ---
+const logout = async (token, reqContext) => {
     const decoded = jwt.decode(token);
     if (decoded && decoded.jti && decoded.exp) {
         const jti = decoded.jti;
         const exp = new Date(decoded.exp * 1000);
         const query = 'INSERT INTO token_denylist (jti, exp) VALUES ($1, $2) ON CONFLICT (jti) DO NOTHING';
         await db.query(query, [jti, exp]);
-        await logActivity(decoded.id, 'USER_LOGOUT_SUCCESS');
+        await logActivity(decoded.id, 'USER_LOGOUT_SUCCESS', {}, reqContext);
     }
 };
 

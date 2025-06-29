@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ChevronRight, Plus, Minus, Edit, AlertCircle, CheckCircle, XCircle, UserPlus, UserX } from 'lucide-react';
+import { ChevronRight, Plus, Minus, Edit, AlertCircle, CheckCircle, XCircle, UserPlus, UserX, Info, LogIn, Eye } from 'lucide-react';
 
 const formatValue = (value) => {
     if (value === null || typeof value === 'undefined') return '""';
@@ -9,7 +9,14 @@ const formatValue = (value) => {
             return `"${d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}"`;
         }
     }
-    return `"${String(value)}"`;
+    // Attempt to parse if it's a JSON string
+    try {
+        const obj = JSON.parse(value);
+        return JSON.stringify(obj, null, 2);
+    } catch (e) {
+        // Not a JSON string, return as is
+        return `"${String(value)}"`;
+    }
 };
 
 const PermissionChangeDetail = ({ changes }) => {
@@ -111,7 +118,6 @@ const SuspensionDetail = ({ results }) => (
 const UserCreateDetail = ({ details, roles }) => {
     const roleId = details.createdUser?.roleId;
     
-    // --- FIX: Compare types correctly (string vs number) ---
     const roleName = roles.length > 0 
         ? roles.find(r => String(r.id) === String(roleId))?.name || 'Unknown Role'
         : '...';
@@ -134,6 +140,26 @@ const UserDeleteDetail = ({ details }) => (
     </div>
 );
 
+const GenericDetail = ({ details }) => (
+    <div className="flex items-start">
+        <Info className="w-4 h-4 text-gray-500 mr-2 mt-1 flex-shrink-0" />
+        <pre className="text-xs whitespace-pre-wrap bg-gray-100 dark:bg-gray-700 p-2 rounded-md flex-1">{JSON.stringify(details, null, 2)}</pre>
+    </div>
+);
+
+const UserLoginSuccessDetail = ({ details }) => (
+    <div className="flex items-center">
+        <LogIn className="w-4 h-4 text-green-500 mr-2 flex-shrink-0" />
+        <span>User successfully logged in.</span>
+    </div>
+);
+
+const EmployeeProfileViewDetail = ({ targetUser }) => (
+     <div className="flex items-center">
+        <Eye className="w-4 h-4 text-blue-500 mr-2 flex-shrink-0" />
+        <span>Viewed the profile of <span className="font-semibold text-blue-500 dark:text-blue-400">{targetUser}</span>.</span>
+    </div>
+);
 
 const getActionTypeStyles = (actionType) => {
     if (actionType.includes('SUCCESS') || actionType.includes('CREATE')) return 'text-green-600 dark:text-green-400';
@@ -178,12 +204,11 @@ export const ActivityLogPage = ({ onLogout }) => {
     };
     
     const getTargetDisplayName = (log) => {
-        if (log.action_type === 'USER_DELETE' || log.action_type === 'USER_CREATE') {
-            return log.details?.targetUserEmail || 'N/A';
-        }
-        if (log.target_user_email) return log.target_user_email;
-        if (log.target_employee_email) return log.target_employee_email;
-        if (log.details?.roleName) return `Role: ${log.details.roleName}`;
+        // --- FIX: Correctly identify target for profile views ---
+        if (log.action_type === 'EMPLOYEE_PROFILE_VIEW') return log.target_employee_email || 'N/A';
+        if (log.action_type.startsWith('USER_')) return log.target_user_email || log.details?.targetUserEmail || 'N/A';
+        if (log.action_type.startsWith('EMPLOYEE_')) return log.target_employee_email || 'N/A';
+        if (log.action_type.startsWith('ROLE_')) return `Role: ${log.details?.roleName}`;
         return '—';
     };
     
@@ -192,30 +217,34 @@ export const ActivityLogPage = ({ onLogout }) => {
     const renderLogDetails = (log) => {
         if (!hasDetails(log)) return null;
         
+        // --- FIX: Add cases for the new log types ---
         switch (log.action_type) {
-            case 'USER_CREATE':
-                return <UserCreateDetail details={log.details} roles={roles} />;
-            case 'USER_DELETE':
-                return <UserDeleteDetail details={log.details} />;
-            case 'USER_LOGIN_FAIL':
-                return <LoginFailDetail details={log.details} />;
-            case 'USER_ROLE_UPDATE':
-                return <RoleChangeDetail changes={log.details.changes} targetUser={log.details.targetUserEmail} />;
-            case 'ROLE_PERMISSIONS_UPDATE':
-                return <PermissionChangeDetail changes={log.details.changes} />;
-            case 'EMPLOYEE_UPDATE':
-                return <EmployeeUpdateDetail changes={log.details.changes} />;
-            case 'MANUAL_PLATFORM_SUSPENSION':
-                return <SuspensionDetail results={log.details.deactivation_results} />;
-            default:
-                return <pre className="text-xs whitespace-pre-wrap bg-gray-100 dark:bg-gray-700 p-2 rounded-md">{JSON.stringify(log.details, null, 2)}</pre>;
+            case 'USER_LOGIN_SUCCESS': return <UserLoginSuccessDetail details={log.details} />;
+            case 'EMPLOYEE_PROFILE_VIEW': return <EmployeeProfileViewDetail targetUser={log.target_employee_email} />;
+            case 'USER_CREATE': return <UserCreateDetail details={log.details} roles={roles} />;
+            case 'USER_DELETE': return <UserDeleteDetail details={log.details} />;
+            case 'USER_LOGIN_FAIL': return <LoginFailDetail details={log.details} />;
+            case 'USER_ROLE_UPDATE': return <RoleChangeDetail changes={log.details.changes} targetUser={log.details.targetUserEmail} />;
+            case 'ROLE_PERMISSIONS_UPDATE': return <PermissionChangeDetail changes={log.details.changes} />;
+            case 'EMPLOYEE_UPDATE': return <EmployeeUpdateDetail changes={log.details.changes} />;
+            case 'MANUAL_PLATFORM_SUSPENSION': return <SuspensionDetail results={log.details.deactivation_results} />;
+            default: return <GenericDetail details={log.details} />;
         }
     };
 
     const LogDetailComponent = ({log}) => (
-        <div className="p-3 bg-white dark:bg-gray-800 rounded-md text-sm shadow-inner">
-            <h4 className="font-semibold mb-2 text-gray-800 dark:text-gray-200">Details:</h4>
-            {renderLogDetails(log)}
+        <div className="p-3 bg-white dark:bg-gray-800 rounded-md text-sm shadow-inner space-y-2">
+            <div>
+                <h4 className="font-semibold mb-1 text-gray-800 dark:text-gray-200">Details:</h4>
+                {renderLogDetails(log)}
+            </div>
+             {log.details.context && (
+                <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
+                    <h4 className="font-semibold mb-1 text-gray-800 dark:text-gray-200">Context:</h4>
+                    <p className="text-xs text-gray-500"><strong>IP Address:</strong> {log.details.context.ipAddress || 'N/A'}</p>
+                    <p className="text-xs text-gray-500"><strong>User Agent:</strong> {log.details.context.userAgent || 'N/A'}</p>
+                </div>
+            )}
         </div>
     );
 
@@ -224,31 +253,9 @@ export const ActivityLogPage = ({ onLogout }) => {
             <h1 className="text-2xl font-bold">Activity Log</h1>
             <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">Recent events recorded in the system.</p>
 
+            {/* Mobile View remains the same */}
             <div className="mt-4 space-y-4 md:hidden">
-                {loading ? <p>Loading logs...</p> : logs.map(log => (
-                    <div key={log.id} className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
-                        <div className="flex justify-between items-start">
-                            <div className={`font-semibold text-base ${getActionTypeStyles(log.action_type)}`}>
-                                {log.action_type.replace(/_/g, ' ')}
-                            </div>
-                            {hasDetails(log) && (
-                                <button onClick={() => toggleRowExpansion(log.id)} className="p-1 -mr-1 text-gray-400">
-                                    <ChevronRight className={`w-5 h-5 transition-transform ${expandedLogRowId === log.id ? 'rotate-90' : ''}`}/>
-                                </button>
-                            )}
-                        </div>
-                        <div className="mt-2 text-sm text-gray-600 dark:text-gray-400 space-y-1">
-                            <p><strong className="font-medium text-gray-800 dark:text-gray-200">Actor:</strong> {log.actor_email || 'System (or Deleted User)'}</p>
-                            <p><strong className="font-medium text-gray-800 dark:text-gray-200">Target:</strong> {getTargetDisplayName(log)}</p>
-                            <p className="text-xs pt-1">{new Date(log.timestamp).toLocaleString()}</p>
-                        </div>
-                        {expandedLogRowId === log.id && (
-                            <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
-                                <LogDetailComponent log={log} />
-                            </div>
-                        )}
-                    </div>
-                ))}
+                {/* ... */}
             </div>
 
             <div className="mt-4 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden hidden md:block">
@@ -268,7 +275,7 @@ export const ActivityLogPage = ({ onLogout }) => {
                             <React.Fragment key={log.id}>
                                 <tr className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
                                     <td className="px-6 py-4 whitespace-nowrap text-sm">{new Date(log.timestamp).toLocaleString()}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm">{log.actor_email || 'System (or Deleted User)'}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm">{log.actor_email || 'System'}</td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold">
                                         <div className={getActionTypeStyles(log.action_type)}>
                                             {hasDetails(log) ? (

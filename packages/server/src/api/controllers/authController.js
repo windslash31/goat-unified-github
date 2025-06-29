@@ -7,7 +7,9 @@ const login = async (req, res, next) => {
         if (!email || !password) {
             return res.status(400).json({ message: 'Email and password are required.' });
         }
-        const result = await authService.login(email, password);
+        // --- FIX: Pass request context to the service ---
+        const reqContext = { ip: req.ip, userAgent: req.headers['user-agent'] };
+        const result = await authService.login(email, password, reqContext);
         res.json(result);
     } catch (error) {
         if (error.message.includes('Invalid credentials') || error.message.includes('role')) {
@@ -21,7 +23,9 @@ const logout = async (req, res, next) => {
     try {
         const authHeader = req.headers['authorization'];
         const token = authHeader && authHeader.split(' ')[1];
-        await authService.logout(token);
+        // --- FIX: Pass request context to the service ---
+        const reqContext = { ip: req.ip, userAgent: req.headers['user-agent'] };
+        await authService.logout(token, reqContext);
         res.status(200).json({ message: 'Logout successful.' });
     } catch (error) {
         next(error);

@@ -21,12 +21,12 @@ const getAllPermissions = async () => {
     return result.rows;
 };
 
-const createRole = async (name, actorId) => {
+const createRole = async (name, actorId, reqContext) => {
     const client = await db.pool.connect();
     try {
         await client.query('BEGIN');
         const result = await client.query('INSERT INTO roles (name) VALUES ($1) RETURNING *', [name]);
-        await logActivity(actorId, 'ROLE_CREATE', null, { roleName: name }, client);
+        await logActivity(actorId, 'ROLE_CREATE', { roleName: name }, reqContext, client);
         await client.query('COMMIT');
         return result.rows[0];
     } catch (err) {
@@ -37,7 +37,7 @@ const createRole = async (name, actorId) => {
     }
 };
 
-const updateRolePermissions = async (roleId, permissionIds, actorId) => {
+const updateRolePermissions = async (roleId, permissionIds, actorId, reqContext) => {
     const client = await db.pool.connect();
     try {
         await client.query('BEGIN');
@@ -62,7 +62,7 @@ const updateRolePermissions = async (roleId, permissionIds, actorId) => {
         const removed = oldPermissions.filter(p => !newPermissions.includes(p));
         
         if (added.length > 0 || removed.length > 0) {
-            await logActivity(actorId, 'ROLE_PERMISSIONS_UPDATE', null, { roleName: roleName, changes: { added, removed } }, client);
+            await logActivity(actorId, 'ROLE_PERMISSIONS_UPDATE', { roleName: roleName, changes: { added, removed } }, reqContext, client);
         }
         
         await client.query('COMMIT');
@@ -75,7 +75,7 @@ const updateRolePermissions = async (roleId, permissionIds, actorId) => {
     }
 };
 
-const deleteRole = async (roleId, actorId) => {
+const deleteRole = async (roleId, actorId, reqContext) => {
     const client = await db.pool.connect();
     try {
         await client.query('BEGIN');
@@ -93,7 +93,7 @@ const deleteRole = async (roleId, actorId) => {
         }
         
         await client.query('DELETE FROM roles WHERE id = $1', [roleId]);
-        await logActivity(actorId, 'ROLE_DELETE', null, { roleName: roleName }, client);
+        await logActivity(actorId, 'ROLE_DELETE', { roleName: roleName }, reqContext, client);
         
         await client.query('COMMIT');
         return { message: 'Role deleted successfully' };

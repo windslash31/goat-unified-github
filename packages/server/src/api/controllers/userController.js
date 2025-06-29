@@ -11,9 +11,9 @@ const listUsers = async (req, res, next) => {
 
 const createUser = async (req, res, next) => {
     try {
-        // --- FIX: Pass the actor's ID from the request to the service ---
         const actorId = req.user.id; 
-        const newUser = await userService.createUser(req.body, actorId);
+        const reqContext = { ip: req.ip, userAgent: req.headers['user-agent'] };
+        const newUser = await userService.createUser(req.body, actorId, reqContext);
         res.status(201).json(newUser);
     } catch (error) {
         if (error.message.includes('already exists')) {
@@ -27,7 +27,8 @@ const updateUserRole = async (req, res, next) => {
     try {
         const { id } = req.params;
         const { roleId } = req.body;
-        const result = await userService.updateUserRole(id, roleId, req.user.id);
+        const reqContext = { ip: req.ip, userAgent: req.headers['user-agent'] };
+        const result = await userService.updateUserRole(id, roleId, req.user.id, reqContext);
         res.status(200).json(result);
     } catch (error) {
         next(error);
@@ -37,7 +38,8 @@ const updateUserRole = async (req, res, next) => {
 const deleteUser = async (req, res, next) => {
     try {
         const { id } = req.params;
-        const result = await userService.deleteUser(id, req.user.id);
+        const reqContext = { ip: req.ip, userAgent: req.headers['user-agent'] };
+        const result = await userService.deleteUser(id, req.user.id, reqContext);
         res.status(200).json(result);
     } catch (error) {
         if(error.message.includes('not found')){

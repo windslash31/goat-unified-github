@@ -111,12 +111,26 @@ export const EmployeeDetailPage = ({ onEdit, onDeactivate, permissions, onLogout
 
     }, [employeeId, onLogout, setDynamicCrumbs]);
 
+    // --- FIX: Add employeeId to the dependency array to ensure the log is sent ---
     useEffect(() => {
         fetchInitialData();
+
+        const token = localStorage.getItem('accessToken');
+        if (token && employeeId) {
+            fetch(`${process.env.REACT_APP_API_BASE_URL}/api/employees/logs/view`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ targetEmployeeId: employeeId })
+            }).catch(err => console.error("Failed to log profile view:", err));
+        }
+        
         return () => {
             setDynamicCrumbs([]);
         }
-    }, [fetchInitialData, setDynamicCrumbs]);
+    }, [fetchInitialData, setDynamicCrumbs, employeeId]);
     
     const fetchLogData = useCallback((tabKey) => {
         if (!permissions.includes('log:read:platform') || tabData[tabKey]?.fetched || tabData[tabKey]?.loading) {

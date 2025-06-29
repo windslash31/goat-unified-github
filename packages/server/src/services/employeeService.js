@@ -149,7 +149,7 @@ const getEmployees = async (filters) => {
     };
 };
 
-const updateEmployee = async (employeeId, updatedData, actorId) => {
+const updateEmployee = async (employeeId, updatedData, actorId, reqContext) => {
     const client = await db.pool.connect();
     try {
         await client.query('BEGIN');
@@ -194,7 +194,7 @@ const updateEmployee = async (employeeId, updatedData, actorId) => {
         for (const key in changes) {
             logChanges[key] = { from: originalEmployee[key], to: changes[key] };
         }
-        await logActivity(actorId, 'EMPLOYEE_UPDATE', { targetEmployeeId: employeeId, changes: logChanges }, client);
+        await logActivity(actorId, 'EMPLOYEE_UPDATE', { targetEmployeeId: employeeId, changes: logChanges }, reqContext, client);
 
         await client.query('COMMIT');
         
@@ -241,7 +241,7 @@ const getJumpCloudLogs = async (employeeId) => {
     if (!findUserResponse.ok) throw new Error(`JumpCloud API Error: ${findUserResponse.status}.`);
     
     const { results: users } = await findUserResponse.json();
-    if (!users || users.length === 0) return []; // Return empty instead of throwing error if user not in JC
+    if (!users || users.length === 0) return [];
     if (!users[0].username) return [];
 
     const eventsUrl = 'https://api.jumpcloud.com/insights/directory/v1/events';
@@ -271,10 +271,10 @@ const getSlackLogs = async (employeeId) => {
 
 const getUnifiedTimeline = async (employeeId) => {
     return [];
-}
+};
 
 
-const deactivateOnPlatforms = async (employeeId, platforms, actorId) => {
+const deactivateOnPlatforms = async (employeeId, platforms, actorId, reqContext) => {
     const employeeRes = await db.query('SELECT employee_email FROM employees WHERE id = $1', [employeeId]);
     if (employeeRes.rows.length === 0) throw new Error('Employee not found.');
     
@@ -294,15 +294,15 @@ const deactivateOnPlatforms = async (employeeId, platforms, actorId) => {
         }
     }
     
-    await logActivity(actorId, 'MANUAL_PLATFORM_SUSPENSION', { targetEmployeeId: employeeId, deactivation_results });
+    await logActivity(actorId, 'MANUAL_PLATFORM_SUSPENSION', { targetEmployeeId: employeeId, deactivation_results }, reqContext);
     return { message: 'Suspension process completed.', results: deactivation_results };
 };
 
-const bulkDeactivateOnPlatforms = async (employeeIds, platforms, actorId) => {
+const bulkDeactivateOnPlatforms = async (employeeIds, platforms, actorId, reqContext) => {
     const results = [];
     for (const employeeId of employeeIds) {
         try {
-            const result = await deactivateOnPlatforms(employeeId, platforms, actorId);
+            const result = await deactivateOnPlatforms(employeeId, platforms, actorId, reqContext);
             results.push({ employeeId, success: true, message: result.message });
         } catch(error) {
             results.push({ employeeId, success: false, message: error.message });
