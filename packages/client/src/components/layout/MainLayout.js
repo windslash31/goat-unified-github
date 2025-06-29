@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Outlet } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
-import { ChevronLeft } from 'lucide-react'; // Import the icon
+import { ChevronLeft } from 'lucide-react';
+import { useUIStore } from '../../stores/uiStore'; // Import our new UI store
 
 export const MainLayout = ({ 
     onLogout, 
@@ -11,8 +12,12 @@ export const MainLayout = ({
     breadcrumbs, 
     user 
 }) => {
-    const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
-    const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+    // Get the state and the action from the Zustand store
+    const isSidebarCollapsed = useUIStore((state) => state.isSidebarCollapsed);
+    const toggleSidebar = useUIStore((state) => state.toggleSidebar);
+    
+    // The local useState for the mobile sidebar can remain here
+    const [isMobileSidebarOpen, setIsMobileSidebarOpen] = React.useState(false);
 
     return (
         <div className="h-screen w-screen flex bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-200">
@@ -32,12 +37,12 @@ export const MainLayout = ({
                     isMobileOpen={isMobileSidebarOpen}
                     setMobileOpen={setIsMobileSidebarOpen}
                     isCollapsed={isSidebarCollapsed}
-                    setCollapsed={setIsSidebarCollapsed}
+                    // We no longer need to pass the setter function
                 />
                 
                 {/* Floating Collapse/Expand Button for Desktop */}
                 <button
-                    onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+                    onClick={toggleSidebar} // Use the action from the store
                     className={`hidden md:flex absolute top-20 z-50 items-center justify-center w-6 h-6 rounded-full bg-white dark:bg-gray-700 shadow-md ring-1 ring-gray-200 dark:ring-gray-600 hover:bg-gray-100 dark:hover:bg-gray-600 transition-all duration-300 ease-in-out ${isSidebarCollapsed ? 'left-[72px]' : 'left-[248px]'}`}
                     aria-label={isSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
                 >

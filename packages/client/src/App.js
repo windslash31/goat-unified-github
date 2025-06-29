@@ -7,6 +7,8 @@ import { MainLayout } from './components/layout/MainLayout';
 import { EditEmployeeModal } from './components/ui/EditEmployeeModal';
 import { DeactivateEmployeeModal } from './components/ui/DeactivateEmployeeModal';
 import { AccessDeniedPage } from './components/ui/AccessDeniedPage';
+import { useAuthStore } from './stores/authStore';
+import api from './api/api';
 
 // Lazy load page components for code splitting
 const LoginPage = lazy(() => import('./pages/LoginPage').then(module => ({ default: module.LoginPage })));
@@ -17,19 +19,12 @@ const ActivityLogPage = lazy(() => import('./pages/ActivityLogPage').then(module
 const UserManagementPage = lazy(() => import('./pages/UserManagementPage').then(module => ({ default: module.UserManagementPage })));
 const RoleManagementPage = lazy(() => import('./pages/RoleManagementPage').then(module => ({ default: module.RoleManagementPage })));
 
-const fetchMe = async (token) => {
-    if (!token) throw new Error("No token provided");
-    const response = await fetch(`${process.env.REACT_APP_API_BASE_URL}/api/me`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-    });
-    if (response.status === 403) throw new Error('Forbidden');
-    if (response.status === 404) return null;
-    if (!response.ok) throw new Error('Could not fetch user profile');
-    return response.json();
+const fetchMe = async () => {
+    const { data } = await api.get('/api/me');
+    return data;
 };
 
-const fetchEmployees = async (token, filters, pagination, sorting) => {
-    if (!token) throw new Error("No token provided");
+const fetchEmployees = async (filters, pagination, sorting) => {
     const queryParams = new URLSearchParams({
         page: pagination.currentPage,
         limit: pagination.limit,
@@ -41,16 +36,12 @@ const fetchEmployees = async (token, filters, pagination, sorting) => {
             queryParams.append(key, filters[key]);
         }
     }
-    const response = await fetch(`${process.env.REACT_APP_API_BASE_URL}/api/employees?${queryParams.toString()}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-    });
-    if (!response.ok) throw new Error('Failed to fetch employees');
-    return response.json();
+    const { data } = await api.get(`/api/employees?${queryParams.toString()}`);
+    return data;
 };
 
 const AppContent = () => {
-    const [token, setToken] = useState(localStorage.getItem('accessToken'));
-    const [currentUser, setCurrentUser] = useState(null);
+    const { isAuthenticated, user, logout, fetchUser } = useAuthStore();
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [isDeactivateModalOpen, setIsDeactivateModalOpen] = useState(false);
     const [employeeToEdit, setEmployeeToEdit] = useState(null);
@@ -67,7 +58,10 @@ const AppContent = () => {
     const location = useLocation();
     const queryClient = useQueryClient();
     const { dynamicCrumbs, setDynamicCrumbs } = useBreadcrumb();
-
+    
+    useEffect(() => {
+        fetchUser();
+    }, [fetchUser]);
 
     const handleOpenEditModal = (employee) => { setEmployeeToEdit(employee); setIsEditModalOpen(true); };
     const handleCloseEditModal = () => { setIsEditModalOpen(false); setEmployeeToEdit(null); };
@@ -75,47 +69,21 @@ const AppContent = () => {
     const handleCloseDeactivateModal = () => { setIsDeactivateModalOpen(false); setEmployeeToEdit(null); };
 
     const handleLogout = useCallback(async () => {
-        const currentToken = localStorage.getItem('accessToken');
-        if (currentToken) {
-            try {
-                await fetch(`${process.env.REACT_APP_API_BASE_URL}/api/logout`, {
-                    method: 'POST',
-                    headers: { 'Authorization': `Bearer ${currentToken}` }
-                });
-            } catch (error) {
-                console.error("Logout communication failed:", error);
-            }
-        }
-        localStorage.removeItem('accessToken');
-        setToken(null);
-        setCurrentUser(null);
+        await logout();
         queryClient.clear();
-    }, [queryClient]);
-
-    useEffect(() => {
-        if (token) {
-            try {
-                const decoded = JSON.parse(atob(token.split('.')[1]));
-                setCurrentUser({ ...decoded });
-            } catch (e) {
-                handleLogout();
-            }
-        } else {
-            setCurrentUser(null);
-        }
-    }, [token, handleLogout]);
+    }, [logout, queryClient]);
 
     const { data: currentUserEmployeeRecord, error: meError } = useQuery({
-        queryKey: ['me', token],
-        queryFn: () => fetchMe(token),
-        enabled: !!token,
+        queryKey: ['me'],
+        queryFn: fetchMe,
+        enabled: isAuthenticated,
         staleTime: 1000 * 60 * 5,
     });
 
     const { data: employeeData, isLoading: isLoadingEmployees, error: employeesError } = useQuery({
-        queryKey: ['employees', token, filters, pagination.currentPage, sorting],
-        queryFn: () => fetchEmployees(token, filters, pagination, sorting),
-        enabled: !!token && (location.pathname === '/employees' || location.pathname === '/'),
+        queryKey: ['employees', filters, pagination.currentPage, sorting],
+        queryFn: () => fetchEmployees(filters, pagination, sorting),
+        enabled: isAuthenticated && (location.pathname === '/employees' || location.pathname === '/'),
         keepPreviousData: true,
         onSuccess: (data) => {
             setPagination(prev => ({ ...prev, totalPages: data.totalPages, totalCount: data.totalCount }));
@@ -123,15 +91,11 @@ const AppContent = () => {
     });
 
     useEffect(() => {
-        if (meError) {
-            console.error("A critical query failed (me):", meError.message);
+        if (meError || employeesError) {
+            console.error("A critical query failed:", meError || employeesError);
             handleLogout();
         }
-        if (employeesError && location.pathname.startsWith('/employees')) {
-            console.error("A critical query failed (employees):", employeesError.message);
-            handleLogout();
-        }
-    }, [meError, employeesError, handleLogout, location.pathname]);
+    }, [meError, employeesError, handleLogout]);
 
     useEffect(() => {
         const nonDynamicPaths = ['/profile', '/employees', '/logs/activity', '/users', '/roles', '/access-denied', '/'];
@@ -155,11 +119,6 @@ const AppContent = () => {
            queryClient.invalidateQueries({ queryKey: ['employee', employeeToEdit.id] });
         }
         handleCloseDeactivateModal();
-    };
-
-    const handleLogin = (newToken) => {
-        localStorage.setItem('accessToken', newToken);
-        setToken(newToken);
     };
 
     const getBreadcrumbs = () => {
@@ -190,10 +149,10 @@ const AppContent = () => {
     };
 
 
-    if (!token) {
+    if (!isAuthenticated) {
         return (
             <Routes>
-                <Route path="/login" element={<LoginPage onLogin={handleLogin} />} />
+                <Route path="/login" element={<LoginPage />} />
                 <Route path="*" element={<Navigate to="/login" replace />} />
             </Routes>
         );
@@ -203,7 +162,7 @@ const AppContent = () => {
         return <Navigate to="/profile" replace />;
     }
 
-    if (!currentUser) {
+    if (!user) {
         return <div className="p-6 text-center text-lg">Loading Application...</div>;
     }
 
@@ -214,13 +173,13 @@ const AppContent = () => {
                     element={
                         <MainLayout 
                             onLogout={handleLogout}
-                            permissions={currentUser.permissions}
+                            permissions={user.permissions}
                             breadcrumbs={getBreadcrumbs()}
-                            user={currentUser}
+                            user={user}
                         />
                     }
                 >
-                    <Route path="/profile" element={<ProfilePage employee={currentUserEmployeeRecord} permissions={currentUser.permissions} onEdit={handleOpenEditModal} onDeactivate={handleOpenDeactivateModal} onLogout={handleLogout} user={currentUser} />} />
+                    <Route path="/profile" element={<ProfilePage employee={currentUserEmployeeRecord} permissions={user.permissions} onEdit={handleOpenEditModal} onDeactivate={handleOpenDeactivateModal} onLogout={handleLogout} user={user} />} />
                     
                     <Route 
                         path="/employees" 
@@ -240,10 +199,10 @@ const AppContent = () => {
                         } 
                     />
 
-                    <Route path="/employees/:employeeId" element={<EmployeeDetailPage onEdit={handleOpenEditModal} onDeactivate={handleOpenDeactivateModal} permissions={currentUser.permissions} onLogout={handleLogout} />} />
+                    <Route path="/employees/:employeeId" element={<EmployeeDetailPage onEdit={handleOpenEditModal} onDeactivate={handleOpenDeactivateModal} permissions={user.permissions} onLogout={handleLogout} />} />
                     <Route path="/logs/activity" element={<ActivityLogPage onLogout={handleLogout} />} />
-                    <Route path="/users" element={<UserManagementPage onLogout={handleLogout} currentUser={currentUser} />} />
-                    <Route path="/roles" element={<RoleManagementPage onLogout={handleLogout} permissions={currentUser.permissions}/>} />
+                    <Route path="/users" element={<UserManagementPage onLogout={handleLogout} currentUser={user} />} />
+                    <Route path="/roles" element={<RoleManagementPage onLogout={handleLogout} permissions={user.permissions}/>} />
                     <Route path="/access-denied" element={<AccessDeniedPage />} />
                     <Route path="/" element={<Navigate to="/profile" replace />} /> 
                 </Route>

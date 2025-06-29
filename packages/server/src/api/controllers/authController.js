@@ -7,7 +7,6 @@ const login = async (req, res, next) => {
         if (!email || !password) {
             return res.status(400).json({ message: 'Email and password are required.' });
         }
-        // --- FIX: Pass request context to the service ---
         const reqContext = { ip: req.ip, userAgent: req.headers['user-agent'] };
         const result = await authService.login(email, password, reqContext);
         res.json(result);
@@ -23,12 +22,25 @@ const logout = async (req, res, next) => {
     try {
         const authHeader = req.headers['authorization'];
         const token = authHeader && authHeader.split(' ')[1];
-        // --- FIX: Pass request context to the service ---
-        const reqContext = { ip: req.ip, userAgent: req.headers['user-agent'] };
+        const { refreshToken } = req.body; // Expect refresh token in the body for invalidation
+        const reqContext = { ip: req.ip, userAgent: req.headers['user-agent'], refreshToken };
         await authService.logout(token, reqContext);
         res.status(200).json({ message: 'Logout successful.' });
     } catch (error) {
         next(error);
+    }
+};
+
+const refreshToken = async (req, res, next) => {
+    try {
+        const { token } = req.body;
+        if (!token) {
+            return res.status(401).json({ message: 'Refresh token is required.' });
+        }
+        const newTokens = await authService.refreshAccessToken(token);
+        res.json(newTokens);
+    } catch (error) {
+        res.status(403).json({ message: 'Failed to refresh access token.' });
     }
 };
 
@@ -51,5 +63,6 @@ const getMe = async (req, res, next) => {
 module.exports = {
     login,
     logout,
+    refreshToken,
     getMe,
 };
