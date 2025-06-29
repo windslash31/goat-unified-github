@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Portal } from './Portal';
 import { X, ExternalLink, User, CheckSquare, Calendar, Loader } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { Button } from './Button';
 
 const fetchTicketDetails = async (ticketId, token) => {
     if (!ticketId || !token) return null;
@@ -55,7 +56,7 @@ export const JiraTicketModal = ({ ticketId, onClose }) => {
                     <div className="p-6">
                         {isLoading && (
                             <div className="flex justify-center items-center h-48">
-                                <Loader className="w-8 h-8 animate-spin text-blue-500" />
+                                <Loader className="w-8 h-8 animate-spin text-kredivo-primary" />
                             </div>
                         )}
                         {error && (
@@ -78,9 +79,11 @@ export const JiraTicketModal = ({ ticketId, onClose }) => {
                     </div>
 
                     <div className="bg-gray-50 dark:bg-gray-700/50 px-6 py-3 flex justify-end">
-                        <a href={`${jiraBaseUrl}${ticketId}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700">
-                            <ExternalLink className="w-4 h-4" />
-                            Open in Jira
+                        <a href={`${jiraBaseUrl}${ticketId}`} target="_blank" rel="noopener noreferrer">
+                            <Button variant="primary">
+                                <ExternalLink className="w-4 h-4 mr-2" />
+                                Open in Jira
+                            </Button>
                         </a>
                     </div>
                 </div>

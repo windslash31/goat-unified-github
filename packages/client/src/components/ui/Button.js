@@ -2,7 +2,7 @@ import React from 'react';
 
 export const Button = ({ children, onClick, type = 'button', variant = 'primary', disabled = false, className = '' }) => {
     // Base classes for all buttons
-    const baseClasses = "px-4 py-2 text-sm font-semibold rounded-md shadow-sm border focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors";
+    const baseClasses = "inline-flex items-center px-4 py-2 text-sm font-semibold rounded-md shadow-sm border focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors";
 
     // Variant classes for different button types
     const variants = {

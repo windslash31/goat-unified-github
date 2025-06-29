@@ -1,5 +1,6 @@
 import React from 'react';
 import { AlertTriangle } from 'lucide-react';
+import { Button } from './Button'; // Import our new Button component
 
 export const ConfirmationModal = ({ isOpen, onClose, onConfirm, title, message }) => {
     if (!isOpen) return null;
@@ -16,13 +17,13 @@ export const ConfirmationModal = ({ isOpen, onClose, onConfirm, title, message }
                         </div>
                     </div>
                 </div>
-                <div className="bg-gray-50 dark:bg-gray-700/50 px-4 py-3 sm:px-6 flex flex-row-reverse">
-                    <button type="button" onClick={onConfirm} className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none sm:ml-3 sm:w-auto sm:text-sm">
-                        Confirm
-                    </button>
-                    <button type="button" onClick={onClose} className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 dark:border-gray-500 shadow-sm px-4 py-2 bg-white dark:bg-gray-600 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-500 focus:outline-none sm:mt-0 sm:w-auto sm:text-sm">
+                <div className="bg-gray-50 dark:bg-gray-700/50 px-4 py-3 sm:px-6 flex flex-col-reverse sm:flex-row sm:justify-end gap-3">
+                    <Button onClick={onClose} variant="secondary" className="w-full sm:w-auto">
                         Cancel
-                    </button>
+                    </Button>
+                    <Button onClick={onConfirm} variant="danger" className="w-full sm:w-auto">
+                        Confirm
+                    </Button>
                 </div>
             </div>
         </div>

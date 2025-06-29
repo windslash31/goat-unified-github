@@ -87,7 +87,7 @@ export const RoleManagementPage = ({ onLogout, permissions = [] }) => {
 
     useEffect(() => {
         fetchData();
-    }, [fetchData]); // Removed fetchData from dependency array as it's stable due to useCallback
+    }, [fetchData]);
 
     const handlePermissionChange = (permissionId, isChecked) => {
         if (!selectedRole) return;
@@ -159,6 +159,9 @@ export const RoleManagementPage = ({ onLogout, permissions = [] }) => {
         const promise = fetch(`${process.env.REACT_APP_API_BASE_URL}/api/roles/${roleToDelete.id}`, {
             method: 'DELETE',
             headers: { 'Authorization': `Bearer ${token}` },
+        }).then(res => {
+            if (!res.ok) return res.json().then(err => { throw new Error(err.message) });
+            return res.json();
         });
 
         toast.promise(promise, {
@@ -167,16 +170,12 @@ export const RoleManagementPage = ({ onLogout, permissions = [] }) => {
             error: (err) => err.message || 'Could not delete role.',
         });
 
-        promise.then(res => {
-            if (res.ok) {
-                if (selectedRole?.id === roleToDelete.id) {
-                    setSelectedRole(null);
-                    setIsMobileDetailView(false);
-                }
-                fetchData();
-            } else {
-                return res.json().then(err => { throw new Error(err.message) });
+        promise.then(() => {
+            if (selectedRole?.id === roleToDelete.id) {
+                setSelectedRole(null);
+                setIsMobileDetailView(false);
             }
+            fetchData();
         }).catch(err => {
             toast.error(err.message);
         }).finally(() => {

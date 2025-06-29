@@ -168,7 +168,7 @@ export const ProfilePage = ({ employee, permissions, onEdit, onDeactivate, onLog
         return <WelcomePage user={user} />;
     }
 
-    const TabButton = ({ id, label, icon }) => ( <button onClick={() => handleTabClick(id)} className={`flex items-center gap-2 py-3 px-4 border-b-2 font-semibold text-sm transition-colors whitespace-nowrap ${ activeTab === id ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300' }`}> {icon} {label} </button> );
+    const TabButton = ({ id, label, icon }) => ( <button onClick={() => handleTabClick(id)} className={`flex items-center gap-2 py-3 px-4 border-b-2 font-semibold text-sm transition-colors whitespace-nowrap ${ activeTab === id ? 'border-kredivo-primary text-kredivo-primary' : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300' }`}> {icon} {label} </button> );
 
     return (
         <>
@@ -197,7 +197,7 @@ export const ProfilePage = ({ employee, permissions, onEdit, onDeactivate, onLog
                                 applications={employee.applications || []}
                                 platformStatuses={platformStatuses}
                                 isLoading={isLoadingPlatforms}
-                                permissions={permissions}
+                                onTicketClick={handleTicketClick}
                             />
                         </Section>
                         {permissions.includes('log:read:platform') && (
@@ -244,7 +244,7 @@ export const ProfilePage = ({ employee, permissions, onEdit, onDeactivate, onLog
                                     applications={employee.applications || []}
                                     platformStatuses={platformStatuses}
                                     isLoading={isLoadingPlatforms}
-                                    permissions={permissions}
+                                    onTicketClick={handleTicketClick}
                                 />
                             </div>
                             {permissions.includes('log:read:platform') && (

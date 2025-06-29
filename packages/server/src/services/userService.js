@@ -13,7 +13,6 @@ const getUsers = async () => {
     return result.rows;
 };
 
-// --- FIX: Accept reqContext and pass it to logActivity ---
 const createUser = async (userData, actorId, reqContext) => {
     const { email, fullName, roleId } = userData;
     const client = await db.pool.connect();

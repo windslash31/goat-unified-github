@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import toast from 'react-hot-toast';
 import { Button } from './Button';
+import { CustomSelect } from './CustomSelect';
 
 export const CreateUserModal = ({ roles, onClose, onUserCreated }) => {
     const [formData, setFormData] = useState({
@@ -13,6 +14,10 @@ export const CreateUserModal = ({ roles, onClose, onUserCreated }) => {
     const handleChange = (e) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
+    };
+
+    const handleRoleChange = (newRoleId) => {
+        setFormData(prev => ({ ...prev, roleId: newRoleId }));
     };
 
     const handleSubmit = async (e) => {
@@ -32,7 +37,6 @@ export const CreateUserModal = ({ roles, onClose, onUserCreated }) => {
                 throw new Error(data.message || 'Failed to create user.');
             }
             
-            // Pass the temporary password up to the parent to be shown in the new modal
             onUserCreated(data.temporaryPassword);
 
         } catch (error) {
@@ -41,6 +45,8 @@ export const CreateUserModal = ({ roles, onClose, onUserCreated }) => {
             setIsSubmitting(false);
         }
     };
+
+    const roleOptions = roles.map(role => ({ id: role.id, name: role.name }));
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-50">
@@ -62,20 +68,21 @@ export const CreateUserModal = ({ roles, onClose, onUserCreated }) => {
                             </div>
                             <div>
                                 <label htmlFor="roleId" className="block text-sm font-medium">Role</label>
-                                <select name="roleId" id="roleId" required value={formData.roleId} onChange={handleChange} className="mt-1 w-full px-3 py-2 border rounded-md dark:bg-gray-700 dark:border-gray-600">
-                                    <option value="" disabled>Select a role...</option>
-                                    {roles.map(role => (
-                                        <option key={role.id} value={role.id}>{role.name}</option>
-                                    ))}
-                                </select>
+                                <CustomSelect
+                                    id="roleId"
+                                    value={formData.roleId}
+                                    options={roleOptions}
+                                    onChange={handleRoleChange}
+                                    placeholder="Select a role..."
+                                />
                             </div>
                         </div>
                     </div>
                     <div className="bg-gray-50 dark:bg-gray-700/50 px-6 py-3 flex justify-end gap-3">
-                        <Button type="button" onClick={onClose} disabled={isSubmitting} className="px-4 py-2 text-sm font-semibold rounded-md border">
+                        <Button type="button" onClick={onClose} disabled={isSubmitting} variant="secondary">
                             Cancel
                         </Button>
-                        <Button type="submit" disabled={isSubmitting} className="px-4 py-2 text-sm font-semibold text-white bg-blue-600 rounded-md disabled:opacity-50">
+                        <Button type="submit" disabled={isSubmitting || !formData.roleId} variant="primary">
                             {isSubmitting ? 'Creating...' : 'Create User'}
                         </Button>
                     </div>

@@ -242,7 +242,7 @@ const AppContent = () => {
 
                     <Route path="/employees/:employeeId" element={<EmployeeDetailPage onEdit={handleOpenEditModal} onDeactivate={handleOpenDeactivateModal} permissions={currentUser.permissions} onLogout={handleLogout} />} />
                     <Route path="/logs/activity" element={<ActivityLogPage onLogout={handleLogout} />} />
-                    <Route path="/users" element={<UserManagementPage onLogout={handleLogout} />} />
+                    <Route path="/users" element={<UserManagementPage onLogout={handleLogout} currentUser={currentUser} />} />
                     <Route path="/roles" element={<RoleManagementPage onLogout={handleLogout} permissions={currentUser.permissions}/>} />
                     <Route path="/access-denied" element={<AccessDeniedPage />} />
                     <Route path="/" element={<Navigate to="/profile" replace />} /> 

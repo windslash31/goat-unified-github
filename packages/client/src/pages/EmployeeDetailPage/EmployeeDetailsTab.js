@@ -18,7 +18,7 @@ export const EmployeeDetailsTab = memo(({ employee, permissions, navigate, onTic
         if (!ticketId) return '—';
         // This is now a button that calls the handler passed down from the parent
         return (
-            <button onClick={() => onTicketClick(ticketId)} className="text-blue-500 hover:underline font-mono flex items-center gap-1 text-right">
+            <button onClick={() => onTicketClick(ticketId)} className="text-kredivo-primary hover:text-kredivo-primary-hover hover:underline font-mono flex items-center gap-1 text-right">
                 <Ticket className="w-4 h-4"/>
                 {ticketId}
             </button>
@@ -33,7 +33,7 @@ export const EmployeeDetailsTab = memo(({ employee, permissions, navigate, onTic
             return (
                 <Link 
                     to={`/employees/${managerId}`}
-                    className="text-blue-500 hover:underline text-right"
+                    className="text-kredivo-primary hover:text-kredivo-primary-hover hover:underline text-right"
                 >
                     <div>{managerName}</div>
                     <div className="text-xs text-gray-400">{managerEmail}</div>
@@ -84,12 +84,12 @@ export const EmployeeDetailsTab = memo(({ employee, permissions, navigate, onTic
                 <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
                     <h4 className="font-semibold text-gray-800 dark:text-gray-100 mb-2">Related Tickets</h4>
                     <DetailRow 
-                        icon={<Ticket className="w-4 h-4 mr-2.5 text-blue-500"/>} 
+                        icon={<Ticket className="w-4 h-4 mr-2.5 text-kredivo-primary"/>} 
                         label="Onboarding Ticket" 
                         value={<JiraTicketLink ticketId={employee.onboarding_ticket} />} 
                     />
                     <DetailRow 
-                        icon={<Ticket className="w-4 h-4 mr-2.5 text-blue-500"/>} 
+                        icon={<Ticket className="w-4 h-4 mr-2.5 text-kredivo-primary"/>} 
                         label="Offboarding Ticket" 
                         value={<JiraTicketLink ticketId={employee.offboarding_ticket} />} 
                     />

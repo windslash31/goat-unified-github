@@ -111,7 +111,6 @@ export const EmployeeDetailPage = ({ onEdit, onDeactivate, permissions, onLogout
 
     }, [employeeId, onLogout, setDynamicCrumbs]);
 
-    // --- FIX: Add employeeId to the dependency array to ensure the log is sent ---
     useEffect(() => {
         fetchInitialData();
 
@@ -200,7 +199,7 @@ export const EmployeeDetailPage = ({ onEdit, onDeactivate, permissions, onLogout
     if (!employee) return null;
 
     const TabButton = ({ id, label, icon }) => ( 
-        <button onClick={() => handleTabClick(id)} className={`flex items-center gap-2 py-3 px-4 border-b-2 font-semibold text-sm transition-colors whitespace-nowrap ${ activeTab === id ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300' }`}>
+        <button onClick={() => handleTabClick(id)} className={`flex items-center gap-2 py-3 px-4 border-b-2 font-semibold text-sm transition-colors whitespace-nowrap ${ activeTab === id ? 'border-kredivo-primary text-kredivo-primary' : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300' }`}>
             {icon} {label}
         </button> 
     );
@@ -217,7 +216,7 @@ export const EmployeeDetailPage = ({ onEdit, onDeactivate, permissions, onLogout
                         <EmployeeDetailsTab employee={employee} navigate={navigate} permissions={permissions} onTicketClick={handleTicketClick} />
                     </Section>
                     <Section id="apps-section" title="Apps & Platforms" icon={<LayoutGrid className="w-5 h-5" />}>
-                        <EmployeeApplicationsTab applications={employee.applications || []} platformStatuses={platformStatuses} isLoading={isLoadingPlatforms} permissions={permissions} />
+                        <EmployeeApplicationsTab applications={employee.applications || []} platformStatuses={platformStatuses} isLoading={isLoadingPlatforms} onTicketClick={handleTicketClick} />
                     </Section>
                     {permissions.includes('log:read:platform') && (
                         <>
@@ -257,7 +256,7 @@ export const EmployeeDetailPage = ({ onEdit, onDeactivate, permissions, onLogout
                              <EmployeeDetailsTab employee={employee} navigate={navigate} permissions={permissions} onTicketClick={handleTicketClick} />
                         </div>
                         <div style={{ display: activeTab === 'platforms' ? 'block' : 'none' }}>
-                            <EmployeeApplicationsTab applications={employee.applications || []} platformStatuses={platformStatuses} isLoading={isLoadingPlatforms} permissions={permissions} />
+                            <EmployeeApplicationsTab applications={employee.applications || []} platformStatuses={platformStatuses} isLoading={isLoadingPlatforms} onTicketClick={handleTicketClick} />
                         </div>
                         {permissions.includes('log:read:platform') && (
                             <>

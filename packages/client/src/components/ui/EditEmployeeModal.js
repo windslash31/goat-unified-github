@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import { Button } from '../../components/ui/Button';
+import { CustomSelect } from './CustomSelect';
 
-// A helper to fetch data for our dropdowns
 const useFetchOptions = (tableName, token) => {
     const [options, setOptions] = useState([]);
     useEffect(() => {
@@ -38,6 +38,10 @@ export const EditEmployeeModal = ({ employee, onClose, onSave }) => {
     const handleChange = (e) => {
         const { name, value, type, checked } = e.target;
         setFormData(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
+    };
+    
+    const handleSelectChange = (name, value) => {
+        setFormData(prev => ({...prev, [name]: value}));
     };
 
     const handleToggleChange = (field, value) => {
@@ -96,11 +100,7 @@ export const EditEmployeeModal = ({ employee, onClose, onSave }) => {
             .catch(err => console.error(err));
     };
     
-    const inputClasses = "mt-1 block w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 dark:text-gray-200";
-    const baseButtonStyles = "px-4 py-2 text-sm font-semibold rounded-md shadow-sm border focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800";
-    const primaryButtonStyles = "bg-blue-600 border-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500";
-    const secondaryButtonStyles = "bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 focus:ring-gray-500";
-
+    const inputClasses = "mt-1 block w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-kredivo-primary focus:border-kredivo-primary text-gray-900 dark:text-gray-200";
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-50">
@@ -145,31 +145,27 @@ export const EditEmployeeModal = ({ employee, onClose, onSave }) => {
                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                  <div>
                                     <label htmlFor="legal_entity_id" className="block text-sm font-medium">Legal Entity</label>
-                                    <select name="legal_entity_id" id="legal_entity_id" value={formData.legal_entity_id || ''} onChange={handleChange} className={inputClasses}>
-                                        <option value="">Select...</option>
-                                        {legalEntities.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
-                                    </select>
+                                    <div className="mt-1">
+                                        <CustomSelect id="legal_entity_id" options={legalEntities} value={formData.legal_entity_id} onChange={(value) => handleSelectChange('legal_entity_id', value)} />
+                                    </div>
                                 </div>
                                 <div>
                                     <label htmlFor="office_location_id" className="block text-sm font-medium">Office Location</label>
-                                    <select name="office_location_id" id="office_location_id" value={formData.office_location_id || ''} onChange={handleChange} className={inputClasses}>
-                                        <option value="">Select...</option>
-                                        {officeLocations.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
-                                    </select>
+                                    <div className="mt-1">
+                                        <CustomSelect id="office_location_id" options={officeLocations} value={formData.office_location_id} onChange={(value) => handleSelectChange('office_location_id', value)} />
+                                    </div>
                                 </div>
                                 <div>
                                     <label htmlFor="employee_type_id" className="block text-sm font-medium">Employee Type</label>
-                                    <select name="employee_type_id" id="employee_type_id" value={formData.employee_type_id || ''} onChange={handleChange} className={inputClasses}>
-                                         <option value="">Select...</option>
-                                        {employeeTypes.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
-                                    </select>
+                                    <div className="mt-1">
+                                        <CustomSelect id="employee_type_id" options={employeeTypes} value={formData.employee_type_id} onChange={(value) => handleSelectChange('employee_type_id', value)} />
+                                    </div>
                                 </div>
                                 <div>
                                     <label htmlFor="employee_sub_type_id" className="block text-sm font-medium">Employee Sub-Type</label>
-                                    <select name="employee_sub_type_id" id="employee_sub_type_id" value={formData.employee_sub_type_id || ''} onChange={handleChange} className={inputClasses}>
-                                         <option value="">Select...</option>
-                                        {employeeSubTypes.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
-                                    </select>
+                                    <div className="mt-1">
+                                        <CustomSelect id="employee_sub_type_id" options={employeeSubTypes} value={formData.employee_sub_type_id} onChange={(value) => handleSelectChange('employee_sub_type_id', value)} />
+                                    </div>
                                 </div>
                                 <div className="md:col-span-2">
                                     <label htmlFor="asset_name" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Asset Name</label>
@@ -186,11 +182,11 @@ export const EditEmployeeModal = ({ employee, onClose, onSave }) => {
                                         type="button"
                                         id="is_active_toggle"
                                         onClick={() => handleToggleChange('is_active', !formData.is_active)}
-                                        className={`${formData.is_active ? 'bg-blue-600' : 'bg-gray-200 dark:bg-gray-600'} relative inline-flex h-6 w-11 items-center rounded-full transition-colors`}
+                                        className={`${formData.is_active ? 'bg-kredivo-primary' : 'bg-gray-200 dark:bg-gray-600'} relative inline-flex h-6 w-11 items-center rounded-full transition-colors`}
                                     >
                                         <span className={`${formData.is_active ? 'translate-x-6' : 'translate-x-1'} inline-block h-4 w-4 transform rounded-full bg-white transition-transform`} />
                                     </button>
-                                    <span className={`ml-3 text-sm font-semibold ${formData.is_active ? 'text-blue-600' : 'text-gray-500'}`}>
+                                    <span className={`ml-3 text-sm font-semibold ${formData.is_active ? 'text-kredivo-primary' : 'text-gray-500'}`}>
                                         {formData.is_active ? 'Active' : 'Inactive'}
                                     </span>
                                 </div>
@@ -227,13 +223,13 @@ export const EditEmployeeModal = ({ employee, onClose, onSave }) => {
                          <Button
                             type="button"
                             onClick={onClose}
-                            className={`${baseButtonStyles} ${secondaryButtonStyles}`}
+                            variant="secondary"
                         >
                             Cancel
                         </Button>
                         <Button
                             type="submit"
-                            className={`${baseButtonStyles} ${primaryButtonStyles}`}
+                            variant="primary"
                         >
                             Save Changes
                         </Button>

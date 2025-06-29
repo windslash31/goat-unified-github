@@ -9,7 +9,7 @@ const PlatformStatusBadge = ({ status }) => {
         'Error': 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300',
     };
     return (
-        <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${styles[status] || styles['Error']}`}>
+        <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full whitespace-nowrap ${styles[status] || styles['Error']}`}>
             {status}
         </span>
     );
@@ -28,7 +28,7 @@ const PlatformRowSkeleton = () => (
     </div>
 );
 
-export const EmployeeApplicationsTab = memo(({ applications, platformStatuses, isLoading }) => {
+export const EmployeeApplicationsTab = memo(({ applications, platformStatuses, isLoading, onTicketClick }) => {
     
     const platformLogos = {
         'Google Workspace': 'https://upload.wikimedia.org/wikipedia/commons/a/a8/Google_Workspace_Logo.png',
@@ -52,11 +52,11 @@ export const EmployeeApplicationsTab = memo(({ applications, platformStatuses, i
                     ) : (
                         platformStatuses.map(platform => (
                             <div key={platform.platform} className="flex items-center justify-between p-4 rounded-lg bg-gray-50 dark:bg-gray-900/50">
-                                <div className="flex items-center gap-4">
-                                    <img src={platformLogos[platform.platform] || ''} alt={`${platform.platform} Logo`} className="w-8 h-8"/>
-                                    <div>
-                                        <p className="font-semibold text-gray-800 dark:text-gray-200">{platform.platform}</p>
-                                        <p className="text-xs text-gray-500 dark:text-gray-400">{platform.email || 'N/A'}</p>
+                                <div className="flex items-center gap-4 min-w-0">
+                                    <img src={platformLogos[platform.platform] || ''} alt={`${platform.platform} Logo`} className="w-8 h-8 flex-shrink-0"/>
+                                    <div className="min-w-0">
+                                        <p className="font-semibold text-gray-800 dark:text-gray-200 truncate">{platform.platform}</p>
+                                        <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{platform.email || 'N/A'}</p>
                                     </div>
                                 </div>
                                 <PlatformStatusBadge status={platform.status} />
@@ -71,32 +71,24 @@ export const EmployeeApplicationsTab = memo(({ applications, platformStatuses, i
                  {(!applications || applications.length === 0) ? (
                     <div className="text-center text-gray-500 dark:text-gray-400 py-4">No internal application access records found.</div>
                  ) : (
-                    <div className="overflow-x-auto">
-                        <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                            <thead className="bg-gray-50 dark:bg-gray-700/50">
-                                <tr>
-                                    <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase">Application</th>
-                                    <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase">Role</th>
-                                    <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase">Request Ticket</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                                {applications.map(app => (
-                                    <tr key={app.name}>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800 dark:text-gray-200">{app.name}</td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{app.role}</td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-500 hover:underline">
-                                            {app.jira_ticket ? (
-                                                <a href={`${process.env.REACT_APP_JIRA_BASE_URL}${app.jira_ticket}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2">
-                                                    <Ticket className="w-4 h-4"/>
-                                                    {app.jira_ticket}
-                                                </a>
-                                            ) : '—'}
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                        {applications.map(app => (
+                            <div key={app.name} className="p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-200 dark:border-gray-700/50">
+                                <div className="font-semibold text-gray-800 dark:text-gray-200">{app.name}</div>
+                                <div className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                                    <span className="font-medium">Role:</span> {app.role}
+                                </div>
+                                <div className="mt-1 text-sm text-gray-500 dark:text-gray-400 flex items-center gap-2">
+                                    <span className="font-medium">Request:</span>
+                                    {app.jira_ticket ? (
+                                        <button onClick={() => onTicketClick(app.jira_ticket)} className="text-kredivo-primary hover:underline font-semibold flex items-center gap-1">
+                                            <Ticket className="w-4 h-4"/>
+                                            {app.jira_ticket}
+                                        </button>
+                                    ) : '—'}
+                                </div>
+                            </div>
+                        ))}
                     </div>
                  )}
             </div>

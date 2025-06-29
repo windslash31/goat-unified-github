@@ -6,9 +6,9 @@ import { ConfirmationModal } from '../components/ui/ConfirmationModal';
 import { Portal } from '../components/ui/Portal';
 import { TemporaryPasswordModal } from '../components/ui/TemporaryPasswordModal';
 import { Button } from '../components/ui/Button';
+import { CustomSelect } from '../components/ui/CustomSelect';
 
-
-export const UserManagementPage = ({ onLogout }) => {
+export const UserManagementPage = ({ onLogout, currentUser }) => {
     const [users, setUsers] = useState([]);
     const [roles, setRoles] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -94,17 +94,18 @@ export const UserManagementPage = ({ onLogout }) => {
 
     if (loading) return <div className="p-6">Loading...</div>;
 
+    const roleOptions = roles.map(role => ({ id: role.id, name: role.name }));
+
     return (
         <>
             <div className="p-4 sm:p-6">
-                 {/* --- FIX: Added items-center to fix mobile title alignment --- */}
                 <div className="flex flex-col sm:flex-row justify-between sm:items-center mb-4">
                     <div>
                         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">User Management</h1>
                         <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">Create, delete, and assign roles to users.</p>
                     </div>
-                    <Button onClick={() => setIsCreateModalOpen(true)} className="w-full mt-4 sm:mt-0 sm:w-auto">
-                        <PlusCircle className="w-5 h-5" /> Create User
+                    <Button onClick={() => setIsCreateModalOpen(true)} className="w-full mt-4 sm:mt-0 sm:w-auto justify-center">
+                        <PlusCircle className="w-5 h-5 mr-2" /> Create User
                     </Button>
                 </div>
                 
@@ -117,19 +118,17 @@ export const UserManagementPage = ({ onLogout }) => {
                                     <p className="font-bold text-gray-900 dark:text-white">{user.full_name}</p>
                                     <p className="text-sm text-gray-500 dark:text-gray-400">{user.email}</p>
                                 </div>
-                                <button onClick={() => openDeleteModal(user)} className="p-1 text-gray-400 hover:text-red-500"><Trash2 className="w-4 h-4" /></button>
+                                <button onClick={() => openDeleteModal(user)} disabled={user.id === currentUser.id} className="p-1 text-gray-400 hover:text-red-500 disabled:opacity-50 disabled:cursor-not-allowed"><Trash2 className="w-4 h-4" /></button>
                             </div>
                             <div className="mt-3">
                                 <label htmlFor={`role-select-${user.id}`} className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Role</label>
-                                <select
+                                <CustomSelect
                                     id={`role-select-${user.id}`}
-                                    value={user.role_id || ''}
-                                    onChange={(e) => handleRoleChange(user.id, parseInt(e.target.value))}
-                                    className="w-full bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm py-2 px-3 focus:ring-blue-500 focus:border-blue-500"
-                                >
-                                    <option value="" disabled>No Role</option>
-                                    {roles.map(role => (<option key={role.id} value={role.id}>{role.name}</option>))}
-                                </select>
+                                    value={user.role_id}
+                                    options={roleOptions}
+                                    onChange={(newRoleId) => handleRoleChange(user.id, newRoleId)}
+                                    placeholder="No Role"
+                                />
                             </div>
                         </div>
                     ))}
@@ -152,19 +151,16 @@ export const UserManagementPage = ({ onLogout }) => {
                                     <tr key={user.id}>
                                         <td className="px-6 py-4 whitespace-nowrap font-medium">{user.full_name}</td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{user.email}</td>
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            <select
-                                                value={user.role_id || ''}
-                                                onChange={(e) => handleRoleChange(user.id, parseInt(e.target.value))}
-                                                className="w-full bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm py-2 px-3 focus:ring-blue-500 focus:border-blue-500"
-                                                style={{ minWidth: '150px' }}
-                                            >
-                                                <option value="" disabled>No Role</option>
-                                                {roles.map(role => (<option key={role.id} value={role.id}>{role.name}</option>))}
-                                            </select>
+                                        <td className="px-6 py-4 whitespace-nowrap w-56">
+                                            <CustomSelect
+                                                value={user.role_id}
+                                                options={roleOptions}
+                                                onChange={(newRoleId) => handleRoleChange(user.id, newRoleId)}
+                                                placeholder="No Role"
+                                            />
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
-                                            <button onClick={() => openDeleteModal(user)} className="p-2 text-gray-500 hover:text-red-600 rounded-full hover:bg-red-100 dark:hover:bg-red-900/20"><Trash2 className="w-4 h-4"/></button>
+                                            <button onClick={() => openDeleteModal(user)} disabled={user.id === currentUser.id} className="p-2 text-gray-500 hover:text-red-600 rounded-full hover:bg-red-100 dark:hover:bg-red-900/20 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"><Trash2 className="w-4 h-4"/></button>
                                         </td>
                                     </tr>
                                 ))}
