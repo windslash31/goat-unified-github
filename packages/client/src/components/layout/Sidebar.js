@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { LogOut, ShieldCheck, User, Settings, FileText, Users, ChevronDown, X } from 'lucide-react';
+import { LogOut, ShieldCheck, User, Settings, FileText, Users, ChevronDown, X, LayoutDashboard } from 'lucide-react';
 import { ThemeSwitcher } from '../ui/ThemeSwitcher';
 import { useAuthStore } from '../../stores/authStore';
 import { useUIStore } from '../../stores/uiStore';
@@ -20,6 +20,7 @@ export const Sidebar = ({ onLogout, isMobileOpen, setMobileOpen }) => {
     const hasAuditAccess = permissions.includes('log:read');
 
     const navItems = [
+        { id: 'dashboard', path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, visible: true },
         { id: 'profile', path: '/profile', label: 'Profile', icon: User, permission: 'profile:read:own', visible: permissions.includes('profile:read:own') },
         { id: 'employees', path: '/employees', label: 'Employees', icon: Users, permission: 'employee:read:all', visible: permissions.includes('employee:read:all') },
         { id: 'settings', label: 'Settings', icon: Settings, visible: hasSettingsAccess, subItems: [
@@ -47,7 +48,7 @@ export const Sidebar = ({ onLogout, isMobileOpen, setMobileOpen }) => {
         const hasSubItems = item.subItems && item.subItems.length > 0;
         const isActive = hasSubItems 
             ? item.subItems.some(sub => location.pathname.startsWith(sub.path))
-            : location.pathname.startsWith(item.path);
+            : location.pathname === item.path;
 
         const isDropdownOpen = openDropdowns[item.id] && !isCollapsed;
 

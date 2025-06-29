@@ -13,6 +13,7 @@ import api from './api/api';
 
 // Lazy load page components for code splitting
 const LoginPage = lazy(() => import('./pages/LoginPage').then(module => ({ default: module.LoginPage })));
+const DashboardPage = lazy(() => import('./pages/DashboardPage').then(module => ({ default: module.DashboardPage })));
 const EmployeeListPage = lazy(() => import('./pages/EmployeeListPage').then(module => ({ default: module.EmployeeListPage })));
 const EmployeeDetailPage = lazy(() => import('./pages/EmployeeDetailPage/EmployeeDetailPage').then(module => ({ default: module.EmployeeDetailPage })));
 const ProfilePage = lazy(() => import('./pages/ProfilePage').then(module => ({ default: module.ProfilePage })));
@@ -84,7 +85,7 @@ const AppContent = () => {
     const { data: employeeData, isLoading: isLoadingEmployees, error: employeesError } = useQuery({
         queryKey: ['employees', filters, pagination.currentPage, sorting],
         queryFn: () => fetchEmployees(filters, pagination, sorting),
-        enabled: isAuthenticated && (location.pathname === '/employees' || location.pathname === '/'),
+        enabled: isAuthenticated && (location.pathname === '/employees'),
         keepPreviousData: true,
         onSuccess: (data) => {
             setPagination(prev => ({ ...prev, totalPages: data.totalPages, totalCount: data.totalCount }));
@@ -99,7 +100,7 @@ const AppContent = () => {
     }, [meError, employeesError, handleLogout]);
 
     useEffect(() => {
-        const nonDynamicPaths = ['/profile', '/employees', '/logs/activity', '/users', '/roles', '/access-denied', '/'];
+        const nonDynamicPaths = ['/profile', '/employees', '/logs/activity', '/users', '/roles', '/access-denied', '/dashboard', '/'];
         if (nonDynamicPaths.includes(location.pathname)) {
             setDynamicCrumbs([]);
         }
@@ -124,7 +125,7 @@ const AppContent = () => {
 
     const getBreadcrumbs = () => {
         const pathParts = location.pathname.split('/').filter(p => p);
-        const homeCrumb = { name: 'Home', path: '/' };
+        const homeCrumb = { name: 'Dashboard', path: '/dashboard' };
         
         const pageTitleMap = { 
             'profile': { name: "Profile", path: "/profile" },
@@ -132,6 +133,7 @@ const AppContent = () => {
             'users': { name: "User Management", path: "/users" }, 
             'roles': { name: "Roles & Permissions", path: "/roles" },
             'access-denied': { name: 'Access Denied', path: '/access-denied'},
+            'dashboard': { name: 'Dashboard', path: '/dashboard'}
         };
 
         const crumbs = pathParts.map((part, index) => {
@@ -160,7 +162,7 @@ const AppContent = () => {
     }
     
     if (location.pathname === '/login') {
-        return <Navigate to="/profile" replace />;
+        return <Navigate to="/dashboard" replace />;
     }
 
     if (!user) {
@@ -180,6 +182,7 @@ const AppContent = () => {
                         />
                     }
                 >
+                    <Route path="/dashboard" element={<DashboardPage />} />
                     <Route path="/profile" element={<ProfilePage employee={currentUserEmployeeRecord} permissions={user.permissions} onEdit={handleOpenEditModal} onDeactivate={handleOpenDeactivateModal} onLogout={handleLogout} user={user} />} />
                     
                     <Route path="/employees" element={<EmployeeListPage employees={employeeData?.employees || []} isLoading={isLoadingEmployees} filters={filters} setFilters={setFilters} pagination={pagination} setPagination={setPagination} sorting={sorting} setSorting={setSorting} onEdit={handleOpenEditModal} onDeactivate={handleOpenDeactivateModal} />} />
@@ -194,7 +197,7 @@ const AppContent = () => {
                         <Route path="/roles" element={<RoleManagementPage onLogout={handleLogout} />} />
                     </Route>
                     
-                    <Route path="/" element={<Navigate to="/profile" replace />} /> 
+                    <Route path="/" element={<Navigate to="/dashboard" replace />} /> 
                 </Route>
             </Routes>
             

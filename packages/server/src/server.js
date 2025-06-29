@@ -14,6 +14,7 @@ const userRoutes = require('./api/routes/users');
 const logRoutes = require('./api/routes/logs');
 const applicationRoutes = require('./api/routes/applications');
 const jiraRoutes = require('./api/routes/jira');
+const dashboardRoutes = require('./api/routes/dashboard');
 
 
 const app = express();
@@ -43,6 +44,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/logs', logRoutes);
 app.use('/api/applications', applicationRoutes);
 app.use('/api/jira', jiraRoutes);
+app.use('/api/dashboard', dashboardRoutes);
 
 
 // --- Global Error Handler ---
