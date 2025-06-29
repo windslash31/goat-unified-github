@@ -100,7 +100,7 @@ const AppContent = () => {
     }, [meError, employeesError, handleLogout]);
 
     useEffect(() => {
-        const nonDynamicPaths = ['/profile', '/employees', '/logs/activity', '/users', '/roles', '/access-denied', '/dashboard', '/'];
+        const nonDynamicPaths = ['/profile', '/employees', '/logs/activity', '/users', '/roles', '/access-denied', '/dashboard'];
         if (nonDynamicPaths.includes(location.pathname)) {
             setDynamicCrumbs([]);
         }
@@ -162,7 +162,7 @@ const AppContent = () => {
     }
     
     if (location.pathname === '/login') {
-        return <Navigate to="/dashboard" replace />;
+        return <Navigate to="/" replace />;
     }
 
     if (!user) {
@@ -182,7 +182,10 @@ const AppContent = () => {
                         />
                     }
                 >
-                    <Route path="/dashboard" element={<DashboardPage />} />
+                    <Route element={<ProtectedRoute permission="dashboard:view" />}>
+                        <Route path="/dashboard" element={<DashboardPage />} />
+                    </Route>
+                    
                     <Route path="/profile" element={<ProfilePage employee={currentUserEmployeeRecord} permissions={user.permissions} onEdit={handleOpenEditModal} onDeactivate={handleOpenDeactivateModal} onLogout={handleLogout} user={user} />} />
                     
                     <Route path="/employees" element={<EmployeeListPage employees={employeeData?.employees || []} isLoading={isLoadingEmployees} filters={filters} setFilters={setFilters} pagination={pagination} setPagination={setPagination} sorting={sorting} setSorting={setSorting} onEdit={handleOpenEditModal} onDeactivate={handleOpenDeactivateModal} />} />
@@ -197,7 +200,7 @@ const AppContent = () => {
                         <Route path="/roles" element={<RoleManagementPage onLogout={handleLogout} />} />
                     </Route>
                     
-                    <Route path="/" element={<Navigate to="/dashboard" replace />} /> 
+                    <Route path="/" element={user.permissions.includes('dashboard:view') ? <Navigate to="/dashboard" replace /> : <Navigate to="/profile" replace />} /> 
                 </Route>
             </Routes>
             

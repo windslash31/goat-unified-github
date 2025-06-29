@@ -46,8 +46,101 @@ const permissionGroups = [
             { name: 'log:read:platform', description: 'Allows user to view external platform logs (e.g., JumpCloud).' },
             { name: 'profile:read:own', description: 'Allows user to view their own profile page.' },
         ]
+    },
+    {
+        title: "Dashboard",
+        permissions: [
+            { name: 'dashboard:view', description: 'Allows viewing the main dashboard page.' }
+        ]
     }
 ];
+
+const RoleList = ({ roles, selectedRole, handleSelectRole, permissions, openDeleteModal, newRoleName, setNewRoleName, handleCreateRole }) => (
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+        <div className="p-4">
+            <h2 className="font-semibold text-lg mb-3">Roles</h2>
+            <ul className="space-y-1">
+                {roles.map(role => (
+                    <li key={role.id}>
+                        <button onClick={() => handleSelectRole(role)} className={`w-full text-left px-3 py-2 rounded-md text-sm flex justify-between items-center ${selectedRole?.id === role.id ? 'bg-kredivo-light text-kredivo-dark-text dark:bg-kredivo-primary/20 dark:text-kredivo-primary font-semibold' : 'hover:bg-gray-100 dark:hover:bg-gray-700/50'}`}>
+                            <span>{role.name}</span>
+                            {permissions.includes('role:manage') && !['admin', 'viewer', 'auditor'].includes(role.name) && (
+                                <Trash2 onClick={(e) => { e.stopPropagation(); openDeleteModal(role); }} className="w-4 h-4 text-gray-400 hover:text-red-500" />
+                            )}
+                        </button>
+                    </li>
+                ))}
+            </ul>
+        </div>
+        {permissions.includes('role:manage') && (
+            <form onSubmit={handleCreateRole} className="p-4 border-t border-gray-200 dark:border-gray-700">
+                <input type="text" value={newRoleName} onChange={(e) => setNewRoleName(e.target.value)} placeholder="New role name" className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 rounded-md focus:ring-2 focus:ring-kredivo-primary"/>
+                <Button type="submit" className="mt-2 w-full justify-center">
+                    <PlusCircle className="w-5 h-5 mr-2" /> Create Role
+                </Button>
+            </form>
+        )}
+    </div>
+);
+
+const PermissionDetails = ({ selectedRole, allPermissions, setIsMobileDetailView, handlePermissionChange, handleSaveChanges, hasUnsavedChanges }) => {
+    const { user: currentUser } = useAuthStore();
+    const permissions = currentUser?.permissions || [];
+    
+    return (
+    <div className="flex-1">
+        {selectedRole ? (
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 flex flex-col h-full">
+                <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center">
+                    <button onClick={() => setIsMobileDetailView(false)} className="md:hidden p-1 mr-2 -ml-1 text-gray-500"><ChevronLeft /></button>
+                    <h2 className="font-semibold text-lg">Permissions for '{selectedRole.name}'</h2>
+                </div>
+                <div className="p-6 space-y-6 flex-grow overflow-y-auto">
+                    {permissionGroups.map(group => {
+                        const availablePermissionsInGroup = group.permissions.filter(p => allPermissions.some(ap => ap.name === p.name));
+                        if (availablePermissionsInGroup.length === 0) return null;
+                        return (
+                            <div key={group.title}>
+                                <h3 className="text-md font-semibold text-gray-800 dark:text-gray-200 mb-3">{group.title}</h3>
+                                <div className="space-y-3">
+                                    {availablePermissionsInGroup.map(p => {
+                                        const permissionData = allPermissions.find(ap => ap.name === p.name);
+                                        if (!permissionData) return null;
+                                        return (
+                                            <label key={permissionData.id} className="flex items-start p-2 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer">
+                                                <input 
+                                                    type="checkbox" 
+                                                    className="h-4 w-4 rounded border-gray-300 text-kredivo-primary focus:ring-kredivo-primary mt-1 accent-kredivo-primary" 
+                                                    checked={selectedRole.permissions.some(sp => sp.id === permissionData.id)} 
+                                                    onChange={(e) => handlePermissionChange(permissionData.id, e.target.checked)} 
+                                                />
+                                                <div className="ml-3">
+                                                    <span className="text-sm font-medium text-gray-800 dark:text-gray-300">{p.name}</span>
+                                                    <p className="text-xs text-gray-500 dark:text-gray-400">{p.description}</p>
+                                                </div>
+                                            </label>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+                 {permissions.includes('role:manage') && (
+                    <div className="p-4 bg-gray-50 dark:bg-gray-700/50 border-t border-gray-200 dark:border-gray-700 flex justify-end">
+                         <Button onClick={handleSaveChanges} disabled={!hasUnsavedChanges} variant="primary">
+                            <Save className="w-4 h-4 mr-2"/> Save Changes
+                         </Button>
+                    </div>
+                )}
+            </div>
+        ) : (
+            <div className="text-center p-10 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+                <p>Select a role to view its permissions.</p>
+            </div>
+        )}
+    </div>
+)};
 
 export const RoleManagementPage = ({ onLogout }) => {
     const { user: currentUser } = useAuthStore();
@@ -63,6 +156,33 @@ export const RoleManagementPage = ({ onLogout }) => {
     const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
     const [isMobileDetailView, setIsMobileDetailView] = useState(false);
 
+    const fetchData = useCallback(async () => {
+        setLoading(true);
+        try {
+            const [rolesRes, permsRes] = await Promise.all([
+                api.get('/api/roles/with-permissions'),
+                api.get('/api/roles/permissions')
+            ]);
+            setRoles(rolesRes.data);
+            setAllPermissions(permsRes.data);
+        } catch (err) {
+            console.error("Error:", err);
+            setError(err.message || 'An unknown error occurred.');
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        fetchData();
+    }, [fetchData]);
+
+    useEffect(() => {
+        if (!selectedRole && roles.length > 0) {
+            const currentSelected = roles.find(r => r.id === selectedRole?.id) || roles[0];
+            setSelectedRole(currentSelected);
+        }
+    }, [roles, selectedRole]);
 
     const handleSelectRole = (role) => {
         if (hasUnsavedChanges) {
@@ -76,32 +196,6 @@ export const RoleManagementPage = ({ onLogout }) => {
             setIsMobileDetailView(true);
         }
     };
-
-    const fetchData = useCallback(async () => {
-        setLoading(true);
-        try {
-            const [rolesRes, permsRes] = await Promise.all([
-                api.get('/api/roles/with-permissions'),
-                api.get('/api/roles/permissions')
-            ]);
-            setRoles(rolesRes.data);
-            setAllPermissions(permsRes.data);
-
-            if (rolesRes.data.length > 0) {
-                const currentSelected = rolesRes.data.find(r => r.id === selectedRole?.id) || rolesRes.data[0];
-                setSelectedRole(currentSelected);
-            }
-        } catch (err) {
-            console.error("Error:", err);
-            setError(err.message || 'An unknown error occurred.');
-        } finally {
-            setLoading(false);
-        }
-    }, [selectedRole?.id]);
-
-    useEffect(() => {
-        fetchData();
-    }, [fetchData]);
 
     const handlePermissionChange = (permissionId, isChecked) => {
         if (!selectedRole) return;
@@ -168,89 +262,6 @@ export const RoleManagementPage = ({ onLogout }) => {
     if (loading) return <div className="p-6 text-center">Loading Roles & Permissions...</div>;
     if (error) return <div className="p-6 text-center text-red-500"><AlertTriangle className="mx-auto w-12 h-12 mb-4" /><h2 className="text-xl font-semibold">Could not load data</h2><p>{error}</p></div>;
 
-    const RoleList = () => (
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
-            <div className="p-4">
-                <h2 className="font-semibold text-lg mb-3">Roles</h2>
-                <ul className="space-y-1">
-                    {roles.map(role => (
-                        <li key={role.id}>
-                            <button onClick={() => handleSelectRole(role)} className={`w-full text-left px-3 py-2 rounded-md text-sm flex justify-between items-center ${selectedRole?.id === role.id ? 'bg-kredivo-light text-kredivo-dark-text dark:bg-kredivo-primary/20 dark:text-kredivo-primary font-semibold' : 'hover:bg-gray-100 dark:hover:bg-gray-700/50'}`}>
-                                <span>{role.name}</span>
-                                {permissions.includes('role:manage') && !['admin', 'viewer', 'auditor'].includes(role.name) && (
-                                    <Trash2 onClick={(e) => { e.stopPropagation(); openDeleteModal(role); }} className="w-4 h-4 text-gray-400 hover:text-red-500" />
-                                )}
-                            </button>
-                        </li>
-                    ))}
-                </ul>
-            </div>
-            {permissions.includes('role:manage') && (
-                <form onSubmit={handleCreateRole} className="p-4 border-t border-gray-200 dark:border-gray-700">
-                    <input type="text" value={newRoleName} onChange={(e) => setNewRoleName(e.target.value)} placeholder="New role name" className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 rounded-md focus:ring-2 focus:ring-kredivo-primary"/>
-                    <Button type="submit" className="mt-2 w-full justify-center">
-                        <PlusCircle className="w-5 h-5 mr-2" /> Create Role
-                    </Button>
-                </form>
-            )}
-        </div>
-    );
-
-    const PermissionDetails = () => (
-        <div className="flex-1">
-            {selectedRole ? (
-                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 flex flex-col h-full">
-                    <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center">
-                        <button onClick={() => setIsMobileDetailView(false)} className="md:hidden p-1 mr-2 -ml-1 text-gray-500"><ChevronLeft /></button>
-                        <h2 className="font-semibold text-lg">Permissions for '{selectedRole.name}'</h2>
-                    </div>
-                    <div className="p-6 space-y-6 flex-grow overflow-y-auto">
-                        {permissionGroups.map(group => {
-                            const availablePermissionsInGroup = group.permissions.filter(p => allPermissions.some(ap => ap.name === p.name));
-                            if (availablePermissionsInGroup.length === 0) return null;
-                            return (
-                                <div key={group.title}>
-                                    <h3 className="text-md font-semibold text-gray-800 dark:text-gray-200 mb-3">{group.title}</h3>
-                                    <div className="space-y-3">
-                                        {availablePermissionsInGroup.map(p => {
-                                            const permissionData = allPermissions.find(ap => ap.name === p.name);
-                                            if (!permissionData) return null;
-                                            return (
-                                                <label key={permissionData.id} className="flex items-start p-2 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer">
-                                                    <input 
-                                                        type="checkbox" 
-                                                        className="h-4 w-4 rounded border-gray-300 text-kredivo-primary focus:ring-kredivo-primary mt-1 accent-kredivo-primary" 
-                                                        checked={selectedRole.permissions.some(sp => sp.id === permissionData.id)} 
-                                                        onChange={(e) => handlePermissionChange(permissionData.id, e.target.checked)} 
-                                                    />
-                                                    <div className="ml-3">
-                                                        <span className="text-sm font-medium text-gray-800 dark:text-gray-300">{p.name}</span>
-                                                        <p className="text-xs text-gray-500 dark:text-gray-400">{p.description}</p>
-                                                    </div>
-                                                </label>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
-                     {permissions.includes('role:manage') && (
-                        <div className="p-4 bg-gray-50 dark:bg-gray-700/50 border-t border-gray-200 dark:border-gray-700 flex justify-end">
-                             <Button onClick={handleSaveChanges} disabled={!hasUnsavedChanges} variant="primary">
-                                <Save className="w-4 h-4 mr-2"/> Save Changes
-                             </Button>
-                        </div>
-                    )}
-                </div>
-            ) : (
-                <div className="text-center p-10 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
-                    <p>Select a role to view its permissions.</p>
-                </div>
-            )}
-        </div>
-    );
-
     return (
         <div className="p-6 h-full flex flex-col">
             <div className="mb-6">
@@ -260,11 +271,27 @@ export const RoleManagementPage = ({ onLogout }) => {
             
             <div className="flex-1 md:flex md:gap-6">
                 <div className={`md:w-1/3 lg:w-1/4 ${isMobileDetailView ? 'hidden' : 'block'} md:block`}>
-                    <RoleList />
+                    <RoleList 
+                        roles={roles}
+                        selectedRole={selectedRole}
+                        handleSelectRole={handleSelectRole}
+                        permissions={permissions}
+                        openDeleteModal={openDeleteModal}
+                        newRoleName={newRoleName}
+                        setNewRoleName={setNewRoleName}
+                        handleCreateRole={handleCreateRole}
+                    />
                 </div>
                 
                 <div className={`flex-1 ${isMobileDetailView ? 'block' : 'hidden'} md:block`}>
-                    <PermissionDetails />
+                    <PermissionDetails 
+                         selectedRole={selectedRole}
+                         allPermissions={allPermissions}
+                         setIsMobileDetailView={setIsMobileDetailView}
+                         handlePermissionChange={handlePermissionChange}
+                         handleSaveChanges={handleSaveChanges}
+                         hasUnsavedChanges={hasUnsavedChanges}
+                    />
                 </div>
             </div>
 

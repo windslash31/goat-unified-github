@@ -20,7 +20,7 @@ export const Sidebar = ({ onLogout, isMobileOpen, setMobileOpen }) => {
     const hasAuditAccess = permissions.includes('log:read');
 
     const navItems = [
-        { id: 'dashboard', path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, visible: true },
+        { id: 'dashboard', path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, permission: 'dashboard:view', visible: permissions.includes('dashboard:view') },
         { id: 'profile', path: '/profile', label: 'Profile', icon: User, permission: 'profile:read:own', visible: permissions.includes('profile:read:own') },
         { id: 'employees', path: '/employees', label: 'Employees', icon: Users, permission: 'employee:read:all', visible: permissions.includes('employee:read:all') },
         { id: 'settings', label: 'Settings', icon: Settings, visible: hasSettingsAccess, subItems: [
