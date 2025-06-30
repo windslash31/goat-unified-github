@@ -13,6 +13,19 @@ export const useAuthStore = create((set, get) => ({
         set({ accessToken: token, isAuthenticated: !!token });
     },
 
+    // --- NEW: Function to set both tokens after a refresh ---
+    setRefreshedTokens: (accessToken, refreshToken) => {
+        localStorage.setItem('accessToken', accessToken);
+        localStorage.setItem('refreshToken', refreshToken);
+        const decodedUser = JSON.parse(atob(accessToken.split('.')[1]));
+        set({
+            accessToken,
+            refreshToken,
+            user: decodedUser,
+            isAuthenticated: true,
+        });
+    },
+
     // Login action
     login: async (email, password) => {
         try {
@@ -53,6 +66,7 @@ export const useAuthStore = create((set, get) => ({
     logout: async () => {
         const refreshToken = get().refreshToken;
         try {
+            // Pass the refresh token in the body for invalidation
             await api.post('/api/logout', { refreshToken });
         } catch (error) {
             console.error("Logout API call failed, proceeding with client-side logout.", error);

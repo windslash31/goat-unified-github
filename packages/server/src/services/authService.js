@@ -83,15 +83,18 @@ const refreshAccessToken = async (token) => {
         const decoded = jwt.verify(token, process.env.JWT_REFRESH_SECRET);
         const userId = decoded.id;
 
-        // Check if the token exists in our database
-        const tokenResult = await client.query('SELECT 1 FROM refresh_tokens WHERE token = $1 AND user_id = $2 AND expires_at > NOW()', [token, userId]);
+        // Check if the token exists and immediately delete it to prevent reuse (rotation)
+        const tokenResult = await client.query('DELETE FROM refresh_tokens WHERE token = $1 AND user_id = $2 AND expires_at > NOW() RETURNING token', [token, userId]);
         if (tokenResult.rows.length === 0) {
+            // This is a critical security event. A used or invalid refresh token was attempted.
+            // For enhanced security, you could invalidate all refresh tokens for this user here.
+            await client.query('ROLLBACK');
             throw new Error('Invalid or expired refresh token.');
         }
 
-        // Token is valid, issue a new access token
+        // Token was valid, so now we issue new tokens
         const userQuery = `
-            SELECT u.id, u.employee_id, u.email, u.full_name, r.name AS role_name 
+            SELECT u.id, u.employee_id, u.email, u.full_name, r.id as role_id, r.name AS role_name 
             FROM users u 
             LEFT JOIN roles r ON u.role_id = r.id 
             WHERE u.id = $1
@@ -112,13 +115,23 @@ const refreshAccessToken = async (token) => {
             email: user.email, 
             name: user.full_name, 
             role: user.role_name, 
-            permissions: permissions, 
-            jti: uuidv4() 
+            permissions: permissions,
+            jti: uuidv4()
         };
         const newAccessToken = jwt.sign(jwtPayload, process.env.JWT_SECRET, { expiresIn: '15m' });
         
+        // --- CREATE AND STORE THE NEW REFRESH TOKEN ---
+        const newRefreshToken = jwt.sign({ id: user.id, jti: uuidv4() }, process.env.JWT_REFRESH_SECRET, { expiresIn: '7d' });
+        const sevenDaysFromNow = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+        await client.query(
+            'INSERT INTO refresh_tokens (user_id, token, expires_at) VALUES ($1, $2, $3)',
+            [user.id, newRefreshToken, sevenDaysFromNow]
+        );
+
         await client.query('COMMIT');
-        return { accessToken: newAccessToken };
+        
+        // Return both new tokens
+        return { accessToken: newAccessToken, refreshToken: newRefreshToken };
 
     } catch (error) {
         await client.query('ROLLBACK');

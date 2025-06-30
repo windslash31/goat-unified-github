@@ -1,3 +1,5 @@
+// packages/client/src/api/api.js
+
 import axios from 'axios';
 import { useAuthStore } from '../stores/authStore';
 
@@ -8,7 +10,6 @@ const api = axios.create({
     },
 });
 
-// Request Interceptor: Add the access token to every outgoing request
 api.interceptors.request.use(
     (config) => {
         const token = useAuthStore.getState().accessToken;
@@ -20,27 +21,58 @@ api.interceptors.request.use(
     (error) => Promise.reject(error)
 );
 
-// Response Interceptor: Handle expired access tokens
+// --- NEW: Logic for handling token refresh race conditions ---
+let isRefreshing = false;
+let failedQueue = [];
+
+const processQueue = (error, token = null) => {
+    failedQueue.forEach(prom => {
+        if (error) {
+            prom.reject(error);
+        } else {
+            prom.resolve(token);
+        }
+    });
+    failedQueue = [];
+};
+
 api.interceptors.response.use(
     (response) => response,
     async (error) => {
         const originalRequest = error.config;
-        // Do not retry login requests or requests that already failed once
-        if (error.response.status === 401 && !originalRequest._retry &&
-         !originalRequest.url.includes('/api/login') // Do not retry login requests
-        ) {
+        if (error.response.status === 401 && !originalRequest._retry) {
+            if (isRefreshing) {
+                return new Promise(function(resolve, reject) {
+                    failedQueue.push({ resolve, reject });
+                }).then(token => {
+                    originalRequest.headers['Authorization'] = 'Bearer ' + token;
+                    return api(originalRequest);
+                }).catch(err => {
+                    return Promise.reject(err);
+                });
+            }
+
             originalRequest._retry = true;
+            isRefreshing = true;
+
             try {
                 const refreshToken = useAuthStore.getState().refreshToken;
-                const { data } = await axios.post(`${process.env.REACT_APP_API_BASE_URL}/api/refresh`, { token: refreshToken });
-                const newAccessToken = data.accessToken;
-                useAuthStore.getState().setAccessToken(newAccessToken);
-                axios.defaults.headers.common['Authorization'] = `Bearer ${newAccessToken}`;
-                originalRequest.headers['Authorization'] = `Bearer ${newAccessToken}`;
+                const { data } = await api.post('/api/refresh', { token: refreshToken });
+                
+                // Use the new store function to set both tokens
+                useAuthStore.getState().setRefreshedTokens(data.accessToken, data.refreshToken);
+                
+                api.defaults.headers.common['Authorization'] = 'Bearer ' + data.accessToken;
+                originalRequest.headers['Authorization'] = 'Bearer ' + data.accessToken;
+                
+                processQueue(null, data.accessToken);
                 return api(originalRequest);
             } catch (refreshError) {
+                processQueue(refreshError, null);
                 useAuthStore.getState().logout();
                 return Promise.reject(refreshError);
+            } finally {
+                isRefreshing = false;
             }
         }
         return Promise.reject(error);
