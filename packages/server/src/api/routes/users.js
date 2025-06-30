@@ -14,4 +14,9 @@ router.post('/:id/reset-password', authenticateToken, authorize('user:reset_pass
 router.put('/:id/role', authenticateToken, authorize('user:update:role'), userController.updateUserRole);
 router.delete('/:id', authenticateToken, authorize('user:delete'), userController.deleteUser);
 
+// api keys management
+router.get('/:id/api-keys', authenticateToken, authorize('user:manage_api_keys'), userController.listApiKeys);
+router.post('/:id/api-keys', authenticateToken, authorize('user:manage_api_keys'), userController.generateApiKey);
+router.delete('/api-keys/:keyId', authenticateToken, authorize('user:manage_api_keys'), userController.deleteApiKey);
+
 module.exports = router;

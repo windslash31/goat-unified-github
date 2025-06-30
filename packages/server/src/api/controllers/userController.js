@@ -98,6 +98,51 @@ const resetPassword = async (req, res, next) => {
     }
 };
 
+const generateApiKey = async (req, res, next) => {
+    try {
+        const { id: targetUserId } = req.params;
+        const { description, expiresInDays } = req.body;
+        const actorId = req.user.id;
+        const reqContext = { ip: req.ip, userAgent: req.headers['user-agent'] };
+
+        if (!description) {
+            return res.status(400).json({ message: 'A description for the API key is required.' });
+        }
+
+        const result = await userService.generateApiKey(targetUserId, description, expiresInDays, actorId, reqContext);
+        res.status(201).json(result);
+    } catch (error) {
+        next(error);
+    }
+};
+
+const listApiKeys = async (req, res, next) => {
+    try {
+        const { id: targetUserId } = req.params;
+        const keys = await userService.listApiKeysForUser(targetUserId);
+        res.json(keys);
+    } catch (error) {
+        next(error);
+    }
+};
+
+const deleteApiKey = async (req, res, next) => {
+    try {
+        const { keyId } = req.params;
+        const actorId = req.user.id;
+        const reqContext = { ip: req.ip, userAgent: req.headers['user-agent'] };
+        
+        await userService.deleteApiKey(keyId, actorId, reqContext);
+        res.status(204).send();
+    } catch (error) {
+        if (error.message.includes('not found')) {
+            return res.status(404).json({ message: error.message });
+        }
+        next(error);
+    }
+};
+
+
 module.exports = {
     listUsers,
     createUser,
@@ -105,4 +150,7 @@ module.exports = {
     deleteUser,
     changePassword,
     resetPassword,
+    generateApiKey,
+    listApiKeys,
+    deleteApiKey,
 };

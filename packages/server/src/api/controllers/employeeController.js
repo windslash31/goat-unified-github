@@ -25,7 +25,6 @@ const getEmployee = async (req, res, next) => {
 const updateEmployee = async (req, res, next) => {
     try {
         const { id } = req.params;
-        // --- FIX: Pass request context to the service ---
         const reqContext = { ip: req.ip, userAgent: req.headers['user-agent'] };
         const result = await employeeService.updateEmployee(id, req.body, req.user.id, reqContext);
         res.status(200).json(result);
@@ -104,7 +103,6 @@ const deactivateOnPlatforms = async (req, res, next) => {
     try {
         const { id } = req.params;
         const { platforms } = req.body;
-        // --- FIX: Pass request context to the service ---
         const reqContext = { ip: req.ip, userAgent: req.headers['user-agent'] };
         const result = await employeeService.deactivateOnPlatforms(id, platforms, req.user.id, reqContext);
         res.status(200).json(result);
@@ -119,7 +117,6 @@ const bulkDeactivateOnPlatforms = async (req, res, next) => {
         if (!employeeIds || !platforms || !Array.isArray(employeeIds) || !Array.isArray(platforms)) {
             return res.status(400).json({ message: 'Invalid request body. `employeeIds` and `platforms` must be arrays.' });
         }
-        // --- FIX: Pass request context to the service ---
         const reqContext = { ip: req.ip, userAgent: req.headers['user-agent'] };
         const result = await employeeService.bulkDeactivateOnPlatforms(employeeIds, platforms, req.user.id, reqContext);
         res.status(200).json(result);
@@ -142,6 +139,39 @@ const logEmployeeView = async (req, res, next) => {
     }
 };
 
+/**
+ * NEW: Controller method to handle employee onboarding from a ticket.
+ * It passes the request body (from n8n) and actor details to the service layer.
+ */
+const onboardFromTicket = async (req, res, next) => {
+    try {
+        const reqContext = { ip: req.ip, userAgent: req.headers['user-agent'], source: 'n8n_onboard_workflow' };
+        const result = await employeeService.createEmployeeFromTicket(req.body, req.user.id, reqContext);
+        res.status(201).json(result);
+    } catch (error) {
+        next(error);
+    }
+};
+
+/**
+ * NEW: Controller method to handle employee offboarding from a ticket.
+ * It passes the request body and employee ID to the service layer.
+ */
+const offboardFromTicket = async (req, res, next) => {
+    try {
+        const reqContext = { ip: req.ip, userAgent: req.headers['user-agent'], source: 'n8n_offboard_workflow' };
+        // The employee's email is now in the body, which is passed directly to the service.
+        const result = await employeeService.updateOffboardingFromTicket(req.body, req.user.id, reqContext);
+        res.status(200).json(result);
+    } catch (error) {
+        // Add more specific error handling for this route
+        if (error.message.includes('Employee not found')) {
+            return res.status(404).json({ message: error.message });
+        }
+        next(error);
+    }
+};
+
 
 module.exports = {
     listEmployees,
@@ -155,5 +185,7 @@ module.exports = {
     getGoogleLogs,
     getSlackLogs,
     getUnifiedTimeline,
-    bulkDeactivateOnPlatforms
+    bulkDeactivateOnPlatforms,
+    onboardFromTicket,
+    offboardFromTicket,
 };

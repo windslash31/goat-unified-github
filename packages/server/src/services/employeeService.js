@@ -219,6 +219,138 @@ const updateEmployee = async (employeeId, updatedData, actorId, reqContext) => {
     }
 };
 
+const createEmployeeFromTicket = async (ticketData, actorId, reqContext) => {
+    const client = await db.pool.connect();
+    try {
+        await client.query('BEGIN');
+
+        const requiredFields = ['first_name', 'last_name', 'employee_email'];
+        for (const field of requiredFields) {
+            if (!ticketData[field]) {
+                throw new Error(`Missing required field from ticket data: ${field}`);
+            }
+        }
+        
+        const existingEmployee = await client.query('SELECT id FROM employees WHERE employee_email ILIKE $1', [ticketData.employee_email]);
+        if (existingEmployee.rows.length > 0) {
+            throw new Error(`An employee with the email ${ticketData.employee_email} already exists.`);
+        }
+
+        const resolvedIds = {};
+        
+        if (ticketData.manager_email) {
+            const result = await client.query('SELECT id FROM employees WHERE employee_email ILIKE $1', [ticketData.manager_email]);
+            if (result.rows.length === 0) throw new Error(`Manager not found with email: ${ticketData.manager_email}`);
+            resolvedIds.manager_id = result.rows[0].id;
+        }
+
+        if (ticketData.legal_entity_name) {
+            const result = await client.query('SELECT id FROM legal_entities WHERE name ILIKE $1', [ticketData.legal_entity_name]);
+            if (result.rows.length === 0) throw new Error(`Legal Entity not found with name: ${ticketData.legal_entity_name}`);
+            resolvedIds.legal_entity_id = result.rows[0].id;
+        }
+        
+        if (ticketData.office_location_name) {
+            const result = await client.query('SELECT id FROM office_locations WHERE name ILIKE $1', [ticketData.office_location_name]);
+            if (result.rows.length === 0) throw new Error(`Office Location not found with name: ${ticketData.office_location_name}`);
+            resolvedIds.office_location_id = result.rows[0].id;
+        }
+        
+        // --- NEWLY ADDED ---
+        if (ticketData.employee_type_name) {
+            const result = await client.query('SELECT id FROM employee_types WHERE name ILIKE $1', [ticketData.employee_type_name]);
+            if (result.rows.length === 0) throw new Error(`Employee Type not found with name: ${ticketData.employee_type_name}`);
+            resolvedIds.employee_type_id = result.rows[0].id;
+        }
+
+        if (ticketData.employee_sub_type_name) {
+            const result = await client.query('SELECT id FROM employee_sub_types WHERE name ILIKE $1', [ticketData.employee_sub_type_name]);
+            if (result.rows.length === 0) throw new Error(`Employee Sub-Type not found with name: ${ticketData.employee_sub_type_name}`);
+            resolvedIds.employee_sub_type_id = result.rows[0].id;
+        }
+        // --- END NEWLY ADDED ---
+
+        const finalData = { ...ticketData, ...resolvedIds };
+        
+        const allowedFields = [
+            'first_name', 'last_name', 'middle_name', 'employee_email',
+            'position_name', 'position_level', 'join_date', 'asset_name',
+            'onboarding_ticket', 'legal_entity_id', 'office_location_id',
+            'employee_type_id', 'employee_sub_type_id', 'manager_id'
+        ];
+
+        const columns = [];
+        const values = [];
+        const valuePlaceholders = [];
+        let paramIndex = 1;
+
+        for (const field of allowedFields) {
+            if (finalData[field] !== undefined) {
+                columns.push(field);
+                values.push(finalData[field]);
+                valuePlaceholders.push(`$${paramIndex++}`);
+            }
+        }
+
+        const query = `
+            INSERT INTO employees (${columns.join(', ')})
+            VALUES (${valuePlaceholders.join(', ')})
+            RETURNING id;
+        `;
+        
+        const result = await client.query(query, values);
+        const newEmployeeId = result.rows[0].id;
+
+        await logActivity(
+            actorId,
+            'EMPLOYEE_CREATE',
+            {
+                targetEmployeeId: newEmployeeId,
+                details: { ...ticketData, source_ticket: ticketData.onboarding_ticket }
+            },
+            reqContext,
+            client
+        );
+
+        await client.query('COMMIT');
+        
+        return { message: 'Employee created successfully from ticket.', employeeId: newEmployeeId };
+
+    } catch (err) {
+        await client.query('ROLLBACK');
+        throw err;
+    } finally {
+        client.release();
+    }
+};
+
+const updateOffboardingFromTicket = async (ticketData, actorId, reqContext) => {
+    const { employee_email, date_of_exit, access_cut_off_date, offboarding_ticket } = ticketData;
+
+    if (!employee_email) {
+        throw new Error('Required field "employee_email" is missing from the request body.');
+    }
+    if (!date_of_exit || !access_cut_off_date) {
+        throw new Error('Missing required fields: date_of_exit and access_cut_off_date are required.');
+    }
+
+    const employeeResult = await db.query('SELECT id FROM employees WHERE employee_email = $1', [employee_email]);
+    if (employeeResult.rows.length === 0) {
+        throw new Error(`Employee not found with email: ${employee_email}`);
+    }
+    const employeeId = employeeResult.rows[0].id;
+
+    const updatedData = {
+        date_of_exit_at_date: date_of_exit,
+        access_cut_off_date_at_date: access_cut_off_date,
+        offboarding_ticket: offboarding_ticket,
+        is_active: false
+    };
+    
+    return await updateEmployee(employeeId, updatedData, actorId, reqContext);
+};
+
+
 const getPlatformStatuses = async (employeeId) => {
     const employeeRes = await db.query('SELECT employee_email FROM employees WHERE id = $1', [employeeId]);
     if (employeeRes.rows.length === 0) throw new Error('Employee not found.');
@@ -342,5 +474,7 @@ module.exports = {
     getGoogleLogs,
     getSlackLogs,
     getUnifiedTimeline,
-    bulkDeactivateOnPlatforms
+    bulkDeactivateOnPlatforms,
+    createEmployeeFromTicket,
+    updateOffboardingFromTicket,
 };

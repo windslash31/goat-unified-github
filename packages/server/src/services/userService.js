@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const db = require('../config/db');
 const { logActivity } = require('./logService');
 const bcrypt = require('bcrypt');
@@ -166,6 +167,49 @@ const resetPassword = async (targetUserId, actorId, reqContext) => {
     return { temporaryPassword };
 };
 
+const generateApiKey = async (userId, description, expiresInDays, actorId, reqContext) => {
+    const apiKey = crypto.randomBytes(32).toString('hex');
+    const keyHash = await bcrypt.hash(apiKey, 10);
+
+    let expiresAt = null;
+    const days = parseInt(expiresInDays, 10);
+    if (days > 0 && days <= 365) {
+        expiresAt = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
+    } else if (days > 365) {
+        throw new Error('Expiration cannot be more than 365 days.');
+    }
+
+    const result = await db.query(
+        'INSERT INTO api_keys (user_id, key_hash, description, expires_at) VALUES ($1, $2, $3, $4) RETURNING id, description, created_at, expires_at',
+        [userId, keyHash, description, expiresAt]
+    );
+
+    await logActivity(actorId, 'API_KEY_CREATE', { targetUserId: userId, keyId: result.rows[0].id, expires: expiresAt }, reqContext);
+
+    return { newKey: apiKey, details: result.rows[0] };
+};
+
+const listApiKeysForUser = async (userId) => {
+    const result = await db.query(
+        'SELECT id, description, created_at, expires_at FROM api_keys WHERE user_id = $1 ORDER BY created_at DESC',
+        [userId]
+    );
+    return result.rows;
+};
+
+const deleteApiKey = async (keyId, actorId, reqContext) => {
+    const keyResult = await db.query('SELECT user_id FROM api_keys WHERE id = $1', [keyId]);
+    if (keyResult.rows.length === 0) {
+        throw new Error('API Key not found.');
+    }
+    const targetUserId = keyResult.rows[0].user_id;
+    
+    await db.query('DELETE FROM api_keys WHERE id = $1', [keyId]);
+    await logActivity(actorId, 'API_KEY_DELETE', { targetUserId, keyId: keyId }, reqContext);
+
+    return { message: 'API Key revoked successfully.' };
+};
+
 module.exports = {
     getUsers,
     createUser,
@@ -173,4 +217,7 @@ module.exports = {
     deleteUser,
     changePassword,
     resetPassword,
+    generateApiKey,
+    listApiKeysForUser,
+    deleteApiKey,
 };

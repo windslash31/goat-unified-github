@@ -1,9 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const employeeController = require('../controllers/employeeController');
-const { authenticateToken, authorize, authorizeAdminOrSelf, authorizeAdminOrSelfForLogs } = require('../middleware/authMiddleware');
+const { authenticateToken, authenticateApiKey, authorize, authorizeAdminOrSelf, authorizeAdminOrSelfForLogs } = require('../middleware/authMiddleware');
 
-// General Employee Routes
+// General Employee Routes for the UI
 router.get('/', authenticateToken, authorize('employee:read:all'), employeeController.listEmployees);
 router.get('/:id', authenticateToken, authorizeAdminOrSelf, employeeController.getEmployee);
 router.put('/:id', authenticateToken, authorize('employee:update'), employeeController.updateEmployee);
@@ -25,5 +25,8 @@ router.get('/options/:table', authenticateToken, authorize('employee:read:all'),
 // Route for bulk actions
 router.post('/bulk-deactivate', authenticateToken, authorize('employee:deactivate'), employeeController.bulkDeactivateOnPlatforms);
 
+// Route for N8N
+router.post('/onboard', authenticateApiKey, authorize('employee:create'), employeeController.onboardFromTicket);
+router.post('/offboard', authenticateApiKey, authorize('employee:update'), employeeController.offboardFromTicket);
 
 module.exports = router;

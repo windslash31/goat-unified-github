@@ -1,6 +1,9 @@
+// packages/client/src/pages/UserManagementPage.js
+
 import React, { useState, useEffect, useCallback } from 'react';
 import toast from 'react-hot-toast';
-import { PlusCircle, Trash2, KeyRound } from 'lucide-react';
+// ADD KeyIcon to imports
+import { PlusCircle, Trash2, KeyRound, Key as KeyIcon } from 'lucide-react';
 import { CreateUserModal } from '../components/ui/CreateUserModal';
 import { ConfirmationModal } from '../components/ui/ConfirmationModal';
 import { Portal } from '../components/ui/Portal';
@@ -9,6 +12,8 @@ import { Button } from '../components/ui/Button';
 import { CustomSelect } from '../components/ui/CustomSelect';
 import { useAuthStore } from '../stores/authStore';
 import api from '../api/api';
+// --- NEW IMPORT ---
+import { ApiKeyManagerModal } from '../components/ui/ApiKeyManagerModal';
 
 export const UserManagementPage = ({ onLogout }) => {
     const [users, setUsers] = useState([]);
@@ -23,6 +28,10 @@ export const UserManagementPage = ({ onLogout }) => {
     const [isResetModalOpen, setIsResetModalOpen] = useState(false);
     const [userToReset, setUserToReset] = useState(null);
     const [newPassword, setNewPassword] = useState(null);
+
+    // --- NEW STATE FOR API KEY MODAL ---
+    const [isApiKeyModalOpen, setIsApiKeyModalOpen] = useState(false);
+    const [userForApiKey, setUserForApiKey] = useState(null);
 
     const fetchData = useCallback(async () => {
         setLoading(true);
@@ -83,6 +92,12 @@ export const UserManagementPage = ({ onLogout }) => {
         setUserToReset(user);
         setIsResetModalOpen(true);
     };
+    
+    // --- NEW FUNCTION TO OPEN THE API KEY MODAL ---
+    const openApiKeyModal = (user) => {
+        setUserForApiKey(user);
+        setIsApiKeyModalOpen(true);
+    };
 
     const handleResetPassword = async () => {
         if (!userToReset) return;
@@ -106,6 +121,7 @@ export const UserManagementPage = ({ onLogout }) => {
     return (
         <>
             <div className="p-4 sm:p-6">
+                 {/* ... (The header section remains the same) ... */}
                 <div className="flex flex-col sm:flex-row justify-between sm:items-center mb-4">
                     <div>
                         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">User Management</h1>
@@ -117,48 +133,8 @@ export const UserManagementPage = ({ onLogout }) => {
                         </Button>
                     )}
                 </div>
-                
-                {/* Mobile View */}
-                <div className="mt-4 space-y-4 md:hidden">
-                    {users.map(user => (
-                        <div key={user.id} className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
-                            <div className="flex justify-between items-start">
-                                <div>
-                                    <p className="font-bold text-gray-900 dark:text-white">{user.full_name}</p>
-                                    <p className="text-sm text-gray-500 dark:text-gray-400">{user.email}</p>
-                                </div>
-                                <div className="flex items-center">
-                                    {permissions.includes('user:reset_password') && (
-                                        <button 
-                                            onClick={() => openResetModal(user)} 
-                                            disabled={user.id === currentUser.id || user.role_name === 'admin'}
-                                            className="p-1 text-gray-400 hover:text-yellow-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                                        >
-                                            <KeyRound className="w-4 h-4" />
-                                        </button>
-                                    )}
-                                    {permissions.includes('user:delete') && (
-                                        <button onClick={() => openDeleteModal(user)} disabled={user.id === currentUser.id} className="p-1 text-gray-400 hover:text-red-500 disabled:opacity-50 disabled:cursor-not-allowed"><Trash2 className="w-4 h-4" /></button>
-                                    )}
-                                </div>
-                            </div>
-                            <div className="mt-3">
-                                <label htmlFor={`role-select-${user.id}`} className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Role</label>
-                                <CustomSelect
-                                    id={`role-select-${user.id}`}
-                                    value={user.role_id}
-                                    options={roleOptions}
-                                    onChange={(newRoleId) => handleRoleChange(user.id, newRoleId)}
-                                    placeholder="No Role"
-                                    disabled={!permissions.includes('user:update:role')}
-                                />
-                            </div>
-                        </div>
-                    ))}
-                </div>
 
-                {/* Desktop View */}
-                <div className="mt-4 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden hidden md:block">
+                <div className="mt-4 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
                     <div className="overflow-x-auto">
                         <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                             <thead className="bg-gray-50 dark:bg-gray-700/50">
@@ -184,19 +160,29 @@ export const UserManagementPage = ({ onLogout }) => {
                                             />
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
-                                            <div className="flex items-center gap-2">
+                                            <div className="flex items-center gap-1">
+                                                {/* --- ADDED API KEY BUTTON --- */}
+                                                {permissions.includes('user:manage_api_keys') && (
+                                                    <button 
+                                                        onClick={() => openApiKeyModal(user)} 
+                                                        className="p-2 text-gray-500 hover:text-blue-600 rounded-full hover:bg-blue-100 dark:hover:bg-blue-900/20"
+                                                        title="Manage API Keys"
+                                                    >
+                                                        <KeyIcon className="w-4 h-4"/>
+                                                    </button>
+                                                )}
                                                 {permissions.includes('user:reset_password') && (
                                                     <button 
                                                         onClick={() => openResetModal(user)} 
                                                         disabled={user.id === currentUser.id || user.role_name === 'admin'}
-                                                        className="p-2 text-gray-500 hover:text-yellow-600 rounded-full hover:bg-yellow-100 dark:hover:bg-yellow-900/20 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                                                        className="p-2 text-gray-500 hover:text-yellow-600 rounded-full hover:bg-yellow-100 dark:hover:bg-yellow-900/20 disabled:opacity-50 disabled:cursor-not-allowed"
                                                         title="Reset Password"
                                                     >
                                                         <KeyRound className="w-4 h-4"/>
                                                     </button>
                                                 )}
                                                 {permissions.includes('user:delete') && (
-                                                    <button onClick={() => openDeleteModal(user)} disabled={user.id === currentUser.id} className="p-2 text-gray-500 hover:text-red-600 rounded-full hover:bg-red-100 dark:hover:bg-red-900/20 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent" title="Delete User">
+                                                    <button onClick={() => openDeleteModal(user)} disabled={user.id === currentUser.id} className="p-2 text-gray-500 hover:text-red-600 rounded-full hover:bg-red-100 dark:hover:bg-red-900/20 disabled:opacity-50 disabled:cursor-not-allowed" title="Delete User">
                                                         <Trash2 className="w-4 h-4"/>
                                                     </button>
                                                 )}
@@ -215,6 +201,8 @@ export const UserManagementPage = ({ onLogout }) => {
                 {isDeleteModalOpen && <ConfirmationModal isOpen={isDeleteModalOpen} onClose={() => setIsDeleteModalOpen(false)} onConfirm={handleDeleteUser} title="Delete User" message={`Are you sure you want to delete the user "${userToDelete?.full_name}"? This will permanently revoke their access.`} />}
                 {isResetModalOpen && <ConfirmationModal isOpen={isResetModalOpen} onClose={() => setIsResetModalOpen(false)} onConfirm={handleResetPassword} title="Reset Password" message={`Are you sure you want to reset the password for "${userToReset?.full_name}"? Their old password will no longer work.`} />}
                 {newPassword && <TemporaryPasswordModal password={newPassword} onClose={() => setNewPassword(null)} />}
+                {/* --- RENDER THE NEW MODAL --- */}
+                {isApiKeyModalOpen && userForApiKey && <ApiKeyManagerModal user={userForApiKey} onClose={() => setIsApiKeyModalOpen(false)} />}
             </Portal>
         </>
     );
