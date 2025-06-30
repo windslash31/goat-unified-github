@@ -13,6 +13,7 @@ import { EmptyState } from '../components/ui/EmptyState';
 import { useDebounce } from '../hooks/useDebounce';
 import { useFetchFilterOptions } from '../hooks/useFetchFilterOptions';
 import { useMediaQuery } from '../hooks/useMediaQuery';
+import { motion } from 'framer-motion';
 
 export const EmployeeListPage = ({ employees, isLoading, filters, setFilters, pagination, setPagination, sorting, setSorting, onEdit, onDeactivate }) => {
     const [isFilterPopoverOpen, setIsFilterPopoverOpen] = useState(false);
@@ -233,7 +234,13 @@ export const EmployeeListPage = ({ employees, isLoading, filters, setFilters, pa
     if (isLoading && employees.length === 0) { return <div className="p-6 text-center">Loading employees...</div>; }
 
     return (
-        <div className="p-4 sm:p-6">
+        <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ duration: 0.3 }}
+            className="p-4 sm:p-6"
+        >
             <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mb-2 min-h-[40px]">
                 {isDesktop && selectedRows.size > 0 ? (
                     <div className="w-full flex justify-between items-center bg-kredivo-light p-2 rounded-lg">
@@ -306,6 +313,6 @@ export const EmployeeListPage = ({ employees, isLoading, filters, setFilters, pa
                     {employees.length > 0 && <Pagination pagination={pagination} setPagination={setPagination} />}
                 </div>
             </div>
-        </div>
+        </motion.div>
     );
 };

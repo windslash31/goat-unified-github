@@ -2,6 +2,7 @@ import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import api from '../api/api';
 import { Users, UserCheck, UserX, AlertTriangle, Activity, Ticket } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 const fetchDashboardData = async () => {
     const { data } = await api.get('/api/dashboard');
@@ -32,7 +33,13 @@ export const DashboardPage = () => {
     const { stats, recentActivity, recentTickets } = data;
 
     return (
-        <div className="p-6">
+        <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ duration: 0.3 }}
+            className="p-6"
+        >
             <h1 className="text-2xl font-bold mb-6">Dashboard</h1>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
                 <StatCard title="Total Employees" value={stats.total_employees} icon={<Users className="text-white" />} color="bg-blue-500" />
@@ -71,6 +78,6 @@ export const DashboardPage = () => {
                     </div>
                 </div>
             </div>
-        </div>
+        </motion.div>
     );
 };

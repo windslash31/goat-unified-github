@@ -10,6 +10,7 @@ import { AccessDeniedPage } from './components/ui/AccessDeniedPage';
 import { useAuthStore } from './stores/authStore';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import api from './api/api';
+import { AnimatePresence } from 'framer-motion';
 
 // Lazy load page components for code splitting
 const LoginPage = lazy(() => import('./pages/LoginPage').then(module => ({ default: module.LoginPage })));
@@ -171,38 +172,40 @@ const AppContent = () => {
 
     return (
         <>
-            <Routes>
-                <Route 
-                    element={
-                        <MainLayout 
-                            onLogout={handleLogout}
-                            permissions={user.permissions}
-                            breadcrumbs={getBreadcrumbs()}
-                            user={user}
-                        />
-                    }
-                >
-                    <Route element={<ProtectedRoute permission="dashboard:view" />}>
-                        <Route path="/dashboard" element={<DashboardPage />} />
+            <AnimatePresence mode="wait">
+                <Routes location={location} key={location.pathname}>
+                    <Route 
+                        element={
+                            <MainLayout 
+                                onLogout={handleLogout}
+                                permissions={user.permissions}
+                                breadcrumbs={getBreadcrumbs()}
+                                user={user}
+                            />
+                        }
+                    >
+                        <Route element={<ProtectedRoute permission="dashboard:view" />}>
+                            <Route path="/dashboard" element={<DashboardPage />} />
+                        </Route>
+                        
+                        <Route path="/profile" element={<ProfilePage employee={currentUserEmployeeRecord} permissions={user.permissions} onEdit={handleOpenEditModal} onDeactivate={handleOpenDeactivateModal} onLogout={handleLogout} user={user} />} />
+                        
+                        <Route path="/employees" element={<EmployeeListPage employees={employeeData?.employees || []} isLoading={isLoadingEmployees} filters={filters} setFilters={setFilters} pagination={pagination} setPagination={setPagination} sorting={sorting} setSorting={setSorting} onEdit={handleOpenEditModal} onDeactivate={handleOpenDeactivateModal} />} />
+                        <Route path="/employees/:employeeId" element={<EmployeeDetailPage onEdit={handleOpenEditModal} onDeactivate={handleOpenDeactivateModal} permissions={user.permissions} onLogout={handleLogout} />} />
+                        <Route path="/logs/activity" element={<ActivityLogPage onLogout={handleLogout} />} />
+                        <Route path="/access-denied" element={<AccessDeniedPage />} />
+                        
+                        <Route element={<ProtectedRoute permission="admin:view_users" />}>
+                            <Route path="/users" element={<UserManagementPage onLogout={handleLogout} />} />
+                        </Route>
+                        <Route element={<ProtectedRoute permission="admin:view_roles" />}>
+                            <Route path="/roles" element={<RoleManagementPage onLogout={handleLogout} />} />
+                        </Route>
+                        
+                        <Route path="/" element={user.permissions.includes('dashboard:view') ? <Navigate to="/dashboard" replace /> : <Navigate to="/profile" replace />} /> 
                     </Route>
-                    
-                    <Route path="/profile" element={<ProfilePage employee={currentUserEmployeeRecord} permissions={user.permissions} onEdit={handleOpenEditModal} onDeactivate={handleOpenDeactivateModal} onLogout={handleLogout} user={user} />} />
-                    
-                    <Route path="/employees" element={<EmployeeListPage employees={employeeData?.employees || []} isLoading={isLoadingEmployees} filters={filters} setFilters={setFilters} pagination={pagination} setPagination={setPagination} sorting={sorting} setSorting={setSorting} onEdit={handleOpenEditModal} onDeactivate={handleOpenDeactivateModal} />} />
-                    <Route path="/employees/:employeeId" element={<EmployeeDetailPage onEdit={handleOpenEditModal} onDeactivate={handleOpenDeactivateModal} permissions={user.permissions} onLogout={handleLogout} />} />
-                    <Route path="/logs/activity" element={<ActivityLogPage onLogout={handleLogout} />} />
-                    <Route path="/access-denied" element={<AccessDeniedPage />} />
-                    
-                    <Route element={<ProtectedRoute permission="admin:view_users" />}>
-                        <Route path="/users" element={<UserManagementPage onLogout={handleLogout} />} />
-                    </Route>
-                    <Route element={<ProtectedRoute permission="admin:view_roles" />}>
-                        <Route path="/roles" element={<RoleManagementPage onLogout={handleLogout} />} />
-                    </Route>
-                    
-                    <Route path="/" element={user.permissions.includes('dashboard:view') ? <Navigate to="/dashboard" replace /> : <Navigate to="/profile" replace />} /> 
-                </Route>
-            </Routes>
+                </Routes>
+            </AnimatePresence>
             
             {isEditModalOpen && <EditEmployeeModal employee={employeeToEdit} onClose={handleCloseEditModal} onSave={handleUpdateEmployee} />}
             {isDeactivateModalOpen && <DeactivateEmployeeModal employee={employeeToEdit} onClose={handleCloseDeactivateModal} onDeactivateSuccess={handleDeactivateSuccess} />}

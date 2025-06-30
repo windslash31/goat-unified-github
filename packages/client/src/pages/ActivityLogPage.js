@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ChevronRight, Plus, Minus, Edit, AlertCircle, CheckCircle, XCircle, UserPlus, UserX, Info, LogIn, Eye, Download } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import api from '../api/api';
+import { motion } from 'framer-motion';
 
 const formatValue = (value) => {
     if (value === null || typeof value === 'undefined') return '""';
@@ -11,12 +12,10 @@ const formatValue = (value) => {
             return `"${d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}"`;
         }
     }
-    // Attempt to parse if it's a JSON string
     try {
         const obj = JSON.parse(value);
         return JSON.stringify(obj, null, 2);
     } catch (e) {
-        // Not a JSON string, return as is
         return `"${String(value)}"`;
     }
 };
@@ -258,7 +257,13 @@ export const ActivityLogPage = ({ onLogout }) => {
     );
 
     return (
-        <div className="p-4 sm:p-6">
+        <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ duration: 0.3 }}
+            className="p-4 sm:p-6"
+        >
             <div className="flex flex-col sm:flex-row justify-between sm:items-center mb-4">
                 <div>
                     <h1 className="text-2xl font-bold">Activity Log</h1>
@@ -341,6 +346,6 @@ export const ActivityLogPage = ({ onLogout }) => {
                     </tbody>
                 </table>
             </div>
-        </div>
+        </motion.div>
     );
 };

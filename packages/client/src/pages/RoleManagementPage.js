@@ -5,6 +5,7 @@ import { ConfirmationModal } from '../components/ui/ConfirmationModal';
 import { Button } from '../components/ui/Button';
 import { useAuthStore } from '../stores/authStore';
 import api from '../api/api';
+import { motion } from 'framer-motion';
 
 const permissionGroups = [
     {
@@ -283,7 +284,13 @@ export const RoleManagementPage = ({ onLogout }) => {
     if (error) return <div className="p-6 text-center text-red-500"><AlertTriangle className="mx-auto w-12 h-12 mb-4" /><h2 className="text-xl font-semibold">Could not load data</h2><p>{error}</p></div>;
 
     return (
-        <div className="p-6 h-full flex flex-col">
+        <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ duration: 0.3 }}
+            className="p-6 h-full flex flex-col"
+        >
             <div className="mb-6">
                 <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Roles & Permissions</h1>
                 <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">Manage what users can see and do.</p>
@@ -323,6 +330,6 @@ export const RoleManagementPage = ({ onLogout }) => {
                 title="Delete Role"
                 message={`Are you sure you want to delete the role "${roleToDelete?.name}"? This action cannot be undone.`}
             />
-        </div>
+        </motion.div>
     );
 };

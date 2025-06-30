@@ -4,7 +4,8 @@ import { Toaster } from 'react-hot-toast';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
 import { ChevronLeft } from 'lucide-react';
-import { useUIStore } from '../../stores/uiStore'; // Import our new UI store
+import { useUIStore } from '../../stores/uiStore';
+import { motion } from 'framer-motion';
 
 export const MainLayout = ({ 
     onLogout, 
@@ -12,11 +13,9 @@ export const MainLayout = ({
     breadcrumbs, 
     user 
 }) => {
-    // Get the state and the action from the Zustand store
     const isSidebarCollapsed = useUIStore((state) => state.isSidebarCollapsed);
     const toggleSidebar = useUIStore((state) => state.toggleSidebar);
     
-    // The local useState for the mobile sidebar can remain here
     const [isMobileSidebarOpen, setIsMobileSidebarOpen] = React.useState(false);
 
     return (
@@ -38,14 +37,15 @@ export const MainLayout = ({
                     setMobileOpen={setIsMobileSidebarOpen}
                 />
                 
-                {/* Floating Collapse/Expand Button for Desktop */}
-                <button
-                    onClick={toggleSidebar} // Use the action from the store
-                    className={`hidden md:flex absolute top-20 z-50 items-center justify-center w-6 h-6 rounded-full bg-white dark:bg-gray-700 shadow-md ring-1 ring-gray-200 dark:ring-gray-600 hover:bg-gray-100 dark:hover:bg-gray-600 transition-all duration-300 ease-in-out ${isSidebarCollapsed ? 'left-[72px]' : 'left-[248px]'}`}
+                <motion.button
+                    layout
+                    onClick={toggleSidebar}
+                    className="hidden md:flex absolute top-20 z-50 items-center justify-center w-6 h-6 rounded-full bg-white dark:bg-gray-700 shadow-md ring-1 ring-gray-200 dark:ring-gray-600 hover:bg-gray-100 dark:hover:bg-gray-600"
                     aria-label={isSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+                    style={{ left: isSidebarCollapsed ? 72 : 248, transition: 'left 0.3s cubic-bezier(0.4, 0, 0.2, 1)' }}
                 >
                     <ChevronLeft className={`w-4 h-4 text-gray-600 dark:text-gray-300 transition-transform duration-300 ${isSidebarCollapsed ? 'rotate-180' : 'rotate-0'}`} />
-                </button>
+                </motion.button>
                 
                 <div className="flex-1 flex flex-col overflow-hidden">
                     <Header 
