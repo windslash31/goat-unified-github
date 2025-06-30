@@ -7,7 +7,6 @@ const googleWorkspaceService = require('./googleService');
 const slackService = require('./slackService');
 const atlassianService = require('./atlassianService');
 
-
 const getEmployeeStatus = (employee) => {
     if (!employee.is_active) return 'Inactive';
     if (employee.access_cut_off_date_at_date) {
@@ -350,7 +349,6 @@ const updateOffboardingFromTicket = async (ticketData, actorId, reqContext) => {
     return await updateEmployee(employeeId, updatedData, actorId, reqContext);
 };
 
-
 const getPlatformStatuses = async (employeeId) => {
     const employeeRes = await db.query('SELECT employee_email FROM employees WHERE id = $1', [employeeId]);
     if (employeeRes.rows.length === 0) throw new Error('Employee not found.');
@@ -396,7 +394,6 @@ const getJumpCloudLogs = async (employeeId) => {
     return eventsResponse.json();
 };
 
-
 const getGoogleLogs = async (employeeId) => {
     const employeeRes = await db.query('SELECT employee_email FROM employees WHERE id = $1', [employeeId]);
     if (employeeRes.rows.length === 0) throw new Error('Employee not found.');
@@ -414,7 +411,6 @@ const getSlackLogs = async (employeeId) => {
 const getUnifiedTimeline = async (employeeId) => {
     return [];
 };
-
 
 const deactivateOnPlatforms = async (employeeId, platforms, actorId, reqContext) => {
     const employeeRes = await db.query('SELECT employee_email FROM employees WHERE id = $1', [employeeId]);
@@ -453,7 +449,6 @@ const bulkDeactivateOnPlatforms = async (employeeIds, platforms, actorId, reqCon
     return { message: 'Bulk suspension process completed.', results };
 };
 
-
 const getEmployeeOptions = async (tableName) => {
     if (!/^[a-z_]+$/.test(tableName)) {
         throw new Error('Invalid table name.');
@@ -462,6 +457,55 @@ const getEmployeeOptions = async (tableName) => {
     return result.rows;
 };
 
+const createApplicationAccess = async (ticketData, actorId, reqContext) => {
+    const { employee_email, application_name, role, jira_ticket } = ticketData;
+
+    if (!employee_email || !application_name) {
+        throw new Error('Missing required fields: employee_email and application_name are required.');
+    }
+
+    const client = await db.pool.connect();
+    try {
+        await client.query('BEGIN');
+
+        const employeeResult = await client.query('SELECT id FROM employees WHERE employee_email ILIKE $1', [employee_email]);
+        if (employeeResult.rows.length === 0) throw new Error(`Employee not found with email: ${employee_email}`);
+        const employeeId = employeeResult.rows[0].id;
+
+        const applicationResult = await client.query('SELECT id FROM internal_applications WHERE name ILIKE $1', [application_name]);
+        if (applicationResult.rows.length === 0) throw new Error(`Internal application not found with name: ${application_name}`);
+        const applicationId = applicationResult.rows[0].id;
+
+        const query = `
+            INSERT INTO employee_application_access (employee_id, application_id, role, jira_ticket)
+            VALUES ($1, $2, $3, $4)
+            ON CONFLICT (employee_id, application_id) DO UPDATE SET
+                role = EXCLUDED.role,
+                jira_ticket = EXCLUDED.jira_ticket;
+        `;
+        await client.query(query, [employeeId, applicationId, role, jira_ticket]);
+
+        await logActivity(
+            actorId,
+            'APPLICATION_ACCESS_CREATE', // A more accurate action type
+            {
+                targetEmployeeId: employeeId,
+                details: { application: application_name, role: role, source_ticket: jira_ticket }
+            },
+            reqContext,
+            client
+        );
+
+        await client.query('COMMIT');
+        return { message: `Access to ${application_name} successfully recorded for ${employee_email}.` };
+
+    } catch (err) {
+        await client.query('ROLLBACK');
+        throw err;
+    } finally {
+        client.release();
+    }
+};
 
 module.exports = {
     getEmployeeById,
@@ -477,4 +521,5 @@ module.exports = {
     bulkDeactivateOnPlatforms,
     createEmployeeFromTicket,
     updateOffboardingFromTicket,
+    createApplicationAccess,
 };

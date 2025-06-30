@@ -172,6 +172,18 @@ const offboardFromTicket = async (req, res, next) => {
     }
 };
 
+const createApplicationAccess = async (req, res, next) => {
+    try {
+        const reqContext = { ip: req.ip, userAgent: req.headers['user-agent'], source: 'n8n_uar_workflow' };
+        const result = await employeeService.createApplicationAccess(req.body, req.user.id, reqContext);
+        res.status(200).json(result);
+    } catch (error) {
+        if (error.message.includes('not found')) {
+            return res.status(404).json({ message: error.message });
+        }
+        next(error);
+    }
+};
 
 module.exports = {
     listEmployees,
@@ -188,4 +200,5 @@ module.exports = {
     bulkDeactivateOnPlatforms,
     onboardFromTicket,
     offboardFromTicket,
+    createApplicationAccess,
 };

@@ -28,5 +28,6 @@ router.post('/bulk-deactivate', authenticateToken, authorize('employee:deactivat
 // Route for N8N
 router.post('/onboard', authenticateApiKey, authorize('employee:create'), employeeController.onboardFromTicket);
 router.post('/offboard', authenticateApiKey, authorize('employee:update'), employeeController.offboardFromTicket);
+router.post('/application-access', authenticateApiKey, authorize('employee:update'), employeeController.createApplicationAccess);
 
 module.exports = router;
