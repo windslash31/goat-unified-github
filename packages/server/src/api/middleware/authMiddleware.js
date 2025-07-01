@@ -25,7 +25,7 @@ const authenticateToken = async (req, res, next) => {
 
     } catch (err) {
         if (err instanceof jwt.JsonWebTokenError) {
-            return res.status(403).json({ message: 'Token is not valid.' });
+            return res.status(401).json({ message: 'Token is not valid.' });
         }
         console.error('Authentication error:', err);
         return res.status(500).send('Server error during authentication.');
