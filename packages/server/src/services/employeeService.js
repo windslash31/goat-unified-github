@@ -148,6 +148,91 @@ const getEmployees = async (filters) => {
     };
 };
 
+const getEmployeesForExport = async (filters) => {
+    const { 
+        status, search, jobTitle, manager, 
+        legal_entity_id, office_location_id, employee_type_id, employee_sub_type_id,
+        application_id
+    } = filters;
+    
+    const whereClauses = [];
+    const queryParams = [];
+    let paramIndex = 1;
+
+    if (application_id) {
+        whereClauses.push(`e.id IN (SELECT employee_id FROM employee_application_access WHERE application_id = $${paramIndex++})`);
+        queryParams.push(application_id);
+    }
+    if (status && status !== 'all') {
+        const statusTextMap = { 'active': 'Active', 'inactive': 'Inactive', 'escalation': 'For Escalation' };
+        whereClauses.push(`get_employee_status(e.is_active, e.access_cut_off_date_at_date) = $${paramIndex++}`);
+        queryParams.push(statusTextMap[status]);
+    }
+    if (search) {
+        whereClauses.push(`(e.first_name || ' ' || e.middle_name || ' ' || e.last_name || ' ' || e.employee_email ILIKE $${paramIndex++})`);
+        queryParams.push(`%${search}%`);
+    }
+    if (jobTitle) {
+        whereClauses.push(`e.position_name ILIKE $${paramIndex++}`);
+        queryParams.push(`%${jobTitle}%`);
+    }
+    if (manager) {
+        // Use the 'manager' alias here
+        whereClauses.push(`manager.employee_email ILIKE $${paramIndex++}`);
+        queryParams.push(`%${manager}%`);
+    }
+    if (legal_entity_id) {
+        whereClauses.push(`e.legal_entity_id = $${paramIndex++}`);
+        queryParams.push(legal_entity_id);
+    }
+    if (office_location_id) {
+        whereClauses.push(`e.office_location_id = $${paramIndex++}`);
+        queryParams.push(office_location_id);
+    }
+    if (employee_type_id) {
+        whereClauses.push(`e.employee_type_id = $${paramIndex++}`);
+        queryParams.push(employee_type_id);
+    }
+    if (employee_sub_type_id) {
+        whereClauses.push(`e.employee_sub_type_id = $${paramIndex++}`);
+        queryParams.push(employee_sub_type_id);
+    }
+
+    const whereCondition = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
+
+    const query = `
+        SELECT 
+            e.id,
+            e.first_name,
+            e.middle_name,
+            e.last_name,
+            e.employee_email,
+            get_employee_status(e.is_active, e.access_cut_off_date_at_date) as status,
+            e.position_name,
+            e.position_level,
+            manager.employee_email as manager_email,
+            le.name as legal_entity,
+            ol.name as office_location,
+            et.name as employee_type,
+            est.name as employee_sub_type,
+            e.join_date,
+            e.date_of_exit_at_date,
+            e.access_cut_off_date_at_date,
+            e.created_at
+        FROM employees e
+        LEFT JOIN employees manager ON e.manager_id = manager.id
+        LEFT JOIN legal_entities le ON e.legal_entity_id = le.id
+        LEFT JOIN office_locations ol ON e.office_location_id = ol.id
+        LEFT JOIN employee_types et ON e.employee_type_id = et.id
+        LEFT JOIN employee_sub_types est ON e.employee_sub_type_id = est.id
+        ${whereCondition}
+        ORDER BY e.first_name, e.last_name;
+    `;
+    
+    const { rows } = await db.query(query, queryParams);
+    return rows;
+};
+
 const updateEmployee = async (employeeId, updatedData, actorId, reqContext) => {
     const client = await db.pool.connect();
     try {
@@ -255,7 +340,6 @@ const createEmployeeFromTicket = async (ticketData, actorId, reqContext) => {
             resolvedIds.office_location_id = result.rows[0].id;
         }
         
-        // --- NEWLY ADDED ---
         if (ticketData.employee_type_name) {
             const result = await client.query('SELECT id FROM employee_types WHERE name ILIKE $1', [ticketData.employee_type_name]);
             if (result.rows.length === 0) throw new Error(`Employee Type not found with name: ${ticketData.employee_type_name}`);
@@ -267,7 +351,6 @@ const createEmployeeFromTicket = async (ticketData, actorId, reqContext) => {
             if (result.rows.length === 0) throw new Error(`Employee Sub-Type not found with name: ${ticketData.employee_sub_type_name}`);
             resolvedIds.employee_sub_type_id = result.rows[0].id;
         }
-        // --- END NEWLY ADDED ---
 
         const finalData = { ...ticketData, ...resolvedIds };
         
@@ -487,7 +570,7 @@ const createApplicationAccess = async (ticketData, actorId, reqContext) => {
 
         await logActivity(
             actorId,
-            'APPLICATION_ACCESS_CREATE', // A more accurate action type
+            'APPLICATION_ACCESS_CREATE',
             {
                 targetEmployeeId: employeeId,
                 details: { application: application_name, role: role, source_ticket: jira_ticket }
@@ -510,6 +593,7 @@ const createApplicationAccess = async (ticketData, actorId, reqContext) => {
 module.exports = {
     getEmployeeById,
     getEmployees,
+    getEmployeesForExport,
     updateEmployee,
     getPlatformStatuses,
     getJumpCloudLogs,

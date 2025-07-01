@@ -1,10 +1,33 @@
 const employeeService = require('../../services/employeeService');
 const { logActivity } = require('../../services/logService');
+const { Parser } = require('json2csv');
 
 const listEmployees = async (req, res, next) => {
     try {
         const result = await employeeService.getEmployees(req.query);
         res.json(result);
+    } catch (error) {
+        next(error);
+    }
+};
+
+// --- NEW CONTROLLER FUNCTION ---
+const exportEmployees = async (req, res, next) => {
+    try {
+        const employees = await employeeService.getEmployeesForExport(req.query);
+        
+        const fields = [
+            'id', 'first_name', 'middle_name', 'last_name', 'employee_email', 'status',
+            'position_name', 'position_level', 'manager_email', 'legal_entity',
+            'office_location', 'employee_type', 'employee_sub_type', 'join_date',
+            'date_of_exit_at_date', 'access_cut_off_date_at_date', 'created_at'
+        ];
+        const json2csvParser = new Parser({ fields });
+        const csv = json2csvParser.parse(employees);
+
+        res.header('Content-Type', 'text/csv');
+        res.attachment('employees.csv');
+        res.send(csv);
     } catch (error) {
         next(error);
     }
@@ -139,10 +162,6 @@ const logEmployeeView = async (req, res, next) => {
     }
 };
 
-/**
- * NEW: Controller method to handle employee onboarding from a ticket.
- * It passes the request body (from n8n) and actor details to the service layer.
- */
 const onboardFromTicket = async (req, res, next) => {
     try {
         const reqContext = { ip: req.ip, userAgent: req.headers['user-agent'], source: 'n8n_onboard_workflow' };
@@ -153,18 +172,12 @@ const onboardFromTicket = async (req, res, next) => {
     }
 };
 
-/**
- * NEW: Controller method to handle employee offboarding from a ticket.
- * It passes the request body and employee ID to the service layer.
- */
 const offboardFromTicket = async (req, res, next) => {
     try {
         const reqContext = { ip: req.ip, userAgent: req.headers['user-agent'], source: 'n8n_offboard_workflow' };
-        // The employee's email is now in the body, which is passed directly to the service.
         const result = await employeeService.updateOffboardingFromTicket(req.body, req.user.id, reqContext);
         res.status(200).json(result);
     } catch (error) {
-        // Add more specific error handling for this route
         if (error.message.includes('Employee not found')) {
             return res.status(404).json({ message: error.message });
         }
@@ -201,4 +214,5 @@ module.exports = {
     onboardFromTicket,
     offboardFromTicket,
     createApplicationAccess,
-};
+    exportEmployees,
+}

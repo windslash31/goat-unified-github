@@ -1,8 +1,5 @@
-// packages/client/src/pages/UserManagementPage.js
-
 import React, { useState, useEffect, useCallback } from 'react';
 import toast from 'react-hot-toast';
-// ADD KeyIcon to imports
 import { PlusCircle, Trash2, KeyRound, Key as KeyIcon } from 'lucide-react';
 import { CreateUserModal } from '../components/ui/CreateUserModal';
 import { ConfirmationModal } from '../components/ui/ConfirmationModal';
@@ -12,8 +9,8 @@ import { Button } from '../components/ui/Button';
 import { CustomSelect } from '../components/ui/CustomSelect';
 import { useAuthStore } from '../stores/authStore';
 import api from '../api/api';
-// --- NEW IMPORT ---
 import { ApiKeyManagerModal } from '../components/ui/ApiKeyManagerModal';
+import { motion } from 'framer-motion';
 
 export const UserManagementPage = ({ onLogout }) => {
     const [users, setUsers] = useState([]);
@@ -29,7 +26,6 @@ export const UserManagementPage = ({ onLogout }) => {
     const [userToReset, setUserToReset] = useState(null);
     const [newPassword, setNewPassword] = useState(null);
 
-    // --- NEW STATE FOR API KEY MODAL ---
     const [isApiKeyModalOpen, setIsApiKeyModalOpen] = useState(false);
     const [userForApiKey, setUserForApiKey] = useState(null);
 
@@ -93,7 +89,6 @@ export const UserManagementPage = ({ onLogout }) => {
         setIsResetModalOpen(true);
     };
     
-    // --- NEW FUNCTION TO OPEN THE API KEY MODAL ---
     const openApiKeyModal = (user) => {
         setUserForApiKey(user);
         setIsApiKeyModalOpen(true);
@@ -119,9 +114,13 @@ export const UserManagementPage = ({ onLogout }) => {
     const roleOptions = roles.map(role => ({ id: role.id, name: role.name }));
 
     return (
-        <>
+        <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ duration: 0.3 }}
+        >
             <div className="p-4 sm:p-6">
-                 {/* ... (The header section remains the same) ... */}
                 <div className="flex flex-col sm:flex-row justify-between sm:items-center mb-4">
                     <div>
                         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">User Management</h1>
@@ -161,7 +160,6 @@ export const UserManagementPage = ({ onLogout }) => {
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
                                             <div className="flex items-center gap-1">
-                                                {/* --- ADDED API KEY BUTTON --- */}
                                                 {permissions.includes('user:manage_api_keys') && (
                                                     <button 
                                                         onClick={() => openApiKeyModal(user)} 
@@ -201,9 +199,8 @@ export const UserManagementPage = ({ onLogout }) => {
                 {isDeleteModalOpen && <ConfirmationModal isOpen={isDeleteModalOpen} onClose={() => setIsDeleteModalOpen(false)} onConfirm={handleDeleteUser} title="Delete User" message={`Are you sure you want to delete the user "${userToDelete?.full_name}"? This will permanently revoke their access.`} />}
                 {isResetModalOpen && <ConfirmationModal isOpen={isResetModalOpen} onClose={() => setIsResetModalOpen(false)} onConfirm={handleResetPassword} title="Reset Password" message={`Are you sure you want to reset the password for "${userToReset?.full_name}"? Their old password will no longer work.`} />}
                 {newPassword && <TemporaryPasswordModal password={newPassword} onClose={() => setNewPassword(null)} />}
-                {/* --- RENDER THE NEW MODAL --- */}
                 {isApiKeyModalOpen && userForApiKey && <ApiKeyManagerModal user={userForApiKey} onClose={() => setIsApiKeyModalOpen(false)} />}
             </Portal>
-        </>
+        </motion.div>
     );
 };

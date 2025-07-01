@@ -5,6 +5,7 @@ const { authenticateToken, authenticateApiKey, authorize, authorizeAdminOrSelf, 
 
 // General Employee Routes for the UI
 router.get('/', authenticateToken, authorize('employee:read:all'), employeeController.listEmployees);
+router.get('/export', authenticateToken, authorize('employee:read:all'), employeeController.exportEmployees); // --- ADD THIS LINE ---
 router.get('/:id', authenticateToken, authorizeAdminOrSelf, employeeController.getEmployee);
 router.put('/:id', authenticateToken, authorize('employee:update'), employeeController.updateEmployee);
 

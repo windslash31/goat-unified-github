@@ -42,7 +42,7 @@ export const LoginPage = () => {
                     <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-kredivo-light">
                         <ShieldCheck className="h-6 w-6 text-kredivo-primary" />
                     </div>
-                    <h2 className="mt-6 text-3xl font-bold text-gray-900 dark:text-white">Sign in to Owl</h2>
+                    <h2 className="mt-6 text-3xl font-bold text-gray-900 dark:text-white">Sign in to G.O.A.T</h2>
                 </div>
                 <form className="mt-8 space-y-6" onSubmit={handleLogin}>
                     <div className="rounded-md shadow-sm -space-y-px">

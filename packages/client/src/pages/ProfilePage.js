@@ -12,6 +12,7 @@ import { SlackLogPage } from './EmployeeDetailPage/SlackLogPage';
 import { UnifiedTimelinePage } from './EmployeeDetailPage/UnifiedTimelinePage';
 import { Button } from '../components/ui/Button';
 import { ChangePasswordModal } from '../components/ui/ChangePasswordModal';
+import { motion } from 'framer-motion';
 
 const Section = ({ id, title, children, icon }) => (
     <div id={id} className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 scroll-mt-24">
@@ -174,7 +175,12 @@ export const ProfilePage = ({ employee, permissions, onEdit, onDeactivate, onLog
     const TabButton = ({ id, label, icon }) => ( <button onClick={() => handleTabClick(id)} className={`flex items-center gap-2 py-3 px-4 border-b-2 font-semibold text-sm transition-colors whitespace-nowrap ${ activeTab === id ? 'border-kredivo-primary text-kredivo-primary' : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300' }`}> {icon} {label} </button> );
 
     return (
-        <>
+        <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ duration: 0.3 }}
+        >
             <div>
                 <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex flex-col md:flex-row justify-between md:items-center">
                     <div>
@@ -278,6 +284,6 @@ export const ProfilePage = ({ employee, permissions, onEdit, onDeactivate, onLog
             </div>
             {isJiraModalOpen && <JiraTicketModal ticketId={selectedTicketId} onClose={() => setIsJiraModalOpen(false)} />}
             {isChangePasswordModalOpen && <ChangePasswordModal onClose={() => setIsChangePasswordModalOpen(false)} />}
-        </>
+        </motion.div>
     );
 };

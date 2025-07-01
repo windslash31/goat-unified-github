@@ -186,14 +186,31 @@ export const EmployeeListPage = ({ employees, isLoading, filters, setFilters, pa
                             <th className="px-6 py-3 w-[5%] text-left text-xs uppercase text-gray-500"></th>
                         </tr>
                     </thead>
-                    <tbody>
+                    <motion.tbody
+                        initial="hidden"
+                        animate="visible"
+                        variants={{
+                            visible: {
+                                transition: {
+                                    staggerChildren: 0.05,
+                                },
+                            },
+                        }}
+                    >
                         {paddingTop > 0 && (<tr><td colSpan={6} style={{ height: `${paddingTop}px` }} /></tr>)}
                         {virtualItems.map(virtualRow => {
                             const employee = employees[virtualRow.index];
                             const fullName = [employee.first_name, employee.middle_name, employee.last_name].filter(Boolean).join(' ');
+                            
+                            const itemVariants = {
+                                hidden: { opacity: 0, y: 10 },
+                                visible: { opacity: 1, y: 0 },
+                            };
+                            
                             return (
-                                <tr
+                                <motion.tr
                                     key={virtualRow.key}
+                                    variants={itemVariants}
                                     data-index={virtualRow.index}
                                     ref={rowVirtualizer.measureElement}
                                     className={`border-b border-gray-200 dark:border-gray-700 ${selectedRows.has(employee.id) ? 'bg-kredivo-light text-kredivo-dark-text dark:bg-kredivo-primary/20 dark:text-kredivo-light' : 'hover:bg-gray-50 dark:hover:bg-gray-700/50'}`}
@@ -220,11 +237,11 @@ export const EmployeeListPage = ({ employees, isLoading, filters, setFilters, pa
                                             )}
                                         </div>
                                     </td>
-                                </tr>
+                                </motion.tr>
                             );
                         })}
                         {paddingBottom > 0 && (<tr><td colSpan={6} style={{ height: `${paddingBottom}px` }} /></tr>)}
-                    </tbody>
+                    </motion.tbody>
                 </table>
             </div>
         );

@@ -1,4 +1,5 @@
 import React from 'react';
+import { motion } from 'framer-motion';
 
 export const Button = ({ children, onClick, type = 'button', variant = 'primary', disabled = false, className = '' }) => {
     // Base classes for all buttons
@@ -14,13 +15,16 @@ export const Button = ({ children, onClick, type = 'button', variant = 'primary'
     const combinedClasses = `${baseClasses} ${variants[variant]} ${className}`;
 
     return (
-        <button
+        <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            transition={{ type: 'spring', stiffness: 400, damping: 17 }}
             type={type}
             onClick={onClick}
             disabled={disabled}
             className={combinedClasses}
         >
             {children}
-        </button>
+        </motion.button>
     );
 };

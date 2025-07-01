@@ -4,6 +4,7 @@ import { LogOut, ShieldCheck, User, Settings, FileText, Users, ChevronDown, X, L
 import { ThemeSwitcher } from '../ui/ThemeSwitcher';
 import { useAuthStore } from '../../stores/authStore';
 import { useUIStore } from '../../stores/uiStore';
+import { motion } from 'framer-motion';
 
 export const Sidebar = ({ onLogout, isMobileOpen, setMobileOpen }) => {
     const location = useLocation();
@@ -92,7 +93,7 @@ export const Sidebar = ({ onLogout, isMobileOpen, setMobileOpen }) => {
                            ${isCollapsed ? 'w-20' : 'w-64'}
                            ${isMobileOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0`}>
             
-            <div className={`h-16 flex items-center border-b border-gray-200 dark:border-gray-700 flex-shrink-0 ${isCollapsed ? 'justify-center' : 'justify-between'} px-4`}>
+            <motion.div layout className={`h-16 flex items-center border-b border-gray-200 dark:border-gray-700 flex-shrink-0 ${isCollapsed ? 'justify-center' : 'justify-between'} px-4`}>
                 <div className="flex items-center overflow-hidden">
                     <ShieldCheck className="w-8 h-8 text-kredivo-primary flex-shrink-0" />
                     <div className={`ml-2 whitespace-nowrap ${isCollapsed ? 'md:hidden' : ''}`}>
@@ -108,13 +109,13 @@ export const Sidebar = ({ onLogout, isMobileOpen, setMobileOpen }) => {
                 >
                     <X className="w-6 h-6" />
                 </button>
-            </div>
+            </motion.div>
             
             <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
                 {navItems.map(item => <NavItem key={item.id} item={item} />)}
             </nav>
 
-            <div className="p-4 mt-auto border-t border-gray-200 dark:border-gray-700 space-y-4">
+            <motion.div layout className="p-4 mt-auto border-t border-gray-200 dark:border-gray-700 space-y-4">
                 <div className="flex justify-center">
                     <ThemeSwitcher isCollapsed={isCollapsed} />
                 </div>
@@ -125,7 +126,7 @@ export const Sidebar = ({ onLogout, isMobileOpen, setMobileOpen }) => {
                     <LogOut className="w-5 h-5 flex-shrink-0" />
                     <span className={`${isCollapsed ? 'md:hidden' : ''}`}>Sign Out</span>
                 </button>
-            </div>
+            </motion.div>
         </aside>
     );
 };
