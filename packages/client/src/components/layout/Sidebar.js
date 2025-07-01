@@ -74,18 +74,6 @@ export function Sidebar({ onLogout }) {
 
                     {/* Moved User Actions into the Provider */}
                     <div className="mt-auto border-t border-gray-200 dark:border-gray-700">
-                        <div className="px-2 pt-2">
-                             {userActions.filter(item => item.visible).map(item => (
-                                <SidebarItem 
-                                    key={item.id} 
-                                    item={item}
-                                    onClick={item.onClick}
-                                />
-                            ))}
-                        </div>
-                         <div className="p-3">
-                            <ThemeSwitcher isCollapsed={!expanded} />
-                        </div>
                          <div 
                             className="flex cursor-pointer items-center p-3 transition hover:bg-gray-100 dark:hover:bg-gray-700"
                             onClick={() => navigate('/profile')}
@@ -104,6 +92,18 @@ export function Sidebar({ onLogout }) {
                                 <span className="text-sm font-medium text-gray-800 dark:text-gray-200">{user?.name}</span>
                                 <span className="text-xs text-gray-500 dark:text-gray-400">{user?.email}</span>
                             </div>
+                        </div>
+                        <div className="px-2 pt-2">
+                             {userActions.filter(item => item.visible).map(item => (
+                                <SidebarItem 
+                                    key={item.id} 
+                                    item={item}
+                                    onClick={item.onClick}
+                                />
+                            ))}
+                        </div>
+                         <div className="p-3">
+                            <ThemeSwitcher isCollapsed={!expanded} />
                         </div>
                     </div>
                 </SidebarContext.Provider>
