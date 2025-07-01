@@ -2,8 +2,9 @@ import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ChevronLeft, Menu } from 'lucide-react';
 import { useBreadcrumb } from '../../context/BreadcrumbContext';
+import { ProfileDropdown } from './ProfileDropdown'; // Import the new component
 
-export const Header = ({ breadcrumbs, user, onMenuClick }) => {
+export const Header = ({ breadcrumbs, user, onLogout, onMenuClick }) => { // Add onLogout to props
     const navigate = useNavigate();
     const { dynamicCrumbs } = useBreadcrumb();
     const finalCrumbs = dynamicCrumbs.length > 0 ? [{ name: 'Home', path: '/' }, ...dynamicCrumbs] : breadcrumbs;
@@ -27,7 +28,6 @@ export const Header = ({ breadcrumbs, user, onMenuClick }) => {
                 </div>
 
                 <nav className="hidden md:flex items-center" aria-label="Breadcrumb">
-                    {/* --- 4. Render the final breadcrumbs --- */}
                     {finalCrumbs.map((crumb, index) => (
                         <div key={index} className="flex items-center min-w-0">
                             {index > 0 && <span className="mx-2 text-gray-400">/</span>}
@@ -47,11 +47,7 @@ export const Header = ({ breadcrumbs, user, onMenuClick }) => {
 
             {/* Right Section: User Info */}
             <div className="flex items-center flex-shrink-0 ml-4">
-                <div className="text-right hidden sm:block">
-                    <p className="font-semibold text-sm text-gray-800 dark:text-gray-200">{user.name}</p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 capitalize">{user.role}</p>
-                </div>
-                <img src={`https://i.pravatar.cc/150?u=${user.email}`} alt="User Avatar" className="w-10 h-10 rounded-full ml-4 border-2 border-gray-300" />
+                <ProfileDropdown user={user} onLogout={onLogout} />
             </div>
         </header>
     );

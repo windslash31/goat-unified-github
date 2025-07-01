@@ -10,9 +10,9 @@ export function SidebarItem({ item, onClick }) {
     const isActive = item.path && location.pathname.startsWith(item.path);
 
     const handleItemClick = () => {
+        // The onClick from the parent (which closes the mobile drawer) is called first
         if (onClick) {
             onClick();
-            return;
         }
         if (item.path) {
             navigate(item.path);
