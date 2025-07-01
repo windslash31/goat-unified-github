@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ChevronRight, Plus, Minus, Edit, AlertCircle, CheckCircle, XCircle, UserPlus, UserX, Info, LogIn, Eye, Download } from 'lucide-react';
+import { ChevronRight, Plus, Minus, Edit, AlertCircle, CheckCircle, XCircle, UserPlus, UserX, Info, LogIn, Eye, Download, KeyRound, ShieldCheck, ShieldX, FilePlus, FileText, PlusCircle } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import api from '../api/api';
 import { motion } from 'framer-motion';
@@ -19,6 +19,85 @@ const formatValue = (value) => {
         return `"${String(value)}"`;
     }
 };
+
+// --- START: New Detail Components ---
+
+const ApplicationAccessDetail = ({ details }) => (
+    <div className="flex items-start">
+        <FilePlus className="w-4 h-4 text-green-500 mr-2 mt-1 flex-shrink-0" />
+        <div>
+            <p>Granted access to <span className="font-semibold">{details.application}</span></p>
+            <p className="text-sm text-gray-500">Role: <span className="font-medium">{details.role}</span></p>
+            <p className="text-sm text-gray-500">Source: <span className="font-medium">{details.source_ticket}</span></p>
+        </div>
+    </div>
+);
+
+const EmployeeCreateDetail = ({ details }) => (
+    <div className="flex items-start">
+        <UserPlus className="w-4 h-4 text-green-500 mr-2 mt-1 flex-shrink-0" />
+        <div>
+            <p>New employee record created for <span className="font-semibold">{details.details.employee_email}</span></p>
+            <p className="text-sm text-gray-500">Source Ticket: <span className="font-medium">{details.details.source_ticket}</span></p>
+        </div>
+    </div>
+);
+
+const PasswordChangeSuccessDetail = () => (
+    <div className="flex items-center">
+        <KeyRound className="w-4 h-4 text-green-500 mr-2 flex-shrink-0" />
+        <span>Password changed successfully.</span>
+    </div>
+);
+
+const AdminPasswordResetDetail = ({ details }) => (
+    <div className="flex items-center">
+        <KeyRound className="w-4 h-4 text-yellow-500 mr-2 flex-shrink-0" />
+        <span>Password was reset for user <span className="font-semibold">{details.targetUserEmail}</span>.</span>
+    </div>
+);
+
+const ApiKeyCreateDetail = ({ details }) => (
+    <div className="flex items-start">
+        <PlusCircle className="w-4 h-4 text-green-500 mr-2 mt-1 flex-shrink-0" />
+        <div>
+            <p>API Key created</p>
+            <p className="text-sm text-gray-500">Expires: <span className="font-medium">{details.expires ? new Date(details.expires).toLocaleString() : 'Never'}</span></p>
+        </div>
+    </div>
+);
+
+const ApiKeyDeleteDetail = () => (
+    <div className="flex items-center">
+        <XCircle className="w-4 h-4 text-red-500 mr-2 flex-shrink-0" />
+        <span>API Key was revoked.</span>
+    </div>
+);
+
+const LogoutSuccessDetail = () => (
+    <div className="flex items-center">
+        <LogOut className="w-4 h-4 text-gray-500 mr-2 flex-shrink-0" />
+        <span>User successfully logged out.</span>
+    </div>
+);
+
+const RoleCreateDetail = ({ details }) => (
+    <div className="flex items-center">
+        <PlusCircle className="w-4 h-4 text-green-500 mr-2 flex-shrink-0" />
+        <span>New role created: <span className="font-semibold">{details.roleName}</span></span>
+    </div>
+);
+
+const RoleDeleteDetail = ({ details }) => (
+    <div className="flex items-center">
+        <XCircle className="w-4 h-4 text-red-500 mr-2 flex-shrink-0" />
+        <span>Role deleted: <span className="font-semibold">{details.roleName}</span></span>
+    </div>
+);
+
+
+// --- END: New Detail Components ---
+
 
 const PermissionChangeDetail = ({ changes }) => {
     const { added = [], removed = [] } = changes;
@@ -163,9 +242,9 @@ const EmployeeProfileViewDetail = ({ targetUser }) => (
 );
 
 const getActionTypeStyles = (actionType) => {
-    if (actionType.includes('SUCCESS') || actionType.includes('CREATE')) return 'text-green-600 dark:text-green-400';
-    if (actionType.includes('FAIL') || actionType.includes('DELETE') || actionType.includes('SUSPENSION')) return 'text-red-600 dark:text-red-400';
-    if (actionType.includes('UPDATE') || actionType.includes('VIEW')) return 'text-blue-600 dark:text-blue-400';
+    if (actionType.includes('SUCCESS') || actionType.includes('CREATE') || actionType.includes('API_KEY_CREATE')) return 'text-green-600 dark:text-green-400';
+    if (actionType.includes('FAIL') || actionType.includes('DELETE') || actionType.includes('SUSPENSION') || actionType.includes('API_KEY_DELETE')) return 'text-red-600 dark:text-red-400';
+    if (actionType.includes('UPDATE') || actionType.includes('VIEW') || actionType.includes('RESET')) return 'text-blue-600 dark:text-blue-400';
     return 'text-gray-700 dark:text-gray-300';
 };
 
@@ -219,6 +298,7 @@ export const ActivityLogPage = ({ onLogout }) => {
         if (log.action_type.startsWith('USER_')) return log.target_user_email || log.details?.targetUserEmail || 'N/A';
         if (log.action_type.startsWith('EMPLOYEE_')) return log.target_employee_email || 'N/A';
         if (log.action_type.startsWith('ROLE_')) return `Role: ${log.details?.roleName}`;
+        if (log.action_type.startsWith('API_KEY')) return log.target_user_email || 'N/A';
         return '—';
     };
     
@@ -227,6 +307,15 @@ export const ActivityLogPage = ({ onLogout }) => {
     const renderLogDetails = (log) => {
         if (!hasDetails(log)) return null;
         switch (log.action_type) {
+            case 'APPLICATION_ACCESS_CREATE': return <ApplicationAccessDetail details={log.details.details} />;
+            case 'EMPLOYEE_CREATE': return <EmployeeCreateDetail details={log.details} />;
+            case 'USER_PASSWORD_CHANGE_SUCCESS': return <PasswordChangeSuccessDetail />;
+            case 'ADMIN_PASSWORD_RESET': return <AdminPasswordResetDetail details={log.details} />;
+            case 'API_KEY_CREATE': return <ApiKeyCreateDetail details={log.details} />;
+            case 'API_KEY_DELETE': return <ApiKeyDeleteDetail />;
+            case 'USER_LOGOUT_SUCCESS': return <LogoutSuccessDetail />;
+            case 'ROLE_CREATE': return <RoleCreateDetail details={log.details} />;
+            case 'ROLE_DELETE': return <RoleDeleteDetail details={log.details} />;
             case 'USER_LOGIN_SUCCESS': return <UserLoginSuccessDetail details={log.details} />;
             case 'EMPLOYEE_PROFILE_VIEW': return <EmployeeProfileViewDetail targetUser={log.target_employee_email} />;
             case 'USER_CREATE': return <UserCreateDetail details={log.details} roles={roles} />;
