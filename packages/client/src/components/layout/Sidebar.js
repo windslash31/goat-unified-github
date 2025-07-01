@@ -1,5 +1,6 @@
 import { MoreVertical, ChevronFirst, ChevronLast, LayoutDashboard, User, Users, Settings, FileText, LogOut } from "lucide-react";
-import { createContext } from "react";
+import { createContext, useState, useEffect } from "react";
+import { useLocation } from 'react-router-dom';
 import { useUIStore } from '../../stores/uiStore';
 import { useAuthStore } from '../../stores/authStore';
 import { SidebarItem } from './SidebarItem';
@@ -10,6 +11,7 @@ export function Sidebar({ onLogout }) {
     const { isSidebarCollapsed: expanded, toggleSidebar: setExpanded } = useUIStore();
     const { user } = useAuthStore();
     const permissions = user?.permissions || [];
+    const location = useLocation();
 
     const hasSettingsAccess = permissions.includes('admin:view_users') || permissions.includes('admin:view_roles');
     const hasAuditAccess = permissions.includes('log:read');
@@ -22,6 +24,7 @@ export function Sidebar({ onLogout }) {
             id: 'settings',
             label: 'Settings',
             icon: <Settings size={20} />,
+            path: '/settings', 
             visible: hasSettingsAccess,
             children: [
                 { id: 'users', label: 'Users', path: '/users', visible: permissions.includes('admin:view_users') },
@@ -30,6 +33,18 @@ export function Sidebar({ onLogout }) {
         },
         { id: 'audit', path: '/logs/activity', label: 'Audit', icon: <FileText size={20} />, visible: hasAuditAccess },
     ];
+
+    const [openDropdown, setOpenDropdown] = useState('');
+
+    useEffect(() => {
+        const activeParent = navItems.find(item => 
+            item.children?.some(child => location.pathname.startsWith(child.path))
+        );
+        if (activeParent) {
+            setOpenDropdown(activeParent.id);
+        }
+    }, [location.pathname]);
+
 
     return (
         <aside className="h-screen">
@@ -53,7 +68,12 @@ export function Sidebar({ onLogout }) {
                 <SidebarContext.Provider value={{ expanded }}>
                     <ul className="flex-1 px-3">
                         {navItems.filter(item => item.visible).map(item => (
-                            <SidebarItem key={item.id} item={item} />
+                            <SidebarItem 
+                                key={item.id} 
+                                item={item}
+                                isOpen={openDropdown === item.id}
+                                setOpen={() => setOpenDropdown(prev => prev === item.id ? '' : item.id)}
+                            />
                         ))}
                     </ul>
                     <SidebarItem item={{ icon: <LogOut size={20} />, label: "Logout" }} onClick={onLogout} />
