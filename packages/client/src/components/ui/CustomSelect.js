@@ -1,90 +1,95 @@
 import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
-import { ChevronDown, Check } from 'lucide-react';
+import { ChevronsUpDown, Check } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Portal } from './Portal';
 
-export const CustomSelect = ({ options, value, onChange, placeholder = "Select...", id = null, disabled = false }) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const [position, setPosition] = useState({ top: 0, left: 0, width: 0 });
-  const buttonRef = useRef(null);
-  const dropdownRef = useRef(null);
-  
-  const selectedOption = options.find(opt => opt.id === value);
+export const CustomSelect = ({ id, options = [], value, onChange, placeholder = 'Select an option', disabled }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const buttonRef = useRef(null);
+    const optionsRef = useRef(null);
+    const [position, setPosition] = useState({ top: 0, left: 0, width: 0 });
 
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (
-        buttonRef.current && !buttonRef.current.contains(event.target) &&
-        dropdownRef.current && !dropdownRef.current.contains(event.target)
-      ) {
+    const selectedOption = options.find(option => String(option.id) === String(value));
+
+    const onSelect = (optionId) => {
+        onChange(optionId);
         setIsOpen(false);
-      }
     };
-    if (isOpen) {
-        document.addEventListener("mousedown", handleClickOutside);
-    }
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [isOpen]);
-  
-  useLayoutEffect(() => {
-    if (isOpen && buttonRef.current) {
-      const rect = buttonRef.current.getBoundingClientRect();
-      setPosition({
-        top: rect.bottom + window.scrollY,
-        left: rect.left + window.scrollX,
-        width: rect.width,
-      });
-    }
-  }, [isOpen]);
 
-  const DropdownList = (
-    <ul 
-      ref={dropdownRef}
-      style={{ 
-        position: 'absolute',
-        top: `${position.top}px`, 
-        left: `${position.left}px`,
-        width: `${position.width}px`,
-      }}
-      className="z-50 mt-1 bg-white dark:bg-gray-800 shadow-lg rounded-md border border-gray-200 dark:border-gray-700 max-h-60 overflow-auto focus:outline-none"
-    >
-      {options.map(option => (
-        <li
-          key={option.id}
-          onClick={() => handleSelectOption(option.id)}
-          className="cursor-pointer select-none relative py-2 pl-3 pr-9 text-gray-900 dark:text-gray-200 hover:bg-kredivo-light dark:hover:bg-kredivo-primary/20"
-        >
-          <span className={`block truncate ${selectedOption?.id === option.id ? 'font-semibold' : 'font-normal'}`}>
-            {option.name}
-          </span>
-          {selectedOption?.id === option.id && (
-            <span className="absolute inset-y-0 right-0 flex items-center pr-4 text-kredivo-primary">
-              <Check className="h-5 w-5" aria-hidden="true" />
-            </span>
-          )}
-        </li>
-      ))}
-    </ul>
-  );
+    useLayoutEffect(() => {
+        if (isOpen && buttonRef.current) {
+            const rect = buttonRef.current.getBoundingClientRect();
+            setPosition({
+                top: rect.bottom + 4,
+                left: rect.left,
+                width: rect.width
+            });
+        }
+    }, [isOpen]);
+    
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (isOpen && buttonRef.current && !buttonRef.current.contains(event.target) && optionsRef.current && !optionsRef.current.contains(event.target)) {
+                setIsOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [isOpen]);
 
-  const handleSelectOption = (optionValue) => {
-    onChange(optionValue);
-    setIsOpen(false);
-  };
-
-  return (
-    <div className="relative w-full" ref={buttonRef}>
-      <button
-        id={id}
-        type="button"
-        onClick={() => !disabled && setIsOpen(prev => !prev)}
-        disabled={disabled}
-        className="w-full bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm py-2 px-3 flex items-center justify-between text-left focus:ring-kredivo-primary focus:border-kredivo-primary focus:outline-none disabled:bg-gray-100 dark:disabled:bg-gray-800 disabled:cursor-not-allowed"
-      >
-        <span className={`truncate ${disabled ? 'text-gray-400 dark:text-gray-500' : ''}`}>{selectedOption ? selectedOption.name : placeholder}</span>
-        <ChevronDown className={`w-4 h-4 ml-2 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
-      </button>
-
-      {isOpen && <Portal>{DropdownList}</Portal>}
-    </div>
-  );
+    return (
+        <div className="relative w-full">
+            <button
+                id={id}
+                ref={buttonRef}
+                type="button"
+                onClick={() => !disabled && setIsOpen(!isOpen)}
+                className={`w-full flex items-center justify-between px-3 py-2 text-left bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-kredivo-primary transition-colors ${disabled ? 'bg-gray-100 dark:bg-gray-800 cursor-not-allowed' : 'cursor-pointer'}`}
+                disabled={disabled}
+            >
+                <span className={`truncate ${selectedOption ? 'text-gray-900 dark:text-white' : 'text-gray-400 dark:text-gray-500'}`}>
+                    {selectedOption ? selectedOption.name : placeholder}
+                </span>
+                <ChevronsUpDown className="w-5 h-5 text-gray-400" />
+            </button>
+            <AnimatePresence>
+                {isOpen && (
+                    <Portal>
+                        <motion.div
+                            ref={optionsRef}
+                            initial={{ opacity: 0, y: -5 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -5 }}
+                            transition={{ duration: 0.15 }}
+                            style={{
+                                position: 'absolute',
+                                top: `${position.top}px`,
+                                left: `${position.left}px`,
+                                width: `${position.width}px`,
+                            }}
+                            // --- MODIFICATION HERE ---
+                            // Added a data-role attribute to identify this dropdown
+                            data-role="custom-select-options"
+                            className="z-50 max-h-60 overflow-auto bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg"
+                        >
+                            <ul className="py-1">
+                                {options.map(option => (
+                                    <li key={option.id}>
+                                        <button
+                                             onMouseDown={(e) => e.preventDefault()}
+                                             onClick={() => onSelect(option.id)}
+                                             className="w-full text-left flex items-center justify-between px-3 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
+                                        >
+                                            <span className="truncate">{option.name}</span>
+                                            {String(option.id) === String(value) && <Check className="w-4 h-4 text-kredivo-primary" />}
+                                        </button>
+                                    </li>
+                                ))}
+                            </ul>
+                        </motion.div>
+                    </Portal>
+                )}
+            </AnimatePresence>
+        </div>
+    );
 };

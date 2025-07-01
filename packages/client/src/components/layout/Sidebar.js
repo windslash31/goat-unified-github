@@ -6,10 +6,11 @@ import { useAuthStore } from '../../stores/authStore';
 import { SidebarItem } from './SidebarItem';
 import { ThemeSwitcher } from "../ui/ThemeSwitcher";
 import { motion, AnimatePresence } from 'framer-motion';
+import logo from '../../assets/logo.png';
 
 export const SidebarContext = createContext();
 
-export function Sidebar({ onLogout, isMobileOpen, setMobileOpen }) { 
+export function Sidebar({ onLogout, isMobileOpen, setMobileOpen }) {
     const { isSidebarCollapsed: expanded, toggleSidebar: setExpanded } = useUIStore();
     const { user } = useAuthStore();
     const permissions = user?.permissions || [];
@@ -23,6 +24,9 @@ export function Sidebar({ onLogout, isMobileOpen, setMobileOpen }) {
         { id: 'logs', path: '/logs/activity', label: 'Activity Log', icon: <FileText size={20} />, visible: permissions.includes('log:read') },
         { id: 'settings', path: '/settings', label: 'Settings', icon: <Settings size={20} />, visible: hasSettingsAccess },
     ];
+    
+    // Define a separate Logout item for clarity
+    const logoutItem = { id: 'logout', label: 'Logout', icon: <LogOut size={20} />, onClick: onLogout };
 
     const sidebarVariants = {
         hidden: { x: '-100%' },
@@ -36,7 +40,7 @@ export function Sidebar({ onLogout, isMobileOpen, setMobileOpen }) {
                 <nav className="h-full flex flex-col bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 shadow-sm">
                     <div className="p-4 pb-2 flex justify-between items-center">
                         <img
-                            src="https://images.seeklogo.com/logo-png/35/1/goat-logo-png_seeklogo-357788.png"
+                            src={logo}
                             className={`overflow-hidden transition-all ${
                                 expanded ? "w-32" : "w-0"
                             }`}
@@ -60,7 +64,6 @@ export function Sidebar({ onLogout, isMobileOpen, setMobileOpen }) {
                             ))}
                         </ul>
 
-                        {/* MODIFICATION HERE: Added flex and justify-center to the container */}
                         <div className="mt-auto p-3 flex justify-center">
                             <ThemeSwitcher isCollapsed={!expanded} />
                         </div>
@@ -82,7 +85,7 @@ export function Sidebar({ onLogout, isMobileOpen, setMobileOpen }) {
                          <nav className="h-full flex flex-col bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 shadow-lg" style={{width: '270px'}}>
                             <div className="p-4 pb-2 flex justify-between items-center">
                                 <img
-                                    src="https://images.seeklogo.com/logo-png/35/1/goat-logo-png_seeklogo-357788.png"
+                                    src={logo}
                                     className="w-32"
                                     alt="Company Logo"
                                 />
@@ -98,8 +101,28 @@ export function Sidebar({ onLogout, isMobileOpen, setMobileOpen }) {
                                          />
                                      ))}
                                  </ul>
-                                 <div className="p-3 border-t border-gray-200 dark:border-gray-700 flex justify-center">
-                                     <ThemeSwitcher isCollapsed={false} />
+                                 {/* MODIFICATION: Added user profile and logout to the bottom of the mobile drawer */}
+                                 <div className="border-t border-gray-200 dark:border-gray-700">
+                                     <div 
+                                        className="flex cursor-pointer items-center p-3 transition hover:bg-gray-100 dark:hover:bg-gray-700"
+                                        onClick={() => { navigate('/profile'); setMobileOpen(false); }}
+                                    >
+                                        <img
+                                            src={`https://ui-avatars.com/api/?background=c7d2fe&color=3730a3&bold=true&name=${encodeURIComponent(user?.name || 'User')}`}
+                                            alt="User Avatar"
+                                            className="w-10 h-10 rounded-md"
+                                        />
+                                        <div className="ml-3 flex flex-col">
+                                            <span className="text-sm font-medium text-gray-800 dark:text-gray-200">{user?.name}</span>
+                                            <span className="text-xs text-gray-500 dark:text-gray-400">{user?.email}</span>
+                                        </div>
+                                    </div>
+                                    <div className="px-3 pb-2">
+                                        <SidebarItem item={logoutItem} onClick={() => { onLogout(); setMobileOpen(false); }} />
+                                    </div>
+                                     <div className="p-3 border-t border-gray-200 dark:border-gray-700 flex justify-center">
+                                         <ThemeSwitcher isCollapsed={false} />
+                                     </div>
                                  </div>
                              </SidebarContext.Provider>
                          </nav>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ChevronRight, Plus, Minus, Edit, AlertCircle, CheckCircle, XCircle, UserPlus, UserX, Info, LogIn, Eye, Download, KeyRound, ShieldCheck, ShieldX, FilePlus, FileText, PlusCircle } from 'lucide-react';
+import { ChevronRight, Plus, Minus, Edit, AlertCircle, CheckCircle, XCircle, UserPlus, UserX, Info, LogIn, LogOut, Eye, Download, KeyRound, ShieldCheck, ShieldX, FilePlus, FileText, PlusCircle } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import api from '../api/api';
 import { motion } from 'framer-motion';
@@ -19,8 +19,6 @@ const formatValue = (value) => {
         return `"${String(value)}"`;
     }
 };
-
-// --- START: New Detail Components ---
 
 const ApplicationAccessDetail = ({ details }) => (
     <div className="flex items-start">
@@ -94,9 +92,6 @@ const RoleDeleteDetail = ({ details }) => (
         <span>Role deleted: <span className="font-semibold">{details.roleName}</span></span>
     </div>
 );
-
-
-// --- END: New Detail Components ---
 
 
 const PermissionChangeDetail = ({ changes }) => {
@@ -358,7 +353,7 @@ export const ActivityLogPage = ({ onLogout }) => {
                     <h1 className="text-2xl font-bold">Activity Log</h1>
                     <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">Recent events recorded in the system.</p>
                 </div>
-                <Button onClick={handleExport} variant="secondary">
+                <Button onClick={handleExport} variant="secondary" className="mt-4 sm:mt-0 w-full sm:w-auto justify-center">
                     <Download className="w-4 h-4 mr-2" />
                     Export to CSV
                 </Button>

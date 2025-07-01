@@ -2,9 +2,9 @@ import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ChevronLeft, Menu } from 'lucide-react';
 import { useBreadcrumb } from '../../context/BreadcrumbContext';
-import { ProfileDropdown } from './ProfileDropdown'; // Import the new component
+import { ProfileDropdown } from './ProfileDropdown';
 
-export const Header = ({ breadcrumbs, user, onLogout, onMenuClick }) => { // Add onLogout to props
+export const Header = ({ breadcrumbs, user, onLogout, onMenuClick }) => {
     const navigate = useNavigate();
     const { dynamicCrumbs } = useBreadcrumb();
     const finalCrumbs = dynamicCrumbs.length > 0 ? [{ name: 'Home', path: '/' }, ...dynamicCrumbs] : breadcrumbs;
@@ -20,7 +20,8 @@ export const Header = ({ breadcrumbs, user, onLogout, onMenuClick }) => { // Add
 
                 <div className="flex md:hidden items-center min-w-0">
                     {parentPage && (
-                        <button onClick={() => navigate(parentPage.path)} className="mr-2 p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700">
+                        // MODIFIED: This now uses navigate(-1) for a true "back" functionality
+                        <button onClick={() => navigate(-1)} className="mr-2 p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700">
                             <ChevronLeft className="w-5 h-5 text-gray-500" />
                         </button>
                     )}
@@ -45,7 +46,6 @@ export const Header = ({ breadcrumbs, user, onLogout, onMenuClick }) => { // Add
                 </nav>
             </div>
 
-            {/* Right Section: User Info */}
             <div className="flex items-center flex-shrink-0 ml-4">
                 <ProfileDropdown user={user} onLogout={onLogout} />
             </div>
