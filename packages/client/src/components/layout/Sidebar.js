@@ -1,132 +1,75 @@
-import React, { useState } from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
-import { LogOut, ShieldCheck, User, Settings, FileText, Users, ChevronDown, X, LayoutDashboard } from 'lucide-react';
-import { ThemeSwitcher } from '../ui/ThemeSwitcher';
-import { useAuthStore } from '../../stores/authStore';
+import { MoreVertical, ChevronFirst, ChevronLast, LayoutDashboard, User, Users, Settings, FileText, LogOut } from "lucide-react";
+import { createContext } from "react";
 import { useUIStore } from '../../stores/uiStore';
-import { motion } from 'framer-motion';
+import { useAuthStore } from '../../stores/authStore';
+import { SidebarItem } from './SidebarItem';
 
-export const Sidebar = ({ onLogout, isMobileOpen, setMobileOpen }) => {
-    const location = useLocation();
+export const SidebarContext = createContext();
+
+export function Sidebar({ onLogout }) {
+    const { isSidebarCollapsed: expanded, toggleSidebar: setExpanded } = useUIStore();
     const { user } = useAuthStore();
     const permissions = user?.permissions || [];
-    const isCollapsed = useUIStore((state) => state.isSidebarCollapsed);
 
-    const [openDropdowns, setOpenDropdowns] = useState({
-      settings: location.pathname.startsWith('/users') || location.pathname.startsWith('/roles'),
-      audit: location.pathname.startsWith('/logs')
-    });
-    
     const hasSettingsAccess = permissions.includes('admin:view_users') || permissions.includes('admin:view_roles');
     const hasAuditAccess = permissions.includes('log:read');
 
     const navItems = [
-        { id: 'dashboard', path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, permission: 'dashboard:view', visible: permissions.includes('dashboard:view') },
-        { id: 'profile', path: '/profile', label: 'Profile', icon: User, permission: 'profile:read:own', visible: permissions.includes('profile:read:own') },
-        { id: 'employees', path: '/employees', label: 'Employees', icon: Users, permission: 'employee:read:all', visible: permissions.includes('employee:read:all') },
-        { id: 'settings', label: 'Settings', icon: Settings, visible: hasSettingsAccess, subItems: [
-            { id: 'user_management', path: '/users', label: 'User Management', permission: 'admin:view_users' },
-            { id: 'role_management', path: '/roles', label: 'Roles & Permissions', permission: 'admin:view_roles' }
-        ]},
-        { id: 'audit', label: 'Audit', icon: FileText, visible: hasAuditAccess, subItems: [
-            { id: 'activity_log', path: '/logs/activity', label: 'Activity Log', permission: 'log:read' }
-        ]},
+        { id: 'dashboard', path: '/dashboard', label: 'Dashboard', icon: <LayoutDashboard size={20} />, permission: 'dashboard:view', visible: permissions.includes('dashboard:view') },
+        { id: 'profile', path: '/profile', label: 'Profile', icon: <User size={20} />, permission: 'profile:read:own', visible: permissions.includes('profile:read:own') },
+        { id: 'employees', path: '/employees', label: 'Employees', icon: <Users size={20} />, permission: 'employee:read:all', visible: permissions.includes('employee:read:all') },
+        { id: 'settings', path: '/users', label: 'Settings', icon: <Settings size={20} />, permission: 'admin:view_users', visible: hasSettingsAccess },
+        { id: 'audit', path: '/logs/activity', label: 'Audit', icon: <FileText size={20} />, permission: 'log:read', visible: hasAuditAccess },
     ];
 
-    const handleNavLinkClick = () => {
-        if (window.innerWidth < 768) {
-            setMobileOpen(false);
-        }
-    };
-
-    const handleDropdownToggle = (id) => {
-        setOpenDropdowns(prev => ({ ...prev, [id]: !prev[id] }));
-    };
-
-    const NavItem = ({ item }) => {
-        if (!item.visible) return null;
-
-        const hasSubItems = item.subItems && item.subItems.length > 0;
-        const isActive = hasSubItems 
-            ? item.subItems.some(sub => location.pathname.startsWith(sub.path))
-            : location.pathname === item.path;
-
-        const isDropdownOpen = openDropdowns[item.id] && !isCollapsed;
-
-        const linkClasses = `flex items-center w-full px-4 py-2.5 text-sm font-medium rounded-lg transition-colors group ${
-            isActive
-            ? 'bg-kredivo-light text-kredivo-dark-text dark:bg-kredivo-primary/20 dark:text-kredivo-primary'
-            : 'text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700'
-        }`;
-
-        if (hasSubItems) {
-            return (
-                <div>
-                    <button onClick={() => handleDropdownToggle(item.id)} className={`${linkClasses} justify-between`}>
-                        <div className="flex items-center">
-                            {item.icon && <item.icon className={`w-5 h-5 mr-3 flex-shrink-0 ${isActive ? 'text-kredivo-primary' : ''}`} />}
-                            <span className={`${isCollapsed ? 'md:hidden' : ''}`}>{item.label}</span>
-                        </div>
-                        <ChevronDown className={`w-4 h-4 transition-transform ${isDropdownOpen ? 'rotate-180' : ''} ${isCollapsed ? 'md:hidden' : ''}`} />
-                    </button>
-                    {isDropdownOpen && (
-                        <div className="mt-1 space-y-1 pl-8">
-                            {item.subItems.filter(sub => permissions.includes(sub.permission)).map(sub => <NavItem key={sub.id} item={{...sub, visible: true}} />)}
-                        </div>
-                    )}
-                </div>
-            );
-        }
-
-        return (
-            <NavLink to={item.path} className={linkClasses} onClick={handleNavLinkClick}>
-                {item.icon && <item.icon className={`w-5 h-5 mr-3 flex-shrink-0 ${isActive ? 'text-kredivo-primary' : ''}`} />}
-                <span className={`${isCollapsed ? 'md:hidden' : ''}`}>{item.label}</span>
-            </NavLink>
-        );
-    };
-
     return (
-        <aside className={`flex-shrink-0 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col transition-all duration-300 ease-in-out
-                           z-40 h-full
-                           fixed md:relative 
-                           ${isCollapsed ? 'w-20' : 'w-64'}
-                           ${isMobileOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0`}>
-            
-            <motion.div layout className={`h-16 flex items-center border-b border-gray-200 dark:border-gray-700 flex-shrink-0 ${isCollapsed ? 'justify-center' : 'justify-between'} px-4`}>
-                <div className="flex items-center overflow-hidden">
-                    <ShieldCheck className="w-8 h-8 text-kredivo-primary flex-shrink-0" />
-                    <div className={`ml-2 whitespace-nowrap ${isCollapsed ? 'md:hidden' : ''}`}>
-                        <h1 className="text-lg font-bold text-gray-900 dark:text-white">G.O.A.T</h1>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">Kredivo</p>
+        <aside className="h-screen">
+            <nav className="h-full flex flex-col bg-white dark:bg-gray-800 border-r dark:border-gray-700 shadow-sm">
+                <div className="p-4 pb-2 flex justify-between items-center">
+                    <img
+                        src="https://img.logoipsum.com/243.svg"
+                        className={`overflow-hidden transition-all ${
+                            expanded ? "w-32" : "w-0"
+                        }`}
+                        alt="Company Logo"
+                    />
+                    <button
+                        onClick={setExpanded}
+                        className="p-1.5 rounded-lg bg-gray-50 hover:bg-gray-100 dark:bg-gray-700 dark:hover:bg-gray-600"
+                    >
+                        {expanded ? <ChevronFirst /> : <ChevronLast />}
+                    </button>
+                </div>
+
+                <SidebarContext.Provider value={{ expanded }}>
+                    <ul className="flex-1 px-3">
+                        {navItems.filter(item => item.visible).map(item => (
+                            <SidebarItem key={item.id} icon={item.icon} text={item.label} path={item.path} />
+                        ))}
+                    </ul>
+                    <SidebarItem icon={<LogOut size={20} />} text="Logout" onClick={onLogout} />
+                </SidebarContext.Provider>
+
+                <div className="border-t dark:border-gray-700 flex p-3">
+                    <img
+                        src={`https://ui-avatars.com/api/?background=c7d2fe&color=3730a3&bold=true&name=${encodeURIComponent(user?.name || 'User')}`}
+                        alt="User Avatar"
+                        className="w-10 h-10 rounded-md"
+                    />
+                    <div
+                        className={`
+                            flex justify-between items-center
+                            overflow-hidden transition-all ${expanded ? "w-52 ml-3" : "w-0"}
+                        `}
+                    >
+                        <div className="leading-4">
+                            <h4 className="font-semibold text-gray-800 dark:text-gray-200">{user?.name}</h4>
+                            <span className="text-xs text-gray-600 dark:text-gray-400">{user?.email}</span>
+                        </div>
+                        <MoreVertical size={20} className="text-gray-600 dark:text-gray-300" />
                     </div>
                 </div>
-                
-                <button 
-                    onClick={() => setMobileOpen(false)} 
-                    className={`p-2 -mr-2 text-gray-500 hover:text-gray-800 md:hidden ${isCollapsed ? 'hidden' : ''}`}
-                    aria-label="Close sidebar"
-                >
-                    <X className="w-6 h-6" />
-                </button>
-            </motion.div>
-            
-            <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
-                {navItems.map(item => <NavItem key={item.id} item={item} />)}
             </nav>
-
-            <motion.div layout className="p-4 mt-auto border-t border-gray-200 dark:border-gray-700 space-y-4">
-                <div className="flex justify-center">
-                    <ThemeSwitcher isCollapsed={isCollapsed} />
-                </div>
-                <button
-                    onClick={onLogout}
-                    className={`w-full flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-semibold rounded-lg shadow-sm hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors ${isCollapsed ? 'justify-center' : 'justify-start'}`}
-                >
-                    <LogOut className="w-5 h-5 flex-shrink-0" />
-                    <span className={`${isCollapsed ? 'md:hidden' : ''}`}>Sign Out</span>
-                </button>
-            </motion.div>
         </aside>
-    );
-};
+    )
+}
