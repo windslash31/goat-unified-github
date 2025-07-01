@@ -15,11 +15,20 @@ export function Sidebar({ onLogout }) {
     const hasAuditAccess = permissions.includes('log:read');
 
     const navItems = [
-        { id: 'dashboard', path: '/dashboard', label: 'Dashboard', icon: <LayoutDashboard size={20} />, permission: 'dashboard:view', visible: permissions.includes('dashboard:view') },
-        { id: 'profile', path: '/profile', label: 'Profile', icon: <User size={20} />, permission: 'profile:read:own', visible: permissions.includes('profile:read:own') },
-        { id: 'employees', path: '/employees', label: 'Employees', icon: <Users size={20} />, permission: 'employee:read:all', visible: permissions.includes('employee:read:all') },
-        { id: 'settings', path: '/users', label: 'Settings', icon: <Settings size={20} />, permission: 'admin:view_users', visible: hasSettingsAccess },
-        { id: 'audit', path: '/logs/activity', label: 'Audit', icon: <FileText size={20} />, permission: 'log:read', visible: hasAuditAccess },
+        { id: 'dashboard', path: '/dashboard', label: 'Dashboard', icon: <LayoutDashboard size={20} />, visible: permissions.includes('dashboard:view') },
+        { id: 'profile', path: '/profile', label: 'Profile', icon: <User size={20} />, visible: permissions.includes('profile:read:own') },
+        { id: 'employees', path: '/employees', label: 'Employees', icon: <Users size={20} />, visible: permissions.includes('employee:read:all') },
+        {
+            id: 'settings',
+            label: 'Settings',
+            icon: <Settings size={20} />,
+            visible: hasSettingsAccess,
+            children: [
+                { id: 'users', label: 'Users', path: '/users', visible: permissions.includes('admin:view_users') },
+                { id: 'roles', label: 'Roles & Permissions', path: '/roles', visible: permissions.includes('admin:view_roles') },
+            ]
+        },
+        { id: 'audit', path: '/logs/activity', label: 'Audit', icon: <FileText size={20} />, visible: hasAuditAccess },
     ];
 
     return (
@@ -44,10 +53,10 @@ export function Sidebar({ onLogout }) {
                 <SidebarContext.Provider value={{ expanded }}>
                     <ul className="flex-1 px-3">
                         {navItems.filter(item => item.visible).map(item => (
-                            <SidebarItem key={item.id} icon={item.icon} text={item.label} path={item.path} />
+                            <SidebarItem key={item.id} item={item} />
                         ))}
                     </ul>
-                    <SidebarItem icon={<LogOut size={20} />} text="Logout" onClick={onLogout} />
+                    <SidebarItem item={{ icon: <LogOut size={20} />, label: "Logout" }} onClick={onLogout} />
                 </SidebarContext.Provider>
 
                 <div className="border-t dark:border-gray-700 flex p-3">

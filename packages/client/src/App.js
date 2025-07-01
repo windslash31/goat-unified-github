@@ -21,6 +21,8 @@ const ProfilePage = lazy(() => import('./pages/ProfilePage').then(module => ({ d
 const ActivityLogPage = lazy(() => import('./pages/ActivityLogPage').then(module => ({ default: module.ActivityLogPage })));
 const UserManagementPage = lazy(() => import('./pages/UserManagementPage').then(module => ({ default: module.UserManagementPage })));
 const RoleManagementPage = lazy(() => import('./pages/RoleManagementPage').then(module => ({ default: module.RoleManagementPage })));
+const SettingsPage = lazy(() => import('./pages/SettingsPage').then(module => ({ default: module.SettingsPage })));
+
 
 const fetchMe = async () => {
     const { data } = await api.get('/api/me');
@@ -101,7 +103,7 @@ const AppContent = () => {
     }, [meError, employeesError, handleLogout]);
 
     useEffect(() => {
-        const nonDynamicPaths = ['/profile', '/employees', '/logs/activity', '/users', '/roles', '/access-denied', '/dashboard'];
+        const nonDynamicPaths = ['/profile', '/employees', '/logs/activity', '/users', '/roles', '/access-denied', '/dashboard', '/settings'];
         if (nonDynamicPaths.includes(location.pathname)) {
             setDynamicCrumbs([]);
         }
@@ -131,6 +133,7 @@ const AppContent = () => {
         const pageTitleMap = { 
             'profile': { name: "Profile", path: "/profile" },
             'employees': { name: "Employees", path: "/employees" },
+            'settings': { name: "Settings", path: "/settings"},
             'users': { name: "User Management", path: "/users" }, 
             'roles': { name: "Roles & Permissions", path: "/roles" },
             'access-denied': { name: 'Access Denied', path: '/access-denied'},
@@ -192,10 +195,15 @@ const AppContent = () => {
                         
                         <Route path="/employees" element={<EmployeeListPage employees={employeeData?.employees || []} isLoading={isLoadingEmployees} filters={filters} setFilters={setFilters} pagination={pagination} setPagination={setPagination} sorting={sorting} setSorting={setSorting} onEdit={handleOpenEditModal} onDeactivate={handleOpenDeactivateModal} />} />
                         <Route path="/employees/:employeeId" element={<EmployeeDetailPage onEdit={handleOpenEditModal} onDeactivate={handleOpenDeactivateModal} permissions={user.permissions} onLogout={handleLogout} />} />
-                        <Route path="/logs/activity" element={<ActivityLogPage onLogout={handleLogout} />} />
+                        
+                        <Route element={<ProtectedRoute permission="log:read" />}>
+                            <Route path="/logs/activity" element={<ActivityLogPage onLogout={handleLogout} />} />
+                        </Route>
+
                         <Route path="/access-denied" element={<AccessDeniedPage />} />
                         
                         <Route element={<ProtectedRoute permission="admin:view_users" />}>
+                            <Route path="/settings" element={<SettingsPage />} />
                             <Route path="/users" element={<UserManagementPage onLogout={handleLogout} />} />
                         </Route>
                         <Route element={<ProtectedRoute permission="admin:view_roles" />}>
