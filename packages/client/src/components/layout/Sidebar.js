@@ -96,7 +96,7 @@ export const Sidebar = ({ onLogout, isMobileOpen, setMobileOpen }) => {
                 <div className="flex items-center overflow-hidden">
                     <ShieldCheck className="w-8 h-8 text-kredivo-primary flex-shrink-0" />
                     <div className={`ml-2 whitespace-nowrap ${isCollapsed ? 'md:hidden' : ''}`}>
-                        <h1 className="text-lg font-bold text-gray-900 dark:text-white">Owl</h1>
+                        <h1 className="text-lg font-bold text-gray-900 dark:text-white">G.O.A.T</h1>
                         <p className="text-xs text-gray-500 dark:text-gray-400">Kredivo</p>
                     </div>
                 </div>
