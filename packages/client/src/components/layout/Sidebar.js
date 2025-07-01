@@ -1,6 +1,5 @@
 import { MoreVertical, ChevronFirst, ChevronLast, LayoutDashboard, User, Users, Settings, FileText, LogOut } from "lucide-react";
-import { createContext, useState, useEffect } from "react";
-import { useLocation } from 'react-router-dom';
+import { createContext } from "react";
 import { useUIStore } from '../../stores/uiStore';
 import { useAuthStore } from '../../stores/authStore';
 import { SidebarItem } from './SidebarItem';
@@ -11,7 +10,6 @@ export function Sidebar({ onLogout }) {
     const { isSidebarCollapsed: expanded, toggleSidebar: setExpanded } = useUIStore();
     const { user } = useAuthStore();
     const permissions = user?.permissions || [];
-    const location = useLocation();
 
     const hasSettingsAccess = permissions.includes('admin:view_users') || permissions.includes('admin:view_roles');
     const hasAuditAccess = permissions.includes('log:read');
@@ -20,31 +18,9 @@ export function Sidebar({ onLogout }) {
         { id: 'dashboard', path: '/dashboard', label: 'Dashboard', icon: <LayoutDashboard size={20} />, visible: permissions.includes('dashboard:view') },
         { id: 'profile', path: '/profile', label: 'Profile', icon: <User size={20} />, visible: permissions.includes('profile:read:own') },
         { id: 'employees', path: '/employees', label: 'Employees', icon: <Users size={20} />, visible: permissions.includes('employee:read:all') },
-        {
-            id: 'settings',
-            label: 'Settings',
-            icon: <Settings size={20} />,
-            path: '/settings', 
-            visible: hasSettingsAccess,
-            children: [
-                { id: 'users', label: 'Users', path: '/users', visible: permissions.includes('admin:view_users') },
-                { id: 'roles', label: 'Roles & Permissions', path: '/roles', visible: permissions.includes('admin:view_roles') },
-            ]
-        },
+        { id: 'settings', path: '/settings', label: 'Settings', icon: <Settings size={20} />, visible: hasSettingsAccess },
         { id: 'audit', path: '/logs/activity', label: 'Audit', icon: <FileText size={20} />, visible: hasAuditAccess },
     ];
-
-    const [openDropdown, setOpenDropdown] = useState('');
-
-    useEffect(() => {
-        const activeParent = navItems.find(item => 
-            item.children?.some(child => location.pathname.startsWith(child.path))
-        );
-        if (activeParent) {
-            setOpenDropdown(activeParent.id);
-        }
-    }, [location.pathname]);
-
 
     return (
         <aside className="h-screen">
@@ -71,8 +47,6 @@ export function Sidebar({ onLogout }) {
                             <SidebarItem 
                                 key={item.id} 
                                 item={item}
-                                isOpen={openDropdown === item.id}
-                                setOpen={() => setOpenDropdown(prev => prev === item.id ? '' : item.id)}
                             />
                         ))}
                     </ul>
