@@ -20,7 +20,8 @@ const exportEmployees = async (req, res, next) => {
             'id', 'first_name', 'middle_name', 'last_name', 'employee_email', 'status',
             'position_name', 'position_level', 'manager_email', 'legal_entity',
             'office_location', 'employee_type', 'employee_sub_type', 'join_date',
-            'date_of_exit_at_date', 'access_cut_off_date_at_date', 'created_at'
+            'date_of_exit_at_date', 'access_cut_off_date_at_date', 'created_at',
+            'application_access'
         ];
         const json2csvParser = new Parser({ fields });
         const csv = json2csvParser.parse(employees);

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Search, Filter as FilterIcon, MoreVertical, Edit, UserX, Trash2, ChevronUp, ChevronDown, ChevronsUpDown, X } from 'lucide-react';
+import { Search, Filter as FilterIcon, MoreVertical, Edit, UserX, Trash2, ChevronUp, ChevronDown, ChevronsUpDown, X, Download } from 'lucide-react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import toast from 'react-hot-toast';
 import { Button } from '../components/ui/Button';
@@ -14,6 +14,7 @@ import { useDebounce } from '../hooks/useDebounce';
 import { useFetchFilterOptions } from '../hooks/useFetchFilterOptions';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import { motion } from 'framer-motion';
+import api from '../api/api';
 
 export const EmployeeListPage = ({ employees, isLoading, filters, setFilters, pagination, setPagination, sorting, setSorting, onEdit, onDeactivate }) => {
     const [isFilterPopoverOpen, setIsFilterPopoverOpen] = useState(false);
@@ -66,6 +67,29 @@ export const EmployeeListPage = ({ employees, isLoading, filters, setFilters, pa
         });
         setPagination(prev => ({ ...prev, currentPage: 1 }));
         setSearchInputValue('');
+    };
+
+    const handleExport = async () => {
+        const queryParams = new URLSearchParams();
+        for (const key in filters) {
+            if (filters[key] && filters[key] !== 'all') {
+                queryParams.append(key, filters[key]);
+            }
+        }
+        
+        try {
+            const response = await api.get(`/api/employees/export?${queryParams.toString()}`, { responseType: 'blob' });
+            const url = window.URL.createObjectURL(new Blob([response.data]));
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', 'employees.csv');
+            document.body.appendChild(link);
+            link.click();
+            link.parentNode.removeChild(link);
+        } catch (error) {
+            toast.error('Failed to export employees.');
+            console.error(error);
+        }
     };
     
     const areAdvancedFiltersActive = useMemo(() => {
@@ -310,6 +334,10 @@ export const EmployeeListPage = ({ employees, isLoading, filters, setFilters, pa
                                     )}
                                 </div>
                             </div>
+                            <Button onClick={handleExport} variant="secondary">
+                                <Download className="w-4 h-4 mr-2" />
+                                Export
+                            </Button>
                         </div>
                     </>
                 )}

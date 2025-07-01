@@ -218,7 +218,13 @@ const getEmployeesForExport = async (filters) => {
             e.join_date,
             e.date_of_exit_at_date,
             e.access_cut_off_date_at_date,
-            e.created_at
+            e.created_at,
+            (
+                SELECT STRING_AGG(ia.name || ' (Role: ' || eaa.role || ')', '; ')
+                FROM employee_application_access eaa
+                JOIN internal_applications ia ON eaa.application_id = ia.id
+                WHERE eaa.employee_id = e.id
+            ) as application_access
         FROM employees e
         LEFT JOIN employees manager ON e.manager_id = manager.id
         LEFT JOIN legal_entities le ON e.legal_entity_id = le.id
@@ -492,7 +498,23 @@ const getSlackLogs = async (employeeId) => {
 };
 
 const getUnifiedTimeline = async (employeeId) => {
-    return [];
+    const query = `
+        SELECT
+            eaa.application_id as id,
+            'Access to ' || ia.name || ' was granted with the role: ' || eaa.role as description,
+            ia.name as source,
+            eaa.updated_at as timestamp
+        FROM
+            employee_application_access eaa
+        JOIN
+            internal_applications ia ON eaa.application_id = ia.id
+        WHERE
+            eaa.employee_id = $1
+        ORDER BY
+            eaa.updated_at DESC;
+    `;
+    const result = await db.query(query, [employeeId]);
+    return result.rows;
 };
 
 const deactivateOnPlatforms = async (employeeId, platforms, actorId, reqContext) => {
@@ -560,13 +582,17 @@ const createApplicationAccess = async (ticketData, actorId, reqContext) => {
         const applicationId = applicationResult.rows[0].id;
 
         const query = `
-            INSERT INTO employee_application_access (employee_id, application_id, role, jira_ticket)
-            VALUES ($1, $2, $3, $4)
+            INSERT INTO employee_application_access (employee_id, application_id, role, jira_ticket, updated_at)
+            VALUES ($1, $2, $3, $4, NOW())
             ON CONFLICT (employee_id, application_id) DO UPDATE SET
                 role = EXCLUDED.role,
-                jira_ticket = EXCLUDED.jira_ticket;
+                jira_ticket = EXCLUDED.jira_ticket,
+                updated_at = NOW();
         `;
         await client.query(query, [employeeId, applicationId, role, jira_ticket]);
+        
+        // This will now trigger the timestamp update on the main employee record
+        await client.query('UPDATE employees SET updated_at = NOW() WHERE id = $1', [employeeId]);
 
         await logActivity(
             actorId,

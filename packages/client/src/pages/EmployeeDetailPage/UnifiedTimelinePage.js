@@ -1,19 +1,18 @@
 import React from 'react';
 import { Shield, Key, Slack, MessageSquare } from 'lucide-react';
 
-// A helper to determine the icon for each timeline event
-const getTimelineIcon = (source) => {
-    const baseClass = "h-8 w-8 rounded-full flex items-center justify-center ring-8 ring-white dark:ring-gray-800 text-white";
-    switch (source) {
-        case 'Google':
-            return <div className={`${baseClass} bg-red-500`}><Shield size={16}/></div>;
-        case 'Slack':
-            return <div className={`${baseClass} bg-purple-500`}><Slack size={16}/></div>;
-        case 'JumpCloud':
-             return <div className={`${baseClass} bg-orange-500`}><Key size={16}/></div>;
-        default:
-            return <div className={`${baseClass} bg-blue-500`}><MessageSquare size={16}/></div>;
-    }
+const TimelineItem = ({ title, description, date }) => {
+    return (
+        <div className="group relative py-6 pl-8 sm:pl-32">
+            <div className="mb-1 flex flex-col items-start before:absolute before:left-2 before:h-full before:-translate-x-1/2 before:translate-y-3 before:self-start before:bg-slate-300 dark:before:bg-gray-700 before:px-px group-last:before:hidden after:absolute after:left-2 after:box-content after:h-2 after:w-2 after:-translate-x-1/2 after:translate-y-1.5 after:rounded-full after:border-4 after:border-white dark:after:border-gray-800 after:bg-kredivo-primary sm:flex-row sm:before:left-0 sm:before:ml-[6.5rem] sm:after:left-0 sm:after:ml-[6.5rem]">
+                <time className="left-0 mb-3 inline-flex h-6 w-24 translate-y-0.5 items-center justify-center rounded-full bg-kredivo-light text-xs font-semibold text-kredivo-dark-text uppercase sm:absolute sm:mb-0">
+                    {date}
+                </time>
+                <div className="text-xl font-bold text-slate-900 dark:text-white">{title}</div>
+            </div>
+            <div className="text-slate-500 dark:text-gray-400">{description}</div>
+        </div>
+    );
 };
 
 export const UnifiedTimelinePage = ({ events, loading, error }) => {
@@ -21,32 +20,24 @@ export const UnifiedTimelinePage = ({ events, loading, error }) => {
     if (error) return <div className="text-center p-8 text-red-500">Error: {error}</div>;
     if (!events || events.length === 0) return <div className="text-center p-8 text-gray-500">No unified activity found for this user.</div>;
 
+    const formatTimelineDate = (timestamp) => {
+        if (!timestamp) return '';
+        return new Date(timestamp).toLocaleDateString('en-US', {
+            month: 'short',
+            year: 'numeric',
+        });
+    };
+
     return (
         <div className="flow-root">
-            <ul className="-mb-8">
-                {events.map((event, eventIdx) => (
-                    <li key={event.id}>
-                        <div className="relative pb-8">
-                            {eventIdx !== events.length - 1 ? (
-                                <span className="absolute left-4 top-4 -ml-px h-full w-0.5 bg-gray-200 dark:bg-gray-700" aria-hidden="true" />
-                            ) : null}
-                            <div className="relative flex space-x-3">
-                                <div>{getTimelineIcon(event.source)}</div>
-                                <div className="min-w-0 flex-1 pt-1.5 flex justify-between space-x-4">
-                                    <div>
-                                        <p className="text-sm text-gray-500 dark:text-gray-400">
-                                            {event.description}
-                                        </p>
-                                    </div>
-                                    <div className="text-right text-sm whitespace-nowrap text-gray-500 dark:text-gray-300">
-                                        <time dateTime={event.timestamp}>{new Date(event.timestamp).toLocaleString()}</time>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </li>
-                ))}
-            </ul>
+            {events.map(event => (
+                <TimelineItem
+                    key={event.id}
+                    title={`Access Granted: ${event.source}`}
+                    description={event.description}
+                    date={formatTimelineDate(event.timestamp)}
+                />
+            ))}
         </div>
     );
 };
