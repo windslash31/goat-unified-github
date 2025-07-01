@@ -50,7 +50,7 @@ export const UserManagementPage = ({ onLogout }) => {
         fetchData();
     }, [fetchData]);
 
-    const handleRoleChange = async (userId, newRoleId) => {
+    const handleRoleChange = (userId) => async (newRoleId) => {
         const originalUsers = [...users];
         const newUsers = users.map(u => u.id === userId ? { ...u, role_id: newRoleId, role_name: roles.find(r => r.id === newRoleId)?.name } : u);
         setUsers(newUsers);
@@ -153,7 +153,7 @@ export const UserManagementPage = ({ onLogout }) => {
                                             <CustomSelect
                                                 value={user.role_id}
                                                 options={roleOptions}
-                                                onChange={(newRoleId) => handleRoleChange(user.id, newRoleId)}
+                                                onChange={handleRoleChange(user.id)}
                                                 placeholder="No Role"
                                                 disabled={!permissions.includes('user:update:role')}
                                             />

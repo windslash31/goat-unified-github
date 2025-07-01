@@ -6,12 +6,16 @@ export const CustomSelect = ({ options, value, onChange, placeholder = "Select..
   const [isOpen, setIsOpen] = useState(false);
   const [position, setPosition] = useState({ top: 0, left: 0, width: 0 });
   const buttonRef = useRef(null);
+  const dropdownRef = useRef(null);
   
   const selectedOption = options.find(opt => opt.id === value);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (buttonRef.current && !buttonRef.current.contains(event.target)) {
+      if (
+        buttonRef.current && !buttonRef.current.contains(event.target) &&
+        dropdownRef.current && !dropdownRef.current.contains(event.target)
+      ) {
         setIsOpen(false);
       }
     };
@@ -34,13 +38,14 @@ export const CustomSelect = ({ options, value, onChange, placeholder = "Select..
 
   const DropdownList = (
     <ul 
+      ref={dropdownRef}
       style={{ 
         position: 'absolute',
         top: `${position.top}px`, 
         left: `${position.left}px`,
         width: `${position.width}px`,
       }}
-      className="z-10 mt-1 bg-white dark:bg-gray-800 shadow-lg rounded-md border border-gray-200 dark:border-gray-700 max-h-60 overflow-auto focus:outline-none"
+      className="z-50 mt-1 bg-white dark:bg-gray-800 shadow-lg rounded-md border border-gray-200 dark:border-gray-700 max-h-60 overflow-auto focus:outline-none"
     >
       {options.map(option => (
         <li
