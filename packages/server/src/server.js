@@ -20,7 +20,12 @@ const app = express();
 const port = process.env.PORT || 4000;
 
 // Setup global middleware
-app.use(cors());
+app.use(
+  cors({
+    origin: "http://localhost:3000",
+    credentials: true,
+  })
+);
 app.use(express.json());
 app.use(
   helmet.contentSecurityPolicy({

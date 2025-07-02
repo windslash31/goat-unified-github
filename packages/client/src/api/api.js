@@ -6,6 +6,7 @@ const api = axios.create({
   headers: {
     "Content-Type": "application/json",
   },
+  withCredentials: true, // Send cookies with requests
 });
 
 api.interceptors.request.use(
@@ -56,14 +57,10 @@ api.interceptors.response.use(
       isRefreshing = true;
 
       try {
-        const refreshToken = useAuthStore.getState().refreshToken;
-        const { data } = await api.post("/api/refresh", {
-          token: refreshToken,
-        });
+        // Removed sending refreshToken in body, backend reads from cookie
+        const { data } = await api.post("/api/refresh");
 
-        useAuthStore
-          .getState()
-          .setRefreshedTokens(data.accessToken, data.refreshToken);
+        useAuthStore.getState().setAccessToken(data.accessToken);
 
         api.defaults.headers.common["Authorization"] =
           "Bearer " + data.accessToken;

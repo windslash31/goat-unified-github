@@ -414,6 +414,14 @@ const AppContent = () => {
 };
 
 export default function App() {
+  const { refreshAccessToken, isAccessTokenValid } = useAuthStore();
+
+  React.useEffect(() => {
+    if (!isAccessTokenValid()) {
+      refreshAccessToken();
+    }
+  }, [refreshAccessToken, isAccessTokenValid]);
+
   return (
     <ThemeProvider>
       <BrowserRouter>
