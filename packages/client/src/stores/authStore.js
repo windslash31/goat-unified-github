@@ -1,100 +1,98 @@
-import { create } from "zustand";
-import api from "../api/api";
+import { create } from 'zustand';
+import api from '../api/api';
 
 export const useAuthStore = create((set, get) => ({
-  accessToken: localStorage.getItem("accessToken") || null,
-  user: null,
-  authStatus: "pending", // 'pending', 'authenticated', 'unauthenticated'
+    accessToken: localStorage.getItem('accessToken') || null,
+    refreshToken: localStorage.getItem('refreshToken') || null,
+    user: null,
+    isAuthenticated: !!localStorage.getItem('accessToken'),
 
-  isAuthenticated: () => get().authStatus === "authenticated",
+    // Action to set the access token
+    setAccessToken: (token) => {
+        localStorage.setItem('accessToken', token);
+        set({ accessToken: token, isAuthenticated: !!token });
+    },
 
-  setRefreshedTokens: (accessToken) => {
-    localStorage.setItem("accessToken", accessToken);
-    try {
-      const decodedUser = JSON.parse(atob(accessToken.split(".")[1]));
-      set({
-        accessToken,
-        user: decodedUser,
-        authStatus: "authenticated",
-      });
-    } catch (e) {
-      console.error("Error decoding token:", e);
-      localStorage.removeItem("accessToken");
-      set({
-        accessToken: null,
-        user: null,
-        authStatus: "unauthenticated",
-      });
+    // --- NEW: Function to set both tokens after a refresh ---
+    setRefreshedTokens: (accessToken, refreshToken) => {
+        localStorage.setItem('accessToken', accessToken);
+        localStorage.setItem('refreshToken', refreshToken);
+        const decodedUser = JSON.parse(atob(accessToken.split('.')[1]));
+        set({
+            accessToken,
+            refreshToken,
+            user: decodedUser,
+            isAuthenticated: true,
+        });
+    },
+
+    // Login action
+    login: async (email, password) => {
+        try {
+            const { data } = await api.post('/api/login', { email, password });
+
+            if (!data.accessToken || !data.refreshToken) {
+                throw new Error("Login response did not include tokens.");
+            }
+
+            localStorage.setItem('accessToken', data.accessToken);
+            localStorage.setItem('refreshToken', data.refreshToken);
+            
+            const decodedUser = JSON.parse(atob(data.accessToken.split('.')[1]));
+            
+            set({
+                accessToken: data.accessToken,
+                refreshToken: data.refreshToken,
+                user: decodedUser,
+                isAuthenticated: true,
+            });
+        } catch (error) {
+            console.error("Client-side login processing error:", error);
+            // Clear any partial login data
+            localStorage.removeItem('accessToken');
+            localStorage.removeItem('refreshToken');
+            set({
+                accessToken: null,
+                refreshToken: null,
+                user: null,
+                isAuthenticated: false,
+            });
+            // Re-throw the error so the component can catch it and display a message
+            throw error;
+        }
+    },
+
+    // Logout action
+    logout: async () => {
+        const refreshToken = get().refreshToken;
+        try {
+            // Pass the refresh token in the body for invalidation
+            await api.post('/api/logout', { refreshToken });
+        } catch (error) {
+            console.error("Logout API call failed, proceeding with client-side logout.", error);
+        } finally {
+            localStorage.removeItem('accessToken');
+            localStorage.removeItem('refreshToken');
+            set({
+                accessToken: null,
+                refreshToken: null,
+                user: null,
+                isAuthenticated: false,
+            });
+        }
+    },
+    
+    // Action to fetch user info if not already present
+    fetchUser: () => {
+        try {
+            const token = get().accessToken;
+            if (token && !get().user) {
+                const decodedUser = JSON.parse(atob(token.split('.')[1]));
+                set({ user: decodedUser });
+            }
+        } catch (e) {
+            console.error("Failed to decode token on load.", e);
+            get().logout();
+        }
     }
-  },
-
-  login: async (email, password) => {
-    try {
-      const { data } = await api.post("/api/login", { email, password });
-
-      if (!data.accessToken) {
-        throw new Error("Login response did not include an accessToken.");
-      }
-
-      localStorage.setItem("accessToken", data.accessToken);
-
-      const decodedUser = JSON.parse(atob(data.accessToken.split(".")[1]));
-
-      set({
-        accessToken: data.accessToken,
-        user: decodedUser,
-        authStatus: "authenticated",
-      });
-    } catch (error) {
-      console.error("Client-side login processing error:", error);
-      localStorage.removeItem("accessToken");
-      set({
-        accessToken: null,
-        user: null,
-        authStatus: "unauthenticated",
-      });
-      throw error;
-    }
-  },
-
-  logout: async () => {
-    const hasToken = !!get().accessToken;
-    if (hasToken) {
-      try {
-        await api.post("/api/logout");
-      } catch (error) {
-        console.error(
-          "Logout API call failed, proceeding with client-side logout.",
-          error
-        );
-      }
-    }
-
-    localStorage.removeItem("accessToken");
-    set({
-      accessToken: null,
-      user: null,
-      authStatus: "unauthenticated",
-    });
-  },
-
-  verifyAuth: async () => {
-    try {
-      // REMOVED THE FLAWED CHECK.
-      // Now, it will ALWAYS attempt to hit the /api/me endpoint.
-      // If the accessToken is missing or expired, this call will fail with a 401.
-      // The axios interceptor will then catch the 401 and try to /refresh.
-      // This is the correct, robust flow.
-      const { data } = await api.get("/api/me");
-
-      const decodedUser = JSON.parse(atob(get().accessToken.split(".")[1]));
-      set({ user: { ...decodedUser, ...data }, authStatus: "authenticated" });
-    } catch (error) {
-      // If the /api/me call fails AND the subsequent refresh in the interceptor also fails,
-      // this catch block will run.
-      console.log("Session verification failed. User is unauthenticated.");
-      // The interceptor already calls logout(), but we ensure the state is correct.
-      set({ authStatus: "unauthenticated" });
-    }
-  },
 }));
