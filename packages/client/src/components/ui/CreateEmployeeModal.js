@@ -1,18 +1,16 @@
 import React, { useState } from "react";
 import toast from "react-hot-toast";
 import { Button } from "./Button";
-import { motion, AnimatePresence } from "framer-motion";
 import api from "../../api/api";
+import { motion, AnimatePresence } from "framer-motion";
 
-export const CreateEmployeeModal = ({ onClose, onSave }) => {
+export const ChangePasswordModal = ({ onClose }) => {
   const [formData, setFormData] = useState({
-    first_name: "",
-    last_name: "",
-    employee_email: "",
-    position_name: "",
-    manager_email: "",
-    join_date: "",
+    oldPassword: "",
+    newPassword: "",
+    confirmPassword: "",
   });
+  const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleChange = (e) => {
@@ -22,23 +20,36 @@ export const CreateEmployeeModal = ({ onClose, onSave }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setError("");
+
+    if (formData.newPassword !== formData.confirmPassword) {
+      setError("New passwords do not match.");
+      return;
+    }
+
     setIsSubmitting(true);
     try {
-      const { data } = await api.post("/api/employees", formData);
-      toast.success("Employee created successfully!");
-      onSave(data);
+      const { oldPassword, newPassword } = formData;
+      await api.post("/api/users/change-password", {
+        oldPassword,
+        newPassword,
+      });
+      toast.success("Password changed successfully!");
       onClose();
-    } catch (error) {
-      toast.error(
-        error.response?.data?.message || "Failed to create employee."
-      );
+    } catch (err) {
+      setError(err.response?.data?.message || "An error occurred.");
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const inputClasses =
-    "mt-1 block w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-kredivo-primary";
+  const passwordRequirements = [
+    "At least 8 characters long",
+    "Contains at least one uppercase letter",
+    "Contains at least one lowercase letter",
+    "Contains at least one number",
+    "Contains at least one special character",
+  ];
 
   return (
     <AnimatePresence>
@@ -47,101 +58,80 @@ export const CreateEmployeeModal = ({ onClose, onSave }) => {
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-50"
-        onClick={onClose}
       >
         <motion.div
           initial={{ scale: 0.9, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           exit={{ scale: 0.9, opacity: 0 }}
-          className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-lg"
-          onClick={(e) => e.stopPropagation()}
+          transition={{ duration: 0.2 }}
+          className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-md"
         >
           <form onSubmit={handleSubmit}>
             <div className="p-6">
-              <h3 className="text-xl font-semibold">Create New Employee</h3>
-              <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                Change Password
+              </h3>
+              <div className="mt-6 space-y-4">
                 <div>
-                  <label htmlFor="first_name">First Name</label>
+                  <label htmlFor="oldPassword">Old Password</label>
                   <input
-                    type="text"
-                    name="first_name"
-                    id="first_name"
+                    type="password"
+                    name="oldPassword"
+                    id="oldPassword"
                     required
-                    value={formData.first_name}
+                    value={formData.oldPassword}
                     onChange={handleChange}
-                    className={inputClasses}
-                  />
-                </div>
-                <div>
-                  <label htmlFor="last_name">Last Name</label>
-                  <input
-                    type="text"
-                    name="last_name"
-                    id="last_name"
-                    required
-                    value={formData.last_name}
-                    onChange={handleChange}
-                    className={inputClasses}
-                  />
-                </div>
-                <div className="md:col-span-2">
-                  <label htmlFor="employee_email">Email</label>
-                  <input
-                    type="email"
-                    name="employee_email"
-                    id="employee_email"
-                    required
-                    value={formData.employee_email}
-                    onChange={handleChange}
-                    className={inputClasses}
+                    className="mt-1 w-full px-3 py-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
                   />
                 </div>
                 <div>
-                  <label htmlFor="position_name">Position</label>
+                  <label htmlFor="newPassword">New Password</label>
                   <input
-                    type="text"
-                    name="position_name"
-                    id="position_name"
+                    type="password"
+                    name="newPassword"
+                    id="newPassword"
                     required
-                    value={formData.position_name}
+                    value={formData.newPassword}
                     onChange={handleChange}
-                    className={inputClasses}
+                    className="mt-1 w-full px-3 py-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
                   />
                 </div>
                 <div>
-                  <label htmlFor="join_date">Join Date</label>
+                  <label htmlFor="confirmPassword">Confirm New Password</label>
                   <input
-                    type="date"
-                    name="join_date"
-                    id="join_date"
+                    type="password"
+                    name="confirmPassword"
+                    id="confirmPassword"
                     required
-                    value={formData.join_date}
+                    value={formData.confirmPassword}
                     onChange={handleChange}
-                    className={inputClasses}
+                    className="mt-1 w-full px-3 py-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
                   />
                 </div>
-                <div className="md:col-span-2">
-                  <label htmlFor="manager_email">
-                    Manager Email (Optional)
-                  </label>
-                  <input
-                    type="email"
-                    name="manager_email"
-                    id="manager_email"
-                    value={formData.manager_email}
-                    onChange={handleChange}
-                    className={inputClasses}
-                    placeholder="manager@example.com"
-                  />
+                <div className="text-xs text-gray-500 dark:text-gray-400 space-y-1">
+                  <p className="font-semibold">
+                    Password must meet the following requirements:
+                  </p>
+                  <ul className="list-disc list-inside">
+                    {passwordRequirements.map((req) => (
+                      <li key={req}>{req}</li>
+                    ))}
+                  </ul>
                 </div>
+                {error && <p className="text-sm text-red-500">{error}</p>}
               </div>
             </div>
-            <div className="bg-gray-50 dark:bg-gray-900/50 px-6 py-4 flex justify-end gap-3">
-              <Button type="button" onClick={onClose} variant="secondary">
+            <div className="bg-gray-50 dark:bg-gray-700/50 px-6 py-3 flex justify-end gap-3">
+              <Button
+                type="button"
+                onClick={onClose}
+                disabled={isSubmitting}
+                variant="secondary"
+              >
                 Cancel
               </Button>
-              <Button type="submit" variant="primary" disabled={isSubmitting}>
-                {isSubmitting ? "Creating..." : "Create Employee"}
+              <Button type="submit" disabled={isSubmitting} variant="primary">
+                {isSubmitting ? "Saving..." : "Save Changes"}
               </Button>
             </div>
           </form>

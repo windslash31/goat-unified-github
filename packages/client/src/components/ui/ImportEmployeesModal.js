@@ -2,13 +2,7 @@ import React, { useState } from "react";
 import toast from "react-hot-toast";
 import { Button } from "./Button";
 import { motion, AnimatePresence } from "framer-motion";
-import {
-  UploadCloud,
-  File,
-  AlertTriangle,
-  Download,
-  Loader2,
-} from "lucide-react";
+import { UploadCloud, File, AlertTriangle, Download } from "lucide-react";
 import api from "../../api/api";
 import * as Papa from "papaparse";
 
@@ -189,9 +183,6 @@ export const ImportEmployeesModal = ({ onClose, onImportComplete }) => {
                 variant="primary"
                 disabled={isSubmitting || !file}
               >
-                {isSubmitting && (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                )}
                 {isSubmitting ? "Importing..." : "Start Import"}
               </Button>
             </div>
