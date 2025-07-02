@@ -616,6 +616,117 @@ const createApplicationAccess = async (ticketData, actorId, reqContext) => {
     }
 };
 
+const createEmployee = async (employeeData, actorId, reqContext) => {
+    const {
+        first_name, last_name, employee_email, position_name,
+        manager_email, join_date
+    } = employeeData;
+
+    if (!first_name || !last_name || !employee_email || !position_name || !join_date) {
+        throw new Error('Missing required fields for employee creation.');
+    }
+
+    const client = await db.pool.connect();
+    try {
+        await client.query('BEGIN');
+
+        const existingEmployee = await client.query('SELECT id FROM employees WHERE employee_email = $1', [employee_email]);
+        if (existingEmployee.rows.length > 0) {
+            throw new Error('An employee with this email already exists.');
+        }
+
+        let manager_id = null;
+        if (manager_email) {
+            const managerResult = await client.query('SELECT id FROM employees WHERE employee_email = $1', [manager_email]);
+            if (managerResult.rows.length > 0) {
+                manager_id = managerResult.rows[0].id;
+            } else {
+                throw new Error(`Manager with email "${manager_email}" not found.`);
+            }
+        }
+        
+        const insertQuery = `
+            INSERT INTO employees (first_name, last_name, employee_email, position_name, manager_id, join_date)
+            VALUES ($1, $2, $3, $4, $5, $6)
+            RETURNING *;
+        `;
+        const values = [first_name, last_name, employee_email, position_name, manager_id, join_date];
+        
+        const result = await client.query(insertQuery, values);
+        const newEmployee = result.rows[0];
+
+        await logActivity(
+            actorId,
+            'EMPLOYEE_CREATE',
+            { targetEmployeeId: newEmployee.id, details: { ...employeeData, source: 'UI' } },
+            reqContext,
+            client
+        );
+
+        await client.query('COMMIT');
+        return newEmployee;
+    } catch (err) {
+        await client.query('ROLLBACK');
+        throw err;
+    } finally {
+        client.release();
+    }
+};
+
+const bulkCreateEmployees = async (employees, actorId, reqContext) => {
+    const client = await db.pool.connect();
+    const results = {
+        success: [],
+        errors: [],
+    };
+
+    try {
+        await client.query('BEGIN');
+
+        for (const [index, employee] of employees.entries()) {
+            try {
+                // Simple validation
+                if (!employee.first_name || !employee.last_name || !employee.employee_email) {
+                    throw new Error('Missing required fields (first_name, last_name, employee_email).');
+                }
+
+                const insertQuery = `
+                    INSERT INTO employees (first_name, last_name, employee_email, position_name, join_date)
+                    VALUES ($1, $2, $3, $4, $5)
+                    RETURNING id;
+                `;
+                const values = [employee.first_name, employee.last_name, employee.employee_email, employee.position_name, employee.join_date];
+                
+                const result = await client.query(insertQuery, values);
+                const newEmployeeId = result.rows[0].id;
+                
+                results.success.push({ row: index + 2, email: employee.employee_email });
+
+                await logActivity(
+                    actorId,
+                    'EMPLOYEE_CREATE',
+                    { targetEmployeeId: newEmployeeId, details: { ...employee, source: 'CSV Import' } },
+                    reqContext,
+                    client
+                );
+
+            } catch (error) {
+                results.errors.push({ row: index + 2, email: employee.employee_email || 'N/A', error: error.message });
+            }
+        }
+
+        await client.query('COMMIT');
+        return results;
+
+    } catch (error) {
+        await client.query('ROLLBACK');
+        throw new Error('A transactional error occurred during the bulk import.');
+    } finally {
+        client.release();
+    }
+};
+
+
 module.exports = {
     getEmployeeById,
     getEmployees,
@@ -632,4 +743,6 @@ module.exports = {
     createEmployeeFromTicket,
     updateOffboardingFromTicket,
     createApplicationAccess,
+    createEmployee,
+    bulkCreateEmployees
 };

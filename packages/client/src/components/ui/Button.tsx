@@ -1,7 +1,24 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 
-export const Button = ({ children, onClick, type = 'button', variant = 'primary', disabled = false, className = '' }) => {
+// Define the types for the component's props
+interface ButtonProps {
+  children: React.ReactNode;
+  onClick?: (event: React.MouseEvent<HTMLButtonElement>) => void; // This is now optional
+  type?: 'button' | 'submit' | 'reset';
+  variant?: 'primary' | 'secondary' | 'danger';
+  disabled?: boolean;
+  className?: string;
+}
+
+export const Button: React.FC<ButtonProps> = ({ 
+    children, 
+    onClick, 
+    type = 'button', 
+    variant = 'primary', 
+    disabled = false, 
+    className = '' 
+}) => {
     // Base classes for all buttons
     const baseClasses = "inline-flex items-center px-4 py-2 text-sm font-semibold rounded-md shadow-sm border focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors";
 

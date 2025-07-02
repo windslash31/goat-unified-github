@@ -22,6 +22,8 @@ const ActivityLogPage = lazy(() => import('./pages/ActivityLogPage').then(module
 const UserManagementPage = lazy(() => import('./pages/UserManagementPage').then(module => ({ default: module.UserManagementPage })));
 const RoleManagementPage = lazy(() => import('./pages/RoleManagementPage').then(module => ({ default: module.RoleManagementPage })));
 const SettingsPage = lazy(() => import('./pages/SettingsPage').then(module => ({ default: module.SettingsPage })));
+const CreateEmployeeModal = lazy(() => import('./components/ui/CreateEmployeeModal').then(module => ({ default: module.CreateEmployeeModal })));
+const ImportEmployeesModal = lazy(() => import('./components/ui/ImportEmployeesModal').then(module => ({ default: module.ImportEmployeesModal })));
 
 
 const fetchMe = async () => {
@@ -50,6 +52,8 @@ const AppContent = () => {
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [isDeactivateModalOpen, setIsDeactivateModalOpen] = useState(false);
     const [employeeToEdit, setEmployeeToEdit] = useState(null);
+    const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+    const [isImportModalOpen, setIsImportModalOpen] = useState(false);
     
     const [filters, setFilters] = useState({ 
         status: 'all', search: '', jobTitle: '', manager: '',
@@ -126,6 +130,14 @@ const AppContent = () => {
         handleCloseDeactivateModal();
     };
 
+    const handleEmployeeCreated = () => {
+        queryClient.invalidateQueries({ queryKey: ['employees'] });
+    };
+    
+    const handleImportComplete = () => {
+        queryClient.invalidateQueries({queryKey: ['employees']});
+    }
+
     const getBreadcrumbs = () => {
         const pathParts = location.pathname.split('/').filter(p => p);
         const homeCrumb = { name: 'Dashboard', path: '/dashboard' };
@@ -193,7 +205,22 @@ const AppContent = () => {
                         
                         <Route path="/profile" element={<ProfilePage employee={currentUserEmployeeRecord} permissions={user.permissions} onEdit={handleOpenEditModal} onDeactivate={handleOpenDeactivateModal} onLogout={handleLogout} user={user} />} />
                         
-                        <Route path="/employees" element={<EmployeeListPage employees={employeeData?.employees || []} isLoading={isLoadingEmployees} filters={filters} setFilters={setFilters} pagination={pagination} setPagination={setPagination} sorting={sorting} setSorting={setSorting} onEdit={handleOpenEditModal} onDeactivate={handleOpenDeactivateModal} />} />
+                        <Route path="/employees" element={
+                            <EmployeeListPage 
+                                employees={employeeData?.employees || []} 
+                                isLoading={isLoadingEmployees} 
+                                filters={filters} 
+                                setFilters={setFilters} 
+                                pagination={pagination} 
+                                setPagination={setPagination} 
+                                sorting={sorting} 
+                                setSorting={setSorting} 
+                                onEdit={handleOpenEditModal} 
+                                onDeactivate={handleOpenDeactivateModal}
+                                onCreate={() => setIsCreateModalOpen(true)}
+                                onImport={() => setIsImportModalOpen(true)}
+                            />
+                        } />
                         <Route path="/employees/:employeeId" element={<EmployeeDetailPage onEdit={handleOpenEditModal} onDeactivate={handleOpenDeactivateModal} permissions={user.permissions} onLogout={handleLogout} />} />
                         
                         <Route element={<ProtectedRoute permission="log:read" />}>
@@ -217,6 +244,8 @@ const AppContent = () => {
             
             {isEditModalOpen && <EditEmployeeModal employee={employeeToEdit} onClose={handleCloseEditModal} onSave={handleUpdateEmployee} />}
             {isDeactivateModalOpen && <DeactivateEmployeeModal employee={employeeToEdit} onClose={handleCloseDeactivateModal} onDeactivateSuccess={handleDeactivateSuccess} />}
+            {isCreateModalOpen && <CreateEmployeeModal onClose={() => setIsCreateModalOpen(false)} onSave={handleEmployeeCreated} />}
+            {isImportModalOpen && <ImportEmployeesModal onClose={() => setIsImportModalOpen(false)} onImportComplete={handleImportComplete} />}
         </>
     );
 }

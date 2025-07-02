@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Search, Filter as FilterIcon, MoreVertical, Edit, UserX, Trash2, ChevronUp, ChevronDown, ChevronsUpDown, X, Download } from 'lucide-react';
+import { Search, Filter as FilterIcon, MoreVertical, Edit, UserX, Trash2, ChevronUp, ChevronDown, ChevronsUpDown, X, Download, PlusCircle, Upload } from 'lucide-react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import toast from 'react-hot-toast';
 import { Button } from '../components/ui/Button';
@@ -16,7 +16,6 @@ import { useMediaQuery } from '../hooks/useMediaQuery';
 import { motion } from 'framer-motion';
 import api from '../api/api';
 
-// --- MODIFICATION 1: Moved MobileList outside and wrapped in React.memo ---
 const MobileList = React.memo(({ employees }) => (
     <div className="divide-y divide-gray-200 dark:divide-gray-700">
         {employees.map(emp => {
@@ -39,7 +38,6 @@ const MobileList = React.memo(({ employees }) => (
     </div>
 ));
 
-// --- MODIFICATION 2: Moved DesktopTable outside and wrapped in React.memo ---
 const DesktopTable = React.memo(({ employees, sorting, setSorting, selectedRows, handleSelectAll, handleSelectRow, onEdit, onDeactivate }) => {
     const parentRef = useRef(null);
     const [activeActionMenu, setActiveActionMenu] = useState(null);
@@ -154,7 +152,7 @@ const DesktopTable = React.memo(({ employees, sorting, setSorting, selectedRows,
     );
 });
 
-export const EmployeeListPage = ({ employees, isLoading, filters, setFilters, pagination, setPagination, sorting, setSorting, onEdit, onDeactivate }) => {
+export const EmployeeListPage = ({ employees, isLoading, filters, setFilters, pagination, setPagination, sorting, setSorting, onEdit, onDeactivate, onCreate, onImport }) => {
     const [isFilterPopoverOpen, setIsFilterPopoverOpen] = useState(false);
     const [searchInputValue, setSearchInputValue] = useState(filters.search);
     const debouncedSearchTerm = useDebounce(searchInputValue, 500);
@@ -301,15 +299,15 @@ export const EmployeeListPage = ({ employees, isLoading, filters, setFilters, pa
                 ) : (
                     <>
                         <h1 className="text-2xl font-bold text-gray-900 dark:text-white self-start sm:self-center">Employees</h1>
-                        <div className="flex items-center gap-4 w-full sm:w-auto">
+                        <div className="flex items-center gap-2 w-full sm:w-auto">
                             <div className="relative flex-grow">
                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                                <input type="text" placeholder="Search employees..." value={searchInputValue} onChange={e => setSearchInputValue(e.target.value)} className="w-full sm:w-64 pl-10 pr-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-kredivo-primary focus:outline-none"/>
+                                <input type="text" placeholder="Search..." value={searchInputValue} onChange={e => setSearchInputValue(e.target.value)} className="w-full sm:w-48 pl-10 pr-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-kredivo-primary focus:outline-none"/>
                             </div>
                             <div className="relative">
-                                <button ref={filterButtonRef} onClick={() => setIsFilterPopoverOpen(!isFilterPopoverOpen)} className={`flex items-center gap-2 px-4 py-2 border rounded-md text-sm font-medium transition-colors ${areAdvancedFiltersActive || isFilterPopoverOpen ? 'bg-kredivo-light text-kredivo-dark-text border-kredivo-primary/30' : 'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700'}`}>
+                                <button ref={filterButtonRef} onClick={() => setIsFilterPopoverOpen(!isFilterPopoverOpen)} className={`flex items-center gap-2 px-3 py-2 border rounded-md text-sm font-medium transition-colors ${areAdvancedFiltersActive || isFilterPopoverOpen ? 'bg-kredivo-light text-kredivo-dark-text border-kredivo-primary/30' : 'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700'}`}>
                                     <FilterIcon size={16} />
-                                    <span>Advanced</span>
+                                    <span className="hidden sm:inline">Filter</span>
                                     {areAdvancedFiltersActive && <div className="w-2 h-2 bg-kredivo-primary rounded-full"></div>}
                                 </button>
                                 {isFilterPopoverOpen && (
@@ -323,9 +321,17 @@ export const EmployeeListPage = ({ employees, isLoading, filters, setFilters, pa
                                     />
                                 )}
                             </div>
-                            <Button onClick={handleExport} variant="secondary">
+                            <Button onClick={handleExport} variant="secondary" className="whitespace-nowrap hidden sm:flex">
                                 <Download className="w-4 h-4 mr-2" />
                                 Export
+                            </Button>
+                            <Button onClick={onImport} variant="secondary" className="whitespace-nowrap hidden sm:flex">
+                                <Upload className="w-4 h-4 mr-2" />
+                                Import
+                            </Button>
+                             <Button onClick={onCreate} variant="primary" className="whitespace-nowrap">
+                                <PlusCircle className="w-4 h-4 mr-2" />
+                                Create
                             </Button>
                         </div>
                     </>
