@@ -17,7 +17,6 @@ import { AccessDeniedPage } from "./components/ui/AccessDeniedPage";
 import { useAuthStore } from "./stores/authStore";
 import { ProtectedRoute } from "./components/auth/ProtectedRoute";
 import api from "./api/api";
-import { AnimatePresence } from "framer-motion";
 
 // Lazy load page components for code splitting
 const LoginPage = lazy(() =>
@@ -215,32 +214,34 @@ const AppContent = () => {
 
   const getBreadcrumbs = () => {
     const pathParts = location.pathname.split("/").filter((p) => p);
-    const homeCrumb = { name: "Dashboard", path: "/dashboard" };
+    const homeCrumb = { name: "Home", path: "/dashboard" };
+
+    if (location.pathname === "/dashboard" || location.pathname === "/") {
+      return [homeCrumb];
+    }
 
     const pageTitleMap = {
       profile: { name: "Profile", path: "/profile" },
       employees: { name: "Employees", path: "/employees" },
       settings: { name: "Settings", path: "/settings" },
-      users: { name: "User Management", path: "/users" },
-      roles: { name: "Roles & Permissions", path: "/roles" },
+      users: { name: "User Management", path: "/settings/users" },
+      roles: { name: "Roles & Permissions", path: "/settings/roles" },
       "access-denied": { name: "Access Denied", path: "/access-denied" },
-      dashboard: { name: "Dashboard", path: "/dashboard" },
+      logs: { name: "Logs" },
+      activity: { name: "Activity Log", path: "/logs/activity" },
     };
 
-    const crumbs = pathParts.map((part, index) => {
+    const crumbs = [];
+    pathParts.forEach((part) => {
       if (pageTitleMap[part]) {
-        return pageTitleMap[part];
+        crumbs.push(pageTitleMap[part]);
       }
-      if (part === "activity" && pathParts[index - 1] === "logs") {
-        return { name: "Activity Log", path: "/logs/activity" };
-      }
-      return null;
     });
 
     const finalCrumbs =
       dynamicCrumbs.length > 0
         ? [homeCrumb, ...dynamicCrumbs]
-        : [homeCrumb, ...crumbs.filter(Boolean)];
+        : [homeCrumb, ...crumbs.filter((c) => c.path)];
 
     return finalCrumbs;
   };
@@ -333,18 +334,9 @@ const AppContent = () => {
 
           <Route path="/access-denied" element={<AccessDeniedPage />} />
 
-          <Route element={<ProtectedRoute permission="admin:view_users" />}>
-            <Route path="/settings" element={<SettingsPage />} />
-            <Route
-              path="/users"
-              element={<UserManagementPage onLogout={handleLogout} />}
-            />
-          </Route>
-          <Route element={<ProtectedRoute permission="admin:view_roles" />}>
-            <Route
-              path="/roles"
-              element={<RoleManagementPage onLogout={handleLogout} />}
-            />
+          <Route path="/settings" element={<SettingsPage />}>
+            <Route path="users" element={<UserManagementPage />} />
+            <Route path="roles" element={<RoleManagementPage />} />
           </Route>
 
           <Route
