@@ -1,7 +1,6 @@
 const employeeService = require('../../services/employeeService');
 const { logActivity } = require('../../services/logService');
 const { Parser } = require('json2csv');
-const papaparse = require('papaparse');
 
 const listEmployees = async (req, res, next) => {
     try {
@@ -12,6 +11,7 @@ const listEmployees = async (req, res, next) => {
     }
 };
 
+// --- NEW CONTROLLER FUNCTION ---
 const exportEmployees = async (req, res, next) => {
     try {
         const employees = await employeeService.getEmployeesForExport(req.query);
@@ -199,42 +199,6 @@ const createApplicationAccess = async (req, res, next) => {
     }
 };
 
-const createEmployee = async (req, res, next) => {
-    try {
-        const reqContext = { ip: req.ip, userAgent: req.headers['user-agent'] };
-        const newEmployee = await employeeService.createEmployee(req.body, req.user.id, reqContext);
-        res.status(201).json(newEmployee);
-    } catch (error) {
-        if (error.message.includes('exists') || error.message.includes('not found')) {
-            return res.status(400).json({ message: error.message });
-        }
-        next(error);
-    }
-};
-
-const importEmployees = async (req, res, next) => {
-    if (!req.file) {
-        return res.status(400).json({ message: 'No file uploaded.' });
-    }
-
-    try {
-        const csvData = req.file.buffer.toString('utf8');
-        const parsed = papaparse.parse(csvData, { header: true, skipEmptyLines: true });
-        
-        const employees = parsed.data;
-        if (!employees || employees.length === 0) {
-            return res.status(400).json({ message: 'CSV file is empty or invalid.' });
-        }
-
-        const reqContext = { ip: req.ip, userAgent: req.headers['user-agent'] };
-        const results = await employeeService.bulkCreateEmployees(employees, req.user.id, reqContext);
-        
-        res.status(200).json(results);
-    } catch (error) {
-        next(error);
-    }
-};
-
 module.exports = {
     listEmployees,
     getEmployee,
@@ -252,6 +216,4 @@ module.exports = {
     offboardFromTicket,
     createApplicationAccess,
     exportEmployees,
-    createEmployee,
-    importEmployees
-};
+}

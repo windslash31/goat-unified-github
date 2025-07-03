@@ -1,21 +1,13 @@
 const express = require('express');
 const router = express.Router();
-const multer = require('multer');
 const employeeController = require('../controllers/employeeController');
 const { authenticateToken, authenticateApiKey, authorize, authorizeAdminOrSelf, authorizeAdminOrSelfForLogs } = require('../middleware/authMiddleware');
 
-const storage = multer.memoryStorage();
-const upload = multer({ storage: storage });
-
 // General Employee Routes for the UI
 router.get('/', authenticateToken, authorize('employee:read:all'), employeeController.listEmployees);
-router.get('/export', authenticateToken, authorize('employee:read:all'), employeeController.exportEmployees);
+router.get('/export', authenticateToken, authorize('employee:read:all'), employeeController.exportEmployees); // --- ADD THIS LINE ---
 router.get('/:id', authenticateToken, authorizeAdminOrSelf, employeeController.getEmployee);
-router.post('/', authenticateToken, authorize('employee:create'), employeeController.createEmployee);
 router.put('/:id', authenticateToken, authorize('employee:update'), employeeController.updateEmployee);
-
-// Bulk import route
-router.post('/import', authenticateToken, authorize('employee:create'), upload.single('file'), employeeController.importEmployees);
 
 // Platform and Log related routes
 router.get('/:id/platform-statuses', authenticateToken, authorizeAdminOrSelf, employeeController.getPlatformStatuses);
