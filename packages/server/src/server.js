@@ -4,7 +4,8 @@ require("./config/loadEnv");
 const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
-const cookieParser = require("cookie-parser"); // Import cookie-parser
+const cookieParser = require("cookie-parser");
+const rateLimit = require("express-rate-limit");
 
 // Import modular routes
 const authRoutes = require("./api/routes/auth");
@@ -18,6 +19,17 @@ const dashboardRoutes = require("./api/routes/dashboard");
 
 const app = express();
 const port = process.env.PORT || 4000;
+
+// --- NEW: General API Rate Limiter ---
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // Limit each IP to 100 requests per window
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Apply the rate limiting middleware to API calls
+app.use("/api", apiLimiter);
 
 // Setup global middleware
 // This is a critical change for cookies to work with a separate frontend
