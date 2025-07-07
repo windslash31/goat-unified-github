@@ -1,6 +1,7 @@
 // packages/server/src/api/routes/employees.js
 const express = require("express");
 const router = express.Router();
+const multer = require("multer");
 const employeeController = require("../controllers/employeeController");
 const {
   authenticateToken,
@@ -9,6 +10,18 @@ const {
   authorizeAdminOrSelf,
   authorizeAdminOrSelfForLogs,
 } = require("../middleware/authMiddleware");
+
+// Configure multer for CSV file uploads
+const upload = multer({
+  storage: multer.memoryStorage(),
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype === "text/csv") {
+      cb(null, true);
+    } else {
+      cb(new Error("Only .csv files are allowed!"), false);
+    }
+  },
+});
 
 // --- FIXED: N8N routes moved to the top to ensure they are matched first ---
 router.post(
@@ -43,6 +56,16 @@ router.get(
   authorize("employee:read:all"),
   employeeController.exportEmployees
 );
+
+// --- NEW: Route for bulk employee import ---
+router.post(
+  "/bulk-import",
+  authenticateToken,
+  authorize("employee:create"),
+  upload.single("file"), // 'file' should match the name attribute in the form
+  employeeController.bulkImportEmployees
+);
+
 router.get(
   "/:id",
   authenticateToken,

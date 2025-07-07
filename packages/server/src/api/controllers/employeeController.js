@@ -170,12 +170,10 @@ const bulkDeactivateOnPlatforms = async (req, res, next) => {
       !Array.isArray(employeeIds) ||
       !Array.isArray(platforms)
     ) {
-      return res
-        .status(400)
-        .json({
-          message:
-            "Invalid request body. `employeeIds` and `platforms` must be arrays.",
-        });
+      return res.status(400).json({
+        message:
+          "Invalid request body. `employeeIds` and `platforms` must be arrays.",
+      });
     }
     const reqContext = { ip: req.ip, userAgent: req.headers["user-agent"] };
     const result = await employeeService.bulkDeactivateOnPlatforms(
@@ -281,6 +279,34 @@ const getLicenseDetails = async (req, res, next) => {
   }
 };
 
+const bulkImportEmployees = async (req, res, next) => {
+  if (!req.file) {
+    return res.status(400).json({ message: "No file uploaded." });
+  }
+
+  try {
+    const reqContext = { ip: req.ip, userAgent: req.headers["user-agent"] };
+    const results = await employeeService.bulkImportEmployees(
+      req.file.buffer,
+      req.user.id,
+      reqContext
+    );
+    res.status(200).json(results);
+  } catch (error) {
+    // Provide more specific error messages
+    if (error.message.includes("not found")) {
+      return res.status(404).json({ message: error.message });
+    }
+    res
+      .status(500)
+      .json({
+        message:
+          error.message ||
+          "An unexpected error occurred during the bulk import.",
+      });
+  }
+};
+
 module.exports = {
   listEmployees,
   getEmployee,
@@ -299,4 +325,5 @@ module.exports = {
   getUnifiedTimeline,
   exportEmployees,
   getLicenseDetails, // Export the new function
+  bulkImportEmployees,
 };
