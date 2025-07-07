@@ -72,8 +72,7 @@ router.get(
   authorizeAdminOrSelf,
   employeeController.getEmployee
 );
-router.patch(
-  // <-- CHANGED FROM PUT TO PATCH
+router.put(
   "/:id",
   authenticateToken,
   authorize("employee:update"),
