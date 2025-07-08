@@ -86,6 +86,16 @@ const permissionGroups = [
     ],
   },
   {
+    title: "Application Management",
+    permissions: [
+      {
+        name: "admin:manage_applications",
+        description:
+          "Allows creating, updating, and deleting internal applications.",
+      },
+    ],
+  },
+  {
     title: "Auditing",
     permissions: [
       {

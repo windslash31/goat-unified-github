@@ -37,6 +37,13 @@ const EmployeeDetailPage = lazy(() =>
     default: module.EmployeeDetailPage,
   }))
 );
+
+const ApplicationManagementPage = lazy(() =>
+  import("./pages/ApplicationManagementPage").then((module) => ({
+    default: module.ApplicationManagementPage,
+  }))
+);
+
 const ProfilePage = lazy(() =>
   import("./pages/ProfilePage").then((module) => ({
     default: module.ProfilePage,
@@ -337,6 +344,10 @@ const AppContent = () => {
           <Route path="/settings" element={<SettingsPage />}>
             <Route path="users" element={<UserManagementPage />} />
             <Route path="roles" element={<RoleManagementPage />} />
+            <Route
+              path="applications"
+              element={<ApplicationManagementPage />}
+            />
           </Route>
 
           <Route

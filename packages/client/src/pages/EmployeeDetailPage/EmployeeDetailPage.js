@@ -13,6 +13,7 @@ import {
   BookLock, // New Icon for Licenses
 } from "lucide-react";
 import { useBreadcrumb } from "../../context/BreadcrumbContext";
+import { useMediaQuery } from "../../hooks/useMediaQuery";
 import { EmployeeDetailHeader } from "./EmployeeDetailHeader";
 import { EmployeeDetailsTab } from "./EmployeeDetailsTab";
 import { EmployeeApplicationsTab } from "./EmployeeApplicationsTab";
@@ -22,6 +23,7 @@ import { GoogleLogPage } from "./GoogleLogPage";
 import { SlackLogPage } from "./SlackLogPage";
 import { LicensesTab } from "./LicensesTab"; // Import the new tab
 import { UnifiedTimelinePage } from "./UnifiedTimelinePage";
+import { EmployeeDetailSkeleton } from "../../components/ui/EmployeeDetailSkeleton";
 
 const Section = ({ id, title, children, icon }) => (
   <div
@@ -87,6 +89,7 @@ export const EmployeeDetailPage = ({
   const { employeeId } = useParams();
   const navigate = useNavigate();
   const { setDynamicCrumbs } = useBreadcrumb();
+  const isDesktop = useMediaQuery("(min-width: 768px)");
   const [employee, setEmployee] = useState(null);
   const [loading, setLoading] = useState(true);
   const [pageError, setPageError] = useState(null);
@@ -104,75 +107,8 @@ export const EmployeeDetailPage = ({
   const [isJiraModalOpen, setIsJiraModalOpen] = useState(false);
   const [selectedTicketId, setSelectedTicketId] = useState(null);
 
-  const fetchInitialData = useCallback(() => {
-    const token = localStorage.getItem("accessToken");
-    if (!token) {
-      onLogout();
-      return;
-    }
-
-    setLoading(true);
-    fetch(`${process.env.REACT_APP_API_BASE_URL}/api/employees/${employeeId}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then((res) => {
-        if (res.status === 404) throw new Error("Employee not found.");
-        if (!res.ok) throw new Error("Failed to fetch employee profile.");
-        return res.json();
-      })
-      .then((empData) => {
-        setEmployee(empData);
-        const fullName = [
-          empData.first_name,
-          empData.middle_name,
-          empData.last_name,
-        ]
-          .filter(Boolean)
-          .join(" ");
-        setDynamicCrumbs([
-          { name: "Employees", path: "/employees" },
-          { name: fullName, path: `/employees/${employeeId}` },
-        ]);
-      })
-      .catch((err) => {
-        console.error("Error fetching main employee data:", err);
-        setPageError(err.message);
-      })
-      .finally(() => setLoading(false));
-
-    setIsLoadingPlatforms(true);
-    fetch(
-      `${process.env.REACT_APP_API_BASE_URL}/api/employees/${employeeId}/platform-statuses`,
-      { headers: { Authorization: `Bearer ${token}` } }
-    )
-      .then((res) => (res.ok ? res.json() : []))
-      .then((statusData) => setPlatformStatuses(statusData))
-      .catch((err) => console.error("Failed to fetch platform statuses:", err))
-      .finally(() => setIsLoadingPlatforms(false));
-  }, [employeeId, onLogout, setDynamicCrumbs]);
-
-  useEffect(() => {
-    fetchInitialData();
-
-    const token = localStorage.getItem("accessToken");
-    if (token && employeeId) {
-      fetch(`${process.env.REACT_APP_API_BASE_URL}/api/employees/logs/view`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ targetEmployeeId: employeeId }),
-      }).catch((err) => console.error("Failed to log profile view:", err));
-    }
-
-    return () => {
-      setDynamicCrumbs([]);
-    };
-  }, [fetchInitialData, setDynamicCrumbs, employeeId]);
-
   const fetchLogData = useCallback(
-    (tabKey) => {
+    async (tabKey) => {
       if (
         !permissions.includes("log:read:platform") ||
         tabData[tabKey]?.fetched ||
@@ -197,36 +133,131 @@ export const EmployeeDetailPage = ({
         [tabKey]: { ...prev[tabKey], loading: true },
       }));
 
-      fetch(`${process.env.REACT_APP_API_BASE_URL}${url}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-        .then((res) =>
-          res.ok ? res.json() : res.json().then((err) => Promise.reject(err))
-        )
-        .then((data) => {
-          setTabData((prev) => ({
-            ...prev,
-            [tabKey]: { data, loading: false, error: null, fetched: true },
-          }));
-        })
-        .catch((err) => {
-          setTabData((prev) => ({
-            ...prev,
-            [tabKey]: {
-              data: [],
-              loading: false,
-              error: err.message,
-              fetched: true,
-            },
-          }));
-        });
+      try {
+        const response = await fetch(
+          `${process.env.REACT_APP_API_BASE_URL}${url}`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
+        if (!response.ok) {
+          const err = await response.json();
+          throw new Error(err.message || `Failed to fetch ${tabKey} logs.`);
+        }
+        const data = await response.json();
+        setTabData((prev) => ({
+          ...prev,
+          [tabKey]: { data, loading: false, error: null, fetched: true },
+        }));
+      } catch (err) {
+        setTabData((prev) => ({
+          ...prev,
+          [tabKey]: {
+            data: [],
+            loading: false,
+            error: err.message,
+            fetched: true,
+          },
+        }));
+      }
     },
     [employeeId, permissions, tabData]
   );
 
+  const fetchInitialData = useCallback(async () => {
+    const token = localStorage.getItem("accessToken");
+    if (!token) {
+      onLogout();
+      return;
+    }
+
+    setLoading(true);
+
+    const employeePromise = fetch(
+      `${process.env.REACT_APP_API_BASE_URL}/api/employees/${employeeId}`,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      }
+    ).then((res) => {
+      if (res.status === 404) throw new Error("Employee not found.");
+      if (!res.ok) throw new Error("Failed to fetch employee profile.");
+      return res.json();
+    });
+
+    const platformStatusesPromise = fetch(
+      `${process.env.REACT_APP_API_BASE_URL}/api/employees/${employeeId}/platform-statuses`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    ).then((res) => (res.ok ? res.json() : []));
+
+    try {
+      const [employeeData, statusData] = await Promise.all([
+        employeePromise,
+        platformStatusesPromise,
+      ]);
+
+      setEmployee(employeeData);
+      setPlatformStatuses(statusData);
+
+      const fullName = [
+        employeeData.first_name,
+        employeeData.middle_name,
+        employeeData.last_name,
+      ]
+        .filter(Boolean)
+        .join(" ");
+
+      setDynamicCrumbs([
+        { name: "Employees", path: "/employees" },
+        { name: fullName, path: `/employees/${employeeId}` },
+      ]);
+
+      // Eager load for mobile, lazy load for desktop
+      if (!isDesktop && permissions.includes("log:read:platform")) {
+        fetchLogData("jumpcloud");
+        fetchLogData("google");
+        fetchLogData("slack");
+        fetchLogData("timeline");
+      }
+    } catch (err) {
+      console.error("Error fetching initial data:", err);
+      setPageError(err.message);
+    } finally {
+      setLoading(false);
+      setIsLoadingPlatforms(false);
+    }
+  }, [
+    employeeId,
+    onLogout,
+    setDynamicCrumbs,
+    permissions,
+    isDesktop,
+    fetchLogData,
+  ]);
+
+  useEffect(() => {
+    fetchInitialData();
+
+    const token = localStorage.getItem("accessToken");
+    if (token && employeeId) {
+      fetch(`${process.env.REACT_APP_API_BASE_URL}/api/employees/logs/view`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ targetEmployeeId: employeeId }),
+      }).catch((err) => console.error("Failed to log profile view:", err));
+    }
+
+    return () => {
+      setDynamicCrumbs([]);
+    };
+  }, [fetchInitialData, setDynamicCrumbs, employeeId]);
+
   const handleTabClick = (tabId) => {
     setActiveTab(tabId);
-    if (["jumpcloud", "google", "slack", "timeline"].includes(tabId)) {
+    // Lazy load on desktop when tab is clicked
+    if (isDesktop) {
       fetchLogData(tabId);
     }
   };
@@ -288,8 +319,7 @@ export const EmployeeDetailPage = ({
     },
   ].filter((s) => s.permission);
 
-  if (loading)
-    return <div className="p-6 text-center">Loading employee profile...</div>;
+  if (loading) return <EmployeeDetailSkeleton />;
   if (pageError)
     return (
       <div className="p-6 text-center text-red-500">

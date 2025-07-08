@@ -29,6 +29,7 @@ import { useMediaQuery } from "../hooks/useMediaQuery";
 import { motion } from "framer-motion";
 import api from "../api/api";
 import { EmployeeImportModal } from "../components/ui/EmployeeImportModal"; // Import the new modal
+import { EmployeeListSkeleton } from "../components/ui/EmployeeListSkeleton";
 
 // --- MODIFICATION 1: Moved MobileList outside and wrapped in React.memo ---
 const MobileList = React.memo(({ employees }) => (
@@ -458,10 +459,19 @@ export const EmployeeListPage = ({
     });
   };
 
-  if (isLoading && employees.length === 0) {
-    return <div className="p-6 text-center">Loading employees...</div>;
+  if (isLoading) {
+    return (
+      <div className="p-4 sm:p-6">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+          <StatusQuickFilters
+            currentStatus={filters.status}
+            onStatusChange={() => {}}
+          />
+          <EmployeeListSkeleton count={10} />
+        </div>
+      </div>
+    );
   }
-
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}

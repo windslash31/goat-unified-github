@@ -1,6 +1,6 @@
 import React from "react";
 import { useNavigate, Outlet, useLocation } from "react-router-dom";
-import { User, Shield, ArrowRight } from "lucide-react";
+import { User, Shield, ArrowRight, Briefcase } from "lucide-react";
 import { motion } from "framer-motion";
 import { useAuthStore } from "../stores/authStore";
 
@@ -75,6 +75,12 @@ export const SettingsPage = () => {
               path="/settings/roles"
             />
           )}
+          <SettingsCard
+            title="Application Management"
+            description="Add or remove internal applications."
+            icon={<Briefcase className="w-6 h-6" />}
+            path="/settings/applications"
+          />
         </div>
       ) : (
         <Outlet />

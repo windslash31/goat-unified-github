@@ -840,11 +840,12 @@ const getLicenseDetails = async (employeeId) => {
     throw new Error("Employee not found");
   }
 
+  // --- FIX: Changed 'work_email' to the correct 'employee_email' field ---
   const platformChecks = {
-    google: googleService.getUserLicense(employee.work_email),
-    jumpcloud: jumpcloudService.getUser(employee.work_email),
-    slack: slackService.getUserByEmail(employee.work_email),
-    atlassian: atlassianService.getUser(employee.work_email),
+    google: googleService.getUserLicense(employee.employee_email),
+    jumpcloud: jumpcloudService.getUser(employee.employee_email),
+    slack: slackService.getUserByEmail(employee.employee_email),
+    atlassian: atlassianService.getUser(employee.employee_email),
   };
 
   const results = await Promise.all(
