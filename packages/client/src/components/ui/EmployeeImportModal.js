@@ -1,7 +1,14 @@
 import React, { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
-import { Upload, X, FileText, CheckCircle, AlertCircle } from "lucide-react";
+import {
+  Upload,
+  X,
+  FileText,
+  CheckCircle,
+  AlertCircle,
+  Download,
+} from "lucide-react";
 import { Button } from "./Button";
 import api from "../../api/api";
 import { motion, AnimatePresence } from "framer-motion";
@@ -52,6 +59,39 @@ export const EmployeeImportModal = ({ isOpen, onClose }) => {
     }
   };
 
+  // --- NEW FUNCTION to Download CSV Template ---
+  const handleDownloadTemplate = () => {
+    const headers = [
+      "first_name",
+      "last_name",
+      "middle_name",
+      "employee_email",
+      "position_name",
+      "position_level",
+      "join_date",
+      "asset_name",
+      "onboarding_ticket",
+      "manager_email",
+      "legal_entity_name",
+      "office_location_name",
+      "employee_type_name",
+      "employee_sub_type_name",
+      "application_access",
+    ];
+
+    const csvContent = headers.join(",");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+
+    link.setAttribute("href", url);
+    link.setAttribute("download", "employee_import_template.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+  // ---------------------------------------------
+
   const handleClose = () => {
     setFile(null);
     setUploadResult(null);
@@ -87,10 +127,23 @@ export const EmployeeImportModal = ({ isOpen, onClose }) => {
             <div className="p-6">
               {!uploadResult ? (
                 <div className="space-y-4">
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
-                    Upload a CSV file with employee data. The required columns
-                    are: `first_name`, `last_name`, and `employee_email`.
-                  </p>
+                  <div className="text-sm text-gray-600 dark:text-gray-400 space-y-3">
+                    <p>
+                      Upload a CSV file to create or update employees in bulk.
+                      Required columns are: `first_name`, `last_name`, and
+                      `employee_email`.
+                    </p>
+                    {/* --- NEW: Download Template Link --- */}
+                    <div className="flex justify-center">
+                      <button
+                        onClick={handleDownloadTemplate}
+                        className="inline-flex items-center gap-2 text-sm font-medium text-kredivo-primary hover:text-kredivo-dark-text"
+                      >
+                        <Download className="w-4 h-4" />
+                        Download CSV Template
+                      </button>
+                    </div>
+                  </div>
                   <div className="flex items-center justify-center w-full">
                     <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 dark:hover:bg-bray-800 dark:bg-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:hover:border-gray-500 dark:hover:bg-gray-600">
                       <div className="flex flex-col items-center justify-center pt-5 pb-6">
