@@ -13,6 +13,7 @@ import {
   X,
   Download,
   Upload,
+  Loader, // Import the Loader icon
 } from "lucide-react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import toast from "react-hot-toast";
@@ -28,10 +29,9 @@ import { useFetchFilterOptions } from "../hooks/useFetchFilterOptions";
 import { useMediaQuery } from "../hooks/useMediaQuery";
 import { motion } from "framer-motion";
 import api from "../api/api";
-import { EmployeeImportModal } from "../components/ui/EmployeeImportModal"; // Import the new modal
+import { EmployeeImportModal } from "../components/ui/EmployeeImportModal";
 import { EmployeeListSkeleton } from "../components/ui/EmployeeListSkeleton";
 
-// --- MODIFICATION 1: Moved MobileList outside and wrapped in React.memo ---
 const MobileList = React.memo(({ employees }) => (
   <div className="divide-y divide-gray-200 dark:divide-gray-700">
     {employees.map((emp) => {
@@ -64,7 +64,6 @@ const MobileList = React.memo(({ employees }) => (
   </div>
 ));
 
-// --- MODIFICATION 2: Moved DesktopTable outside and wrapped in React.memo ---
 const DesktopTable = React.memo(
   ({
     employees,
@@ -207,7 +206,8 @@ const DesktopTable = React.memo(
                   variants={itemVariants}
                   data-index={virtualRow.index}
                   ref={rowVirtualizer.measureElement}
-                  className={`border-b border-gray-200 dark:border-gray-700 ${
+                  onClick={() => navigate(`/employees/${employee.id}`)}
+                  className={`border-b border-gray-200 dark:border-gray-700 cursor-pointer ${
                     selectedRows.has(employee.id)
                       ? "bg-kredivo-light text-kredivo-dark-text dark:bg-kredivo-primary/20 dark:text-kredivo-light"
                       : "hover:bg-gray-50 dark:hover:bg-gray-700/50"
@@ -222,28 +222,16 @@ const DesktopTable = React.memo(
                       onClick={(e) => e.stopPropagation()}
                     />
                   </td>
-                  <td
-                    className="px-6 py-4 whitespace-nowrap font-medium"
-                    onClick={() => navigate(`/employees/${employee.id}`)}
-                  >
+                  <td className="px-6 py-4 whitespace-nowrap font-medium">
                     {fullName}
                   </td>
-                  <td
-                    className="px-6 py-4 whitespace-nowrap text-sm"
-                    onClick={() => navigate(`/employees/${employee.id}`)}
-                  >
+                  <td className="px-6 py-4 whitespace-nowrap text-sm">
                     {employee.employee_email}
                   </td>
-                  <td
-                    className="px-6 py-4 whitespace-nowrap text-sm"
-                    onClick={() => navigate(`/employees/${employee.id}`)}
-                  >
+                  <td className="px-6 py-4 whitespace-nowrap text-sm">
                     {employee.position_name}
                   </td>
-                  <td
-                    className="px-6 py-4 whitespace-nowrap"
-                    onClick={() => navigate(`/employees/${employee.id}`)}
-                  >
+                  <td className="px-6 py-4 whitespace-nowrap">
                     <StatusBadge status={employee.status} />
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-center">
@@ -322,9 +310,10 @@ export const EmployeeListPage = ({
   onDeactivate,
 }) => {
   const [isFilterPopoverOpen, setIsFilterPopoverOpen] = useState(false);
-  const [isImportModalOpen, setIsImportModalOpen] = useState(false); // New state for import modal
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [searchInputValue, setSearchInputValue] = useState(filters.search);
   const debouncedSearchTerm = useDebounce(searchInputValue, 500);
+  const [isDebouncing, setIsDebouncing] = useState(false);
   const filterButtonRef = useRef(null);
   const token = localStorage.getItem("accessToken");
 
@@ -354,10 +343,15 @@ export const EmployeeListPage = ({
   };
 
   useEffect(() => {
-    setFilters((prev) => ({ ...prev, search: debouncedSearchTerm }));
-    if (pagination.currentPage !== 1) {
-      setPagination((prev) => ({ ...prev, currentPage: 1 }));
-    }
+    setIsDebouncing(true);
+    const handler = setTimeout(() => {
+      setFilters((prev) => ({ ...prev, search: debouncedSearchTerm }));
+      if (pagination.currentPage !== 1) {
+        setPagination((prev) => ({ ...prev, currentPage: 1 }));
+      }
+      setIsDebouncing(false);
+    }, 500);
+    return () => clearTimeout(handler);
   }, [debouncedSearchTerm, setFilters, setPagination, pagination.currentPage]);
 
   useEffect(() => {
@@ -459,7 +453,7 @@ export const EmployeeListPage = ({
     });
   };
 
-  if (isLoading) {
+  if (isLoading && !isDebouncing) {
     return (
       <div className="p-4 sm:p-6">
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
@@ -522,7 +516,7 @@ export const EmployeeListPage = ({
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white self-start sm:self-center">
               Employees
             </h1>
-            <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap">
+            <div className="flex items-center gap-4 w-full sm:w-auto">
               <div className="relative flex-grow">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                 <input
@@ -532,6 +526,9 @@ export const EmployeeListPage = ({
                   onChange={(e) => setSearchInputValue(e.target.value)}
                   className="w-full sm:w-64 pl-10 pr-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-kredivo-primary focus:outline-none"
                 />
+                {isDebouncing && (
+                  <Loader className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-gray-400" />
+                )}
               </div>
               <div className="flex items-center gap-2">
                 <div className="relative">
