@@ -1,6 +1,5 @@
 // packages/server/src/server.js
-require("./config/loadEnv");
-
+const config = require("./config/config"); // Import the new config
 const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
@@ -17,13 +16,12 @@ const jiraRoutes = require("./api/routes/jira");
 const dashboardRoutes = require("./api/routes/dashboard");
 
 const app = express();
-const port = process.env.PORT || 4000;
+const port = config.port; // Use the port from config
 
 // Setup global middleware
-// This is a critical change for cookies to work with a separate frontend
 app.use(
   cors({
-    origin: process.env.CLIENT_URL || "http://localhost:3000", // Your React app's address
+    origin: config.clientUrl, // Use the client URL from config
     credentials: true,
   })
 );

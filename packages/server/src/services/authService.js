@@ -1,9 +1,9 @@
-// packages/server/src/services/authService.js
 const db = require("../config/db");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const { v4: uuidv4 } = require("uuid");
 const { logActivity } = require("./logService");
+const config = require("../config/config");
 
 const login = async (email, password, reqContext) => {
   const userQuery = `
@@ -86,14 +86,14 @@ const login = async (email, password, reqContext) => {
     permissions: permissions,
   };
 
-  const accessToken = jwt.sign(jwtPayload, process.env.JWT_SECRET, {
+  const accessToken = jwt.sign(jwtPayload, config.jwt.secret, {
     expiresIn: "15m",
     jwtid: uuidv4(),
   });
 
   const refreshToken = jwt.sign(
     { id: user.id, jti: uuidv4() },
-    process.env.JWT_REFRESH_SECRET,
+    config.jwt.refreshSecret,
     { expiresIn: "7d" }
   );
 
@@ -113,7 +113,7 @@ const refreshAccessToken = async (token) => {
   try {
     await client.query("BEGIN");
 
-    const decoded = jwt.verify(token, process.env.JWT_REFRESH_SECRET);
+    const decoded = jwt.verify(token, config.jwt.refreshSecret);
     const userId = decoded.id;
 
     const tokenResult = await client.query(
@@ -152,13 +152,13 @@ const refreshAccessToken = async (token) => {
       permissions: permissions,
       jti: uuidv4(),
     };
-    const newAccessToken = jwt.sign(jwtPayload, process.env.JWT_SECRET, {
+    const newAccessToken = jwt.sign(jwtPayload, config.jwt.secret, {
       expiresIn: "15m",
     });
 
     const newRefreshToken = jwt.sign(
       { id: user.id, jti: uuidv4() },
-      process.env.JWT_REFRESH_SECRET,
+      config.jwt.refreshSecret,
       { expiresIn: "7d" }
     );
     const sevenDaysFromNow = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
