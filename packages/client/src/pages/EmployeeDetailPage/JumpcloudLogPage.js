@@ -15,6 +15,7 @@ import {
   UserX,
 } from "lucide-react";
 import { Button } from "../../components/ui/Button";
+import { CustomSelect } from "../../components/ui/CustomSelect"; // Import CustomSelect
 
 // A dedicated badge for the log status
 const LogStatusBadge = ({ success }) => {
@@ -117,10 +118,23 @@ export const JumpCloudLogPage = memo(
       onParamsChange({ ...params, [e.target.name]: e.target.value });
     };
 
+    // --- NEW: Handler specifically for the CustomSelect component ---
+    const handleLimitChange = (value) => {
+      onParamsChange({ ...params, limit: value });
+    };
+
     const maxDate = new Date().toISOString().split("T")[0];
     const minDate = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000)
       .toISOString()
       .split("T")[0];
+
+    // --- NEW: Options for the CustomSelect component ---
+    const limitOptions = [
+      { id: 10, name: "10" },
+      { id: 100, name: "100" },
+      { id: 500, name: "500" },
+      { id: 1000, name: "1000" },
+    ];
 
     return (
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
@@ -172,18 +186,15 @@ export const JumpCloudLogPage = memo(
               >
                 Limit
               </label>
-              <select
-                name="limit"
-                id="limit"
-                value={params.limit}
-                onChange={handleInputChange}
-                className="mt-1 block w-full pl-3 pr-10 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 rounded-md shadow-sm focus:ring-2 focus:ring-kredivo-primary"
-              >
-                <option>10</option>
-                <option>100</option>
-                <option>500</option>
-                <option>1000</option>
-              </select>
+              {/* --- REPLACED: The native select is now a CustomSelect --- */}
+              <div className="mt-1">
+                <CustomSelect
+                  id="limit"
+                  options={limitOptions}
+                  value={params.limit}
+                  onChange={handleLimitChange}
+                />
+              </div>
             </div>
             <Button
               onClick={onFetch}
