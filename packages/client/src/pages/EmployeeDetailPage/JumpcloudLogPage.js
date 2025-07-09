@@ -17,14 +17,34 @@ import {
 } from "lucide-react";
 import { Button } from "../../components/ui/Button";
 
-// A small component for displaying key-value pairs in the details section
+// A dedicated badge for the log status
+const LogStatusBadge = ({ success }) => {
+  const isSuccess = success;
+  const baseClasses = "px-2.5 py-0.5 text-xs font-semibold rounded-full";
+  const successClasses =
+    "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300";
+  const failureClasses =
+    "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300";
+
+  return (
+    <span
+      className={`${baseClasses} ${
+        isSuccess ? successClasses : failureClasses
+      }`}
+    >
+      {isSuccess ? "Success" : "Failed"}
+    </span>
+  );
+};
+
+// The key-value pairs for the details section
 const DetailItem = ({ label, children, isMono = false }) => (
-  <div className="flex justify-between py-1.5 px-3 even:bg-gray-50 dark:even:bg-gray-700/50 rounded-md">
-    <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">
+  <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center py-2.5 px-1">
+    <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 flex-shrink-0">
       {label}
     </dt>
     <dd
-      className={`text-sm text-gray-900 dark:text-gray-200 text-right ${
+      className={`text-sm text-gray-800 dark:text-gray-200 text-left sm:text-right mt-1 sm:mt-0 break-words ${
         isMono ? "font-mono text-xs" : ""
       }`}
     >
@@ -33,110 +53,22 @@ const DetailItem = ({ label, children, isMono = false }) => (
   </div>
 );
 
-// Section header for the details view
+// The header for sections within the details card
 const DetailSectionHeader = ({ children }) => (
-  <h5 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mt-3 mb-1 px-1">
+  <h5 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mt-3 mb-1 px-1 first:mt-0">
     {children}
   </h5>
 );
 
-// The component for the collapsible details section
-const CollapsibleDetails = ({ log }) => {
-  const [isOpen, setIsOpen] = useState(false);
-
-  const renderDetails = () => {
-    const hasAuthContext =
-      log.auth_context && Object.keys(log.auth_context).length > 0;
-
-    return (
-      <>
-        <DetailSectionHeader>Event</DetailSectionHeader>
-        <DetailItem label="Event Type" isMono>
-          {log.event_type}
-        </DetailItem>
-        <DetailItem label="Service">{log.service}</DetailItem>
-        {log.message && <DetailItem label="Message">{log.message}</DetailItem>}
-
-        {log.application && (
-          <>
-            <DetailSectionHeader>Application</DetailSectionHeader>
-            <DetailItem label="Name">
-              {log.application.display_label}
-            </DetailItem>
-            <DetailItem label="SSO Type">{log.application.sso_type}</DetailItem>
-            <DetailItem label="ID" isMono>
-              {log.application.id}
-            </DetailItem>
-          </>
-        )}
-
-        {hasAuthContext && (
-          <>
-            <DetailSectionHeader>Authentication</DetailSectionHeader>
-            <DetailItem label="MFA Method">
-              {log.mfa_meta?.type?.replace(/_/g, " ") || "Not Applied"}
-            </DetailItem>
-            <DetailItem label="IDP Initiated">
-              {log.idp_initiated ? "Yes" : "No"}
-            </DetailItem>
-          </>
-        )}
-
-        {log.geoip && (
-          <>
-            <DetailSectionHeader>Location</DetailSectionHeader>
-            <DetailItem label="Timezone">{log.geoip.timezone}</DetailItem>
-            <DetailItem label="Coordinates">
-              {log.geoip.latitude}, {log.geoip.longitude}
-            </DetailItem>
-          </>
-        )}
-
-        {log.useragent && (
-          <>
-            <DetailSectionHeader>Device</DetailSectionHeader>
-            <DetailItem label="OS">{log.useragent.os_full}</DetailItem>
-            <DetailItem label="Browser">
-              {log.useragent.name} {log.useragent.version}
-            </DetailItem>
-            <DetailItem label="Device Type">{log.useragent.device}</DetailItem>
-          </>
-        )}
-        {log.auth_context?.system && (
-          <>
-            <DetailSectionHeader>System</DetailSectionHeader>
-            <DetailItem label="Hostname">
-              {log.auth_context.system.hostname}
-            </DetailItem>
-            <DetailItem label="OS">
-              {log.auth_context.system.os} {log.auth_context.system.version}
-            </DetailItem>
-          </>
-        )}
-      </>
-    );
-  };
-
-  return (
-    <div className="mt-3">
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-1 text-sm text-kredivo-primary font-medium hover:underline"
-      >
-        {isOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-        {isOpen ? "Hide Details" : "View Details"}
-      </button>
-      {isOpen && (
-        <div className="mt-2 p-3 bg-gray-50/75 dark:bg-gray-900/50 rounded-lg border border-gray-200 dark:border-gray-700">
-          <dl>{renderDetails()}</dl>
-        </div>
-      )}
-    </div>
-  );
-};
-
+// The main log page component
 export const JumpCloudLogPage = memo(
   ({ logs, loading, error, params, onParamsChange, onFetch }) => {
+    const [expandedLogRowId, setExpandedLogRowId] = useState(null);
+
+    const toggleRowExpansion = (logId) => {
+      setExpandedLogRowId((prevId) => (prevId === logId ? null : logId));
+    };
+
     const getEventIcon = (eventType, success) => {
       const baseClass = "w-6 h-6 flex-shrink-0";
       switch (eventType) {
@@ -178,7 +110,6 @@ export const JumpCloudLogPage = memo(
         case "ldap_bind":
           return `LDAP Bind attempt via ${log.auth_method}`;
         default:
-          // Fallback to the event type name
           return log.event_type.replace(/_/g, " ");
       }
     };
@@ -229,7 +160,7 @@ export const JumpCloudLogPage = memo(
                 name="endTime"
                 id="endTime"
                 value={params.endTime}
-                min={params.startTime} // Can't be before start date
+                min={params.startTime}
                 max={maxDate}
                 onChange={handleInputChange}
                 className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 rounded-md shadow-sm focus:ring-2 focus:ring-kredivo-primary"
@@ -281,25 +212,41 @@ export const JumpCloudLogPage = memo(
           {!loading &&
             !error &&
             logs &&
-            logs.map((log) => (
-              <div
-                key={log.id}
-                className="p-4 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors duration-150"
-              >
-                <div className="flex items-start gap-4">
-                  {/* Icon */}
-                  <div className="mt-1">
-                    {getEventIcon(log.event_type, log.success)}
-                  </div>
-
-                  {/* Main content */}
-                  <div className="flex-grow">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <p className="font-semibold text-gray-800 dark:text-gray-200 capitalize">
-                          {formatPrimaryInfo(log)}
+            logs.map((log) => {
+              const isExpanded = expandedLogRowId === log.id;
+              const hasAuthContext =
+                log.auth_context && Object.keys(log.auth_context).length > 0;
+              return (
+                <div
+                  key={log.id}
+                  className="p-4 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors duration-150"
+                >
+                  <button
+                    onClick={() => toggleRowExpansion(log.id)}
+                    className="w-full text-left"
+                  >
+                    <div className="flex items-start gap-4">
+                      <div className="mt-1 flex-shrink-0">
+                        {getEventIcon(log.event_type, log.success)}
+                      </div>
+                      <div className="flex-grow min-w-0">
+                        <div className="flex justify-between items-start">
+                          <p className="font-semibold text-gray-800 dark:text-gray-200 capitalize pr-4">
+                            {formatPrimaryInfo(log)}
+                          </p>
+                          <div className="flex-shrink-0 flex items-center gap-2">
+                            <LogStatusBadge success={log.success} />
+                            <ChevronDown
+                              className={`w-5 h-5 text-gray-400 transition-transform ${
+                                isExpanded ? "rotate-180" : ""
+                              }`}
+                            />
+                          </div>
+                        </div>
+                        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                          {new Date(log.timestamp).toLocaleString()}
                         </p>
-                        <div className="flex items-center gap-4 text-sm text-gray-500 dark:text-gray-400 mt-1">
+                        <div className="flex items-center gap-4 text-sm text-gray-500 dark:text-gray-400 mt-2">
                           <span className="flex items-center gap-1.5">
                             <MapPin size={14} />{" "}
                             {log.geoip?.country_code || "N/A"}
@@ -309,26 +256,99 @@ export const JumpCloudLogPage = memo(
                           </span>
                         </div>
                       </div>
-                      <div className="text-right flex-shrink-0 ml-4">
-                        <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                          {new Date(log.timestamp).toLocaleString()}
-                        </p>
-                        <p
-                          className={`text-xs font-bold text-right ${
-                            log.success ? "text-green-600" : "text-red-600"
-                          }`}
-                        >
-                          {log.success ? "Success" : "Failed"}
-                        </p>
+                    </div>
+                  </button>
+                  {isExpanded && (
+                    <div className="pl-10 pt-3">
+                      <div className="p-3 bg-gray-100 dark:bg-gray-900/70 rounded-lg shadow-inner">
+                        <dl className="divide-y divide-gray-200 dark:divide-gray-700">
+                          {/* --- THIS IS THE SECTION THAT WAS MISSING --- */}
+                          <DetailSectionHeader>Event</DetailSectionHeader>
+                          <DetailItem label="Event Type" isMono>
+                            {log.event_type}
+                          </DetailItem>
+                          <DetailItem label="Service">{log.service}</DetailItem>
+                          {log.message && (
+                            <DetailItem label="Message">
+                              {log.message}
+                            </DetailItem>
+                          )}
+                          {log.application && (
+                            <>
+                              <DetailSectionHeader>
+                                Application
+                              </DetailSectionHeader>
+                              <DetailItem label="Name">
+                                {log.application.display_label}
+                              </DetailItem>
+                              <DetailItem label="SSO Type">
+                                {log.application.sso_type}
+                              </DetailItem>
+                              <DetailItem label="ID" isMono>
+                                {log.application.id}
+                              </DetailItem>
+                            </>
+                          )}
+                          {hasAuthContext && (
+                            <>
+                              <DetailSectionHeader>
+                                Authentication
+                              </DetailSectionHeader>
+                              <DetailItem label="MFA Method">
+                                {log.mfa_meta?.type?.replace(/_/g, " ") ||
+                                  "Not Applied"}
+                              </DetailItem>
+                              <DetailItem label="IDP Initiated">
+                                {log.idp_initiated ? "Yes" : "No"}
+                              </DetailItem>
+                            </>
+                          )}
+                          {log.geoip && (
+                            <>
+                              <DetailSectionHeader>
+                                Location
+                              </DetailSectionHeader>
+                              <DetailItem label="Timezone">
+                                {log.geoip.timezone}
+                              </DetailItem>
+                              <DetailItem label="Coordinates">
+                                {log.geoip.latitude}, {log.geoip.longitude}
+                              </DetailItem>
+                            </>
+                          )}
+                          {log.useragent && (
+                            <>
+                              <DetailSectionHeader>Device</DetailSectionHeader>
+                              <DetailItem label="OS">
+                                {log.useragent.os_full}
+                              </DetailItem>
+                              <DetailItem label="Browser">
+                                {log.useragent.name} {log.useragent.version}
+                              </DetailItem>
+                              <DetailItem label="Device Type">
+                                {log.useragent.device}
+                              </DetailItem>
+                            </>
+                          )}
+                          {log.auth_context?.system && (
+                            <>
+                              <DetailSectionHeader>System</DetailSectionHeader>
+                              <DetailItem label="Hostname">
+                                {log.auth_context.system.hostname}
+                              </DetailItem>
+                              <DetailItem label="OS">
+                                {log.auth_context.system.os}{" "}
+                                {log.auth_context.system.version}
+                              </DetailItem>
+                            </>
+                          )}
+                        </dl>
                       </div>
                     </div>
-
-                    {/* Collapsible details */}
-                    <CollapsibleDetails log={log} />
-                  </div>
+                  )}
                 </div>
-              </div>
-            ))}
+              );
+            })}
         </div>
       </div>
     );

@@ -522,7 +522,7 @@ export const EmployeeListPage = ({
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white self-start sm:self-center">
               Employees
             </h1>
-            <div className="flex items-center gap-4 w-full sm:w-auto">
+            <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap">
               <div className="relative flex-grow">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                 <input
