@@ -11,6 +11,13 @@ const googleWorkspaceService = require("./googleService");
 const slackService = require("./slackService");
 const atlassianService = require("./atlassianService");
 
+// --- NEW: In-memory cache for options ---
+const optionsCache = {
+  data: {},
+  timestamp: {},
+  ttl: 10 * 60 * 1000, // 10 minutes
+};
+
 // Zod schema for validating a single row from the CSV import
 const employeeImportSchema = z.object({
   first_name: z.string().min(1, "First name is required."),
@@ -331,8 +338,6 @@ const streamEmployeesForExport = (filters) => {
 
   db.pool.connect((err, client, done) => {
     if (err) {
-      // How the stream from json2csv will handle the error
-      // This is a simplified example. In a real app, you might want more robust error handling.
       queryStream.emit("error", err);
       return;
     }
@@ -838,12 +843,29 @@ const bulkDeactivateOnPlatforms = async (
 };
 
 const getEmployeeOptions = async (tableName) => {
+  // --- MODIFICATION: Check cache first ---
+  const now = Date.now();
+  if (
+    optionsCache.data[tableName] &&
+    now - optionsCache.timestamp[tableName] < optionsCache.ttl
+  ) {
+    console.log(`[Cache] HIT for ${tableName}`);
+    return optionsCache.data[tableName];
+  }
+  console.log(`[Cache] MISS for ${tableName}`);
+
   if (!/^[a-z_]+$/.test(tableName)) {
     throw new Error("Invalid table name.");
   }
+
   const result = await db.query(
     `SELECT id, name FROM ${tableName} ORDER BY name`
   );
+
+  // --- MODIFICATION: Store result in cache ---
+  optionsCache.data[tableName] = result.rows;
+  optionsCache.timestamp[tableName] = now;
+
   return result.rows;
 };
 
@@ -1005,7 +1027,6 @@ const bulkImportEmployees = async (fileBuffer, actorId, reqContext) => {
     for (const [index, row] of parsedData.data.entries()) {
       const rowNum = index + 2;
 
-      // --- ZOD VALIDATION ---
       const validationResult = employeeImportSchema.safeParse(row);
       if (!validationResult.success) {
         results.errors.push({
@@ -1014,7 +1035,7 @@ const bulkImportEmployees = async (fileBuffer, actorId, reqContext) => {
             .map((issue) => `${issue.path.join(".")}: ${issue.message}`)
             .join("; "),
         });
-        continue; // Skip to the next row
+        continue;
       }
 
       const { first_name, last_name, employee_email } = validationResult.data;
