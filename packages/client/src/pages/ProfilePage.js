@@ -1,3 +1,4 @@
+// packages/client/src/pages/ProfilePage.js
 import React, { useState, useCallback, useEffect } from "react";
 import {
   UserSquare,
@@ -98,6 +99,7 @@ export const ProfilePage = ({
     startTime: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
       .toISOString()
       .split("T")[0],
+    endTime: new Date().toISOString().split("T")[0],
     limit: 100,
   });
 
@@ -128,7 +130,8 @@ export const ProfilePage = ({
       switch (tabKey) {
         case "jumpcloud":
           const params = new URLSearchParams({
-            startTime: new Date(jcLogParams.startTime).toISOString(),
+            startTime: jcLogParams.startTime,
+            endTime: jcLogParams.endTime,
             limit: jcLogParams.limit,
           });
           url = `${baseUrl}/jumpcloud-logs?${params.toString()}`;

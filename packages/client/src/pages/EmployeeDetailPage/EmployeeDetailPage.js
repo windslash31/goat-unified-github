@@ -1,4 +1,3 @@
-// packages/client/src/pages/EmployeeDetailPage/EmployeeDetailPage.js
 import React, { useState, useCallback, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
@@ -10,7 +9,7 @@ import {
   Bot,
   MessageSquare,
   Shield,
-  BookLock, // New Icon for Licenses
+  BookLock,
 } from "lucide-react";
 import { useBreadcrumb } from "../../context/BreadcrumbContext";
 import { EmployeeDetailHeader } from "./EmployeeDetailHeader";
@@ -20,7 +19,7 @@ import { JumpCloudLogPage } from "./JumpcloudLogPage";
 import { JiraTicketModal } from "../../components/ui/JiraTicketModal";
 import { GoogleLogPage } from "./GoogleLogPage";
 import { SlackLogPage } from "./SlackLogPage";
-import { LicensesTab } from "./LicensesTab"; // Import the new tab
+import { LicensesTab } from "./LicensesTab";
 import { UnifiedTimelinePage } from "./UnifiedTimelinePage";
 
 const Section = ({ id, title, children, icon }) => (
@@ -98,6 +97,7 @@ export const EmployeeDetailPage = ({
     startTime: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
       .toISOString()
       .split("T")[0],
+    endTime: new Date().toISOString().split("T")[0],
     limit: 100,
   });
 
@@ -181,6 +181,7 @@ export const EmployeeDetailPage = ({
   const fetchLogData = useCallback(
     (tabKey, force = false) => {
       if (
+        !employeeId || // FIX: Add guard to ensure employeeId is available
         !permissions.includes("log:read:platform") ||
         (!force && (tabData[tabKey]?.fetched || tabData[tabKey]?.loading))
       ) {
@@ -194,7 +195,8 @@ export const EmployeeDetailPage = ({
       switch (tabKey) {
         case "jumpcloud":
           const params = new URLSearchParams({
-            startTime: new Date(jcLogParams.startTime).toISOString(),
+            startTime: jcLogParams.startTime,
+            endTime: jcLogParams.endTime,
             limit: jcLogParams.limit,
           });
           url = `${baseUrl}/jumpcloud-logs?${params.toString()}`;

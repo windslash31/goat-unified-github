@@ -11,7 +11,6 @@ const listEmployees = async (req, res, next) => {
   }
 };
 
-// --- NEW CONTROLLER FUNCTION ---
 const exportEmployees = async (req, res, next) => {
   try {
     const employees = await employeeService.getEmployeesForExport(req.query);
@@ -89,7 +88,13 @@ const getPlatformStatuses = async (req, res, next) => {
 
 const getJumpCloudLogs = async (req, res, next) => {
   try {
-    const logs = await employeeService.getJumpCloudLogs(req.params.id);
+    const { startTime, endTime, limit } = req.query; // Added endTime
+    const logs = await employeeService.getJumpCloudLogs(
+      req.params.id,
+      startTime,
+      endTime, // Pass endTime to the service
+      limit
+    );
     res.json(logs);
   } catch (error) {
     if (error.message.includes("not found")) {
@@ -293,17 +298,13 @@ const bulkImportEmployees = async (req, res, next) => {
     );
     res.status(200).json(results);
   } catch (error) {
-    // Provide more specific error messages
     if (error.message.includes("not found")) {
       return res.status(404).json({ message: error.message });
     }
-    res
-      .status(500)
-      .json({
-        message:
-          error.message ||
-          "An unexpected error occurred during the bulk import.",
-      });
+    res.status(500).json({
+      message:
+        error.message || "An unexpected error occurred during the bulk import.",
+    });
   }
 };
 
@@ -324,6 +325,6 @@ module.exports = {
   getSlackLogs,
   getUnifiedTimeline,
   exportEmployees,
-  getLicenseDetails, // Export the new function
+  getLicenseDetails,
   bulkImportEmployees,
 };

@@ -1,4 +1,3 @@
-// packages/server/src/services/employeeService.js
 const db = require("../config/db");
 const { logActivity } = require("./logService");
 
@@ -267,7 +266,7 @@ const getEmployeesForExport = async (filters) => {
                 WHERE eaa.employee_id = e.id
             ) as application_access
         FROM employees e
-        LEFT JOIN employees manager ON e.manager_id = manager.id
+        LEFT JOIN employees manager ON e.manager_id = m.id
         LEFT JOIN legal_entities le ON e.legal_entity_id = le.id
         LEFT JOIN office_locations ol ON e.office_location_id = ol.id
         LEFT JOIN employee_types et ON e.employee_type_id = et.id
@@ -590,7 +589,7 @@ const getPlatformStatuses = async (employeeId) => {
   });
 };
 
-const getJumpCloudLogs = async (employeeId, startTime, limit) => {
+const getJumpCloudLogs = async (employeeId, startTime, endTime, limit) => {
   if (!process.env.JUMPCLOUD_API_KEY) {
     throw new Error("Server configuration error for JumpCloud.");
   }
@@ -610,21 +609,34 @@ const getJumpCloudLogs = async (employeeId, startTime, limit) => {
 
   const eventsUrl = "https://api.jumpcloud.com/insights/directory/v1/events";
 
+  // Ensure limit is a valid number within the allowed range
+  const parsedLimit = parseInt(limit, 10);
+  const effectiveLimit = isNaN(parsedLimit)
+    ? 100
+    : Math.max(10, Math.min(parsedLimit, 1000));
+
   const body = {
     service: ["all"],
     sort: "DESC",
     search_term: {
       and: [{ "initiated_by.username": user.username }],
     },
-    limit: Math.max(10, Math.min(parseInt(limit, 10) || 100, 1000)),
+    limit: effectiveLimit,
   };
 
   if (startTime) {
-    body.start_time = startTime;
+    body.start_time = new Date(startTime).toISOString();
   } else {
+    // Default to 90 days ago if no start time
     body.start_time = new Date(
       Date.now() - 90 * 24 * 60 * 60 * 1000
     ).toISOString();
+  }
+
+  if (endTime) {
+    const endDate = new Date(endTime);
+    endDate.setHours(23, 59, 59, 999);
+    body.end_time = endDate.toISOString();
   }
 
   const eventsResponse = await fetch(eventsUrl, {
@@ -638,6 +650,8 @@ const getJumpCloudLogs = async (employeeId, startTime, limit) => {
   });
 
   if (!eventsResponse.ok) {
+    const errorBody = await eventsResponse.text();
+    console.error("JumpCloud API Error:", errorBody);
     throw new Error(`JumpCloud Events API Error: ${eventsResponse.status}.`);
   }
 
@@ -841,11 +855,10 @@ const getLicenseDetails = async (employeeId) => {
     throw new Error("Employee not found");
   }
 
-  // --- FIX: Changed 'work_email' to the correct 'employee_email' field ---
   const platformChecks = {
     google: googleService.getUserLicense(employee.employee_email),
     jumpcloud: jumpcloudService.getUser(employee.employee_email),
-    slack: slackService.getUserByEmail(employee.employee_email),
+    slack: slackService.getUser(employee.employee_email), // FIX: Changed getUserByEmail to getUser
     atlassian: atlassianService.getUser(employee.employee_email),
   };
 
