@@ -1,12 +1,37 @@
 const db = require("../config/db");
 const { logActivity } = require("./logService");
 const Papa = require("papaparse");
-
+const { z } = require("zod");
+const { Transform } = require("stream");
+const { AsyncParser } = require("json2csv");
+const QueryStream = require("pg-query-stream");
 // External Platform Services
 const jumpcloudService = require("./jumpcloudService");
 const googleWorkspaceService = require("./googleService");
 const slackService = require("./slackService");
 const atlassianService = require("./atlassianService");
+
+// Zod schema for validating a single row from the CSV import
+const employeeImportSchema = z.object({
+  first_name: z.string().min(1, "First name is required."),
+  last_name: z.string().min(1, "Last name is required."),
+  employee_email: z.string().email("Invalid email format."),
+  middle_name: z.string().optional().nullable(),
+  position_name: z.string().optional().nullable(),
+  position_level: z.string().optional().nullable(),
+  join_date: z.string().optional().nullable(),
+  asset_name: z.string().optional().nullable(),
+  onboarding_ticket: z.string().optional().nullable(),
+  manager_email: z
+    .string()
+    .email("Invalid manager email format.")
+    .optional()
+    .nullable(),
+  legal_entity_name: z.string().optional().nullable(),
+  office_location_name: z.string().optional().nullable(),
+  employee_type_name: z.string().optional().nullable(),
+  employee_sub_type_name: z.string().optional().nullable(),
+});
 
 const getEmployeeStatus = (employee) => {
   if (!employee.is_active) return "Inactive";
@@ -171,8 +196,7 @@ const getEmployees = async (filters) => {
     currentPage: parseInt(page, 10),
   };
 };
-
-const getEmployeesForExport = async (filters) => {
+const getEmployeesForExport = (filters) => {
   const {
     status,
     search,
@@ -275,8 +299,52 @@ const getEmployeesForExport = async (filters) => {
         ORDER BY e.first_name, e.last_name;
     `;
 
-  const { rows } = await db.query(query, queryParams);
-  return rows;
+  return { text: query, values: queryParams };
+};
+
+const streamEmployeesForExport = (filters) => {
+  const { text, values } = getEmployeesForExport(filters);
+  const queryStream = new QueryStream(text, values);
+
+  const fields = [
+    "id",
+    "first_name",
+    "middle_name",
+    "last_name",
+    "employee_email",
+    "status",
+    "position_name",
+    "position_level",
+    "manager_email",
+    "legal_entity",
+    "office_location",
+    "employee_type",
+    "employee_sub_type",
+    "join_date",
+    "date_of_exit_at_date",
+    "access_cut_off_date_at_date",
+    "created_at",
+    "application_access",
+  ];
+
+  const asyncParser = new AsyncParser({ fields });
+
+  db.pool.connect((err, client, done) => {
+    if (err) {
+      // How the stream from json2csv will handle the error
+      // This is a simplified example. In a real app, you might want more robust error handling.
+      queryStream.emit("error", err);
+      return;
+    }
+    const stream = client.query(queryStream);
+    stream.on("end", done);
+    stream.on("error", (err) => {
+      done();
+      queryStream.emit("error", err);
+    });
+  });
+
+  return asyncParser.parse(queryStream);
 };
 
 const updateEmployee = async (employeeId, updatedData, actorId, reqContext) => {
@@ -912,11 +980,7 @@ const getLicenseDetails = async (employeeId) => {
 const bulkImportEmployees = async (fileBuffer, actorId, reqContext) => {
   const client = await db.pool.connect();
   const results = { created: 0, updated: 0, errors: [] };
-
-  // Convert buffer to string for parsing
   const csvString = fileBuffer.toString("utf-8");
-
-  // Parse CSV data using papaparse
   const parsedData = Papa.parse(csvString, {
     header: true,
     skipEmptyLines: true,
@@ -933,27 +997,28 @@ const bulkImportEmployees = async (fileBuffer, actorId, reqContext) => {
     await client.query("BEGIN");
 
     for (const [index, row] of parsedData.data.entries()) {
-      const rowNum = index + 2; // CSV rows are typically 1-indexed, +1 for header
-      const { first_name, last_name, employee_email } = row;
+      const rowNum = index + 2;
 
-      // Validate required fields
-      if (!first_name || !last_name || !employee_email) {
+      // --- ZOD VALIDATION ---
+      const validationResult = employeeImportSchema.safeParse(row);
+      if (!validationResult.success) {
         results.errors.push({
           row: rowNum,
-          message:
-            "Missing required fields: first_name, last_name, and employee_email are mandatory.",
+          message: validationResult.error.issues
+            .map((issue) => `${issue.path.join(".")}: ${issue.message}`)
+            .join("; "),
         });
-        continue;
+        continue; // Skip to the next row
       }
 
-      // Check if employee exists
+      const { first_name, last_name, employee_email } = validationResult.data;
+
       const existingEmployeeResult = await client.query(
         "SELECT id FROM employees WHERE employee_email = $1",
         [employee_email]
       );
       const existingEmployee = existingEmployeeResult.rows[0];
 
-      // Resolve foreign keys from names (similar to createEmployeeFromTicket)
       const resolvedIds = {};
       if (row.manager_email) {
         const res = await client.query(
@@ -993,10 +1058,8 @@ const bulkImportEmployees = async (fileBuffer, actorId, reqContext) => {
           resolvedIds.employee_sub_type_id = res.rows[0].id;
       }
 
-      // Prepare data object, combining row data and resolved IDs
-      const employeeData = { ...row, ...resolvedIds };
+      const employeeData = { ...validationResult.data, ...resolvedIds };
 
-      // Whitelist fields to prevent inserting unwanted columns from the CSV
       const allowedFields = [
         "first_name",
         "last_name",
@@ -1015,7 +1078,6 @@ const bulkImportEmployees = async (fileBuffer, actorId, reqContext) => {
       ];
 
       if (existingEmployee) {
-        // UPDATE logic
         const updateFields = allowedFields
           .filter((field) => employeeData[field] !== undefined)
           .map((field, i) => `"${field}" = $${i + 2}`)
@@ -1033,7 +1095,6 @@ const bulkImportEmployees = async (fileBuffer, actorId, reqContext) => {
           results.updated++;
         }
       } else {
-        // CREATE logic
         const insertColumns = allowedFields.filter(
           (field) => employeeData[field] !== undefined
         );
@@ -1064,7 +1125,6 @@ const bulkImportEmployees = async (fileBuffer, actorId, reqContext) => {
       reqContext,
       client
     );
-
     await client.query("COMMIT");
   } catch (err) {
     await client.query("ROLLBACK");
@@ -1092,6 +1152,7 @@ module.exports = {
   getGoogleLogs,
   getSlackLogs,
   getUnifiedTimeline,
+  streamEmployeesForExport,
   bulkDeactivateOnPlatforms,
   createEmployeeFromTicket,
   updateOffboardingFromTicket,

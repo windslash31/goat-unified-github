@@ -1,4 +1,3 @@
-// packages/server/src/api/controllers/employeeController.js
 const employeeService = require("../../services/employeeService");
 const { logActivity } = require("../../services/logService");
 const { Parser } = require("json2csv");
@@ -14,34 +13,11 @@ const listEmployees = async (req, res, next) => {
 
 const exportEmployees = async (req, res, next) => {
   try {
-    const employees = await employeeService.getEmployeesForExport(req.query);
-
-    const fields = [
-      "id",
-      "first_name",
-      "middle_name",
-      "last_name",
-      "employee_email",
-      "status",
-      "position_name",
-      "position_level",
-      "manager_email",
-      "legal_entity",
-      "office_location",
-      "employee_type",
-      "employee_sub_type",
-      "join_date",
-      "date_of_exit_at_date",
-      "access_cut_off_date_at_date",
-      "created_at",
-      "application_access",
-    ];
-    const json2csvParser = new Parser({ fields });
-    const csv = json2csvParser.parse(employees);
-
     res.header("Content-Type", "text/csv");
     res.attachment("employees.csv");
-    res.send(csv);
+
+    const csvStream = employeeService.streamEmployeesForExport(req.query);
+    csvStream.pipe(res);
   } catch (error) {
     next(error);
   }

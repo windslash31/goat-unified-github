@@ -22,12 +22,14 @@
     "google-auth-library": "^10.1.0",
     "googleapis": "^150.0.1",
     "helmet": "^8.1.0",
+    "json2csv": "^6.0.0-alpha.2",
     "jsonwebtoken": "^9.0.2",
     "multer": "^2.0.1",
     "node": "^20.19.3",
     "node-fetch": "^2.7.0",
     "papaparse": "^5.5.3",
     "pg": "^8.16.2",
+    "pg-query-stream": "^4.10.3",
     "sanitize-html": "^2.17.0",
     "uuid": "^11.1.0"
   }
