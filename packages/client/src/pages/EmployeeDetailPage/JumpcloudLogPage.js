@@ -1,118 +1,319 @@
-import React, { memo } from 'react';
-import { ArrowRight, UserCheck, UserX, KeyRound, FileLock, Shield, MapPin, Monitor, Database, Server } from 'lucide-react';
+import React, { memo, useState } from "react";
+import {
+  ArrowRight,
+  UserCheck,
+  UserX,
+  KeyRound,
+  FileLock,
+  Shield,
+  MapPin,
+  Monitor,
+  Database,
+  Filter,
+  ChevronDown,
+  ChevronUp,
+  Vpn,
+  AppWindow,
+  Fingerprint,
+  Server,
+} from "lucide-react";
+import { Button } from "../../components/ui/Button";
 
-export const JumpCloudLogPage = memo(({ logs, loading, error }) => {
+// A small component for displaying key-value pairs in the details section
+const DetailItem = ({ label, children }) => (
+  <div className="grid grid-cols-3 gap-2 py-1">
+    <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 col-span-1">
+      {label}
+    </dt>
+    <dd className="text-sm text-gray-900 dark:text-gray-200 col-span-2">
+      {children}
+    </dd>
+  </div>
+);
+
+// The component for the collapsible details section
+const CollapsibleDetails = ({ log }) => {
+  const [isOpen, setIsOpen] = useState(false);
+
+  const renderDetails = () => {
+    switch (log.event_type) {
+      case "sso_auth":
+        return (
+          <>
+            <DetailItem label="Application">
+              {log.application?.display_label || "N/A"}
+            </DetailItem>
+            <DetailItem label="SSO Type">
+              {log.application?.sso_type || "N/A"}
+            </DetailItem>
+            <DetailItem label="MFA Method">
+              {log.mfa_meta?.type?.replace(/_/g, " ") || "Not Applied"}
+            </DetailItem>
+            <DetailItem label="Hostname">
+              {log.auth_context?.system?.hostname || "N/A"}
+            </DetailItem>
+            <DetailItem label="OS">
+              {log.useragent?.os_full || "N/A"}
+            </DetailItem>
+            <DetailItem label="Browser">
+              {log.useragent?.name || "N/A"}
+            </DetailItem>
+            <DetailItem label="Latitude">
+              {log.geoip?.latitude || "N/A"}
+            </DetailItem>
+            <DetailItem label="Longitude">
+              {log.geoip?.longitude || "N/A"}
+            </DetailItem>
+            <DetailItem label="Service">{log.service || "N/A"}</DetailItem>
+            <DetailItem label="Application ID">
+              {log.application?.id || "N/A"}
+            </DetailItem>
+          </>
+        );
+      case "login_attempt":
+        return (
+          <>
+            <DetailItem label="System ID">{log.system?.id || "N/A"}</DetailItem>
+            <DetailItem label="Message">
+              {log.message || "No message."}
+            </DetailItem>
+            <DetailItem label="Latitude">
+              {log.geoip?.latitude || "N/A"}
+            </DetailItem>
+            <DetailItem label="Longitude">
+              {log.geoip?.longitude || "N/A"}
+            </DetailItem>
+          </>
+        );
+      case "ldap_bind":
+        return (
+          <>
+            <DetailItem label="Distinguished Name">
+              <span className="font-mono text-xs">{log.dn}</span>
+            </DetailItem>
+            <DetailItem label="Auth Method">{log.auth_method}</DetailItem>
+            <DetailItem label="Connection ID">{log.connection_id}</DetailItem>
+          </>
+        );
+      case "passwordmanager_backup_create":
+        return (
+          <>
+            <DetailItem label="Resource Name">{log.resource?.name}</DetailItem>
+            <DetailItem label="Resource ID">{log.resource?.id}</DetailItem>
+            <DetailItem label="Latitude">
+              {log.geoip?.latitude || "N/A"}
+            </DetailItem>
+            <DetailItem label="Longitude">
+              {log.geoip?.longitude || "N/A"}
+            </DetailItem>
+          </>
+        );
+      default:
+        return (
+          <>
+            <DetailItem label="Details">
+              {log.message || "No additional details."}
+            </DetailItem>
+            <DetailItem label="Latitude">
+              {log.geoip?.latitude || "N/A"}
+            </DetailItem>
+            <DetailItem label="Longitude">
+              {log.geoip?.longitude || "N/A"}
+            </DetailItem>
+          </>
+        );
+    }
+  };
+
+  return (
+    <div className="mt-2 md:mt-0 md:pl-10">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="flex items-center gap-1 text-sm text-kredivo-primary hover:underline"
+      >
+        {isOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+        {isOpen ? "Hide Details" : "View Details"}
+      </button>
+      {isOpen && (
+        <div className="mt-2 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-md border border-gray-200 dark:border-gray-600">
+          <dl>{renderDetails()}</dl>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export const JumpCloudLogPage = memo(
+  ({ logs, loading, error, params, onParamsChange, onFetch }) => {
     const getEventIcon = (eventType, success) => {
-        const baseClass = "w-6 h-6 flex-shrink-0";
-        switch (eventType) {
-            case 'login_attempt':
-                return success ? <ArrowRight className={`${baseClass} text-green-500`} /> : <ArrowRight className={`${baseClass} text-red-500`} />;
-            case 'sso_login':
-                return <ArrowRight className={`${baseClass} text-blue-500`} />;
-            case 'user_create':
-                return <UserCheck className={`${baseClass} text-green-500`} />;
-            case 'user_delete':
-                return <UserX className={`${baseClass} text-red-500`} />;
-            case 'password_change':
-                return <KeyRound className={`${baseClass} text-yellow-500`} />;
-            case 'directory_object_modify':
-                return <FileLock className={`${baseClass} text-orange-500`} />;
-            case 'ldap_bind':
-                return <Database className={`${baseClass} text-indigo-500`} />;
-            default:
-                return <Shield className={`${baseClass} text-gray-400`} />;
-        }
+      const baseClass = "w-6 h-6 flex-shrink-0";
+      switch (eventType) {
+        case "login_attempt":
+          return success ? (
+            <Monitor className={`${baseClass} text-green-500`} />
+          ) : (
+            <Monitor className={`${baseClass} text-red-500`} />
+          );
+        case "sso_auth":
+          return <AppWindow className={`${baseClass} text-blue-500`} />;
+        case "user_create":
+          return <UserCheck className={`${baseClass} text-green-500`} />;
+        case "user_delete":
+          return <UserX className={`${baseClass} text-red-500`} />;
+        case "password_change":
+          return <KeyRound className={`${baseClass} text-yellow-500`} />;
+        case "directory_object_modify":
+          return <FileLock className={`${baseClass} text-orange-500`} />;
+        case "ldap_bind":
+          return <Database className={`${baseClass} text-indigo-500`} />;
+        case "user_login_attempt":
+          return <Fingerprint className={`${baseClass} text-cyan-500`} />;
+        case "passwordmanager_backup_create":
+          return <FileLock className={`${baseClass} text-purple-500`} />;
+        default:
+          return <Shield className={`${baseClass} text-gray-400`} />;
+      }
     };
 
-    const formatEventDetails = (log) => {
-        if (log.event_type === 'login_attempt') {
-            return (
-                <div className="flex flex-col gap-1 text-sm">
-                    <div className="flex items-center gap-2">
-                        <Monitor className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                        <span>{log.system?.displayName || 'Unknown'}</span>
-                    </div>
-                    {log.geoip?.country_code && (
-                        <div className="flex items-center gap-2 text-gray-500">
-                            <MapPin className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                            <span>{log.geoip.region_name}, {log.geoip.country_code}</span>
-                        </div>
-                    )}
-                    <div className="flex items-center gap-2 text-gray-500">
-                        <Server className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                        <span>{log.client_ip || 'N/A'}</span>
-                    </div>
-                </div>
-            );
-        }
-        if (log.event_type === 'ldap_bind') {
-            return (
-                 <div className="flex flex-col gap-1 text-sm">
-                    <span>Auth: <span className="font-mono bg-gray-100 dark:bg-gray-700 p-1 rounded-md text-xs">{log.auth_method}</span></span>
-                     <span className="truncate">Conn ID: {log.connection_id || 'N/A'}</span>
-                </div>
-            );
-        }
-        return <p className="text-sm text-gray-600 dark:text-gray-400">{log.message || 'No additional details.'}</p>;
+    const formatPrimaryInfo = (log) => {
+      switch (log.event_type) {
+        case "sso_auth":
+          return `Authenticated to ${
+            log.application?.display_label || "an application"
+          }`;
+        case "login_attempt":
+          return `Login to ${log.system?.displayName || "system"}`;
+        case "ldap_bind":
+          return `LDAP Bind attempt via ${log.auth_method}`;
+        default:
+          // Fallback to the event type name
+          return log.event_type.replace(/_/g, " ");
+      }
     };
 
-    if (loading) return <div className="text-center p-8">Loading JumpCloud logs...</div>;
-    if (error) return <div className="text-center p-8 text-red-500">Error: {error}</div>;
-    if (!logs || logs.length === 0) return <div className="text-center p-8">No JumpCloud logs found for this user in the last 90 days.</div>;
+    const handleInputChange = (e) => {
+      onParamsChange({ ...params, [e.target.name]: e.target.value });
+    };
+
+    const maxDate = new Date().toISOString().split("T")[0];
+    const minDate = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000)
+      .toISOString()
+      .split("T")[0];
 
     return (
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
-            <div className="hidden md:flex px-6 py-3 bg-gray-50 dark:bg-gray-700/50 border-b border-gray-200 dark:border-gray-700">
-                <div className="w-1/4 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Event</div>
-                <div className="w-2/4 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Details</div>
-                <div className="w-1/4 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Timestamp</div>
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+        <div className="p-4 bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-700">
+          <h4 className="font-semibold text-lg mb-2 flex items-center gap-2">
+            <Filter /> Filter Options
+          </h4>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+            <div>
+              <label
+                htmlFor="startTime"
+                className="block text-sm font-medium text-gray-700 dark:text-gray-300"
+              >
+                Start Date
+              </label>
+              <input
+                type="date"
+                name="startTime"
+                id="startTime"
+                value={params.startTime}
+                min={minDate}
+                max={maxDate}
+                onChange={handleInputChange}
+                className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 rounded-md shadow-sm focus:ring-2 focus:ring-kredivo-primary"
+              />
             </div>
-
-            <div className="divide-y divide-gray-200 dark:divide-gray-700">
-                {logs.map(log => (
-                    <div key={log.id} className="flex flex-col md:flex-row px-4 md:px-6 py-4 hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                        
-                        <div className="flex md:hidden items-start gap-4">
-                            <div className="flex flex-col items-center gap-1 w-20 text-center">
-                                {getEventIcon(log.event_type, log.success)}
-                                <p className="font-semibold text-sm capitalize">{log.event_type.replace(/_/g, ' ')}</p>
-                                <p className={`text-xs font-bold ${log.success ? 'text-green-600' : 'text-red-600'}`}>
-                                    {log.success ? 'Success' : 'Failed'}
-                                </p>
-                            </div>
-
-                            <div className="flex-1 flex justify-between items-start">
-                                {formatEventDetails(log)}
-                                <p className="text-xs text-right text-gray-500 dark:text-gray-400 whitespace-nowrap ml-2">
-                                    {new Date(log.timestamp).toLocaleDateString()}<br/>
-                                    {new Date(log.timestamp).toLocaleTimeString()}
-                                </p>
-                            </div>
-                        </div>
-
-
-                        <div className="hidden md:w-1/4 md:pr-4 md:flex items-center">
-                            <div className="flex items-center gap-3">
-                                {getEventIcon(log.event_type, log.success)}
-                                <div>
-                                    <div className="font-medium text-sm text-gray-800 dark:text-gray-200 capitalize">
-                                        {log.event_type.replace(/_/g, ' ')}
-                                    </div>
-                                    <div className={`text-xs ${log.success ? 'text-green-600' : 'text-red-600'}`}>
-                                        {log.success ? 'Success' : 'Failed'}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div className="hidden md:w-2/4 md:pr-4 md:flex md:items-center text-sm text-gray-600 dark:text-gray-300">
-                            {formatEventDetails(log)}
-                        </div>
-                        <div className="hidden md:w-1/4 md:flex md:items-center text-sm text-gray-800 dark:text-gray-200">
-                            {new Date(log.timestamp).toLocaleString()}
-                        </div>
-                    </div>
-                ))}
+            <div>
+              <label
+                htmlFor="limit"
+                className="block text-sm font-medium text-gray-700 dark:text-gray-300"
+              >
+                Limit (10-1000)
+              </label>
+              <input
+                type="number"
+                name="limit"
+                id="limit"
+                min="10"
+                max="1000"
+                value={params.limit}
+                onChange={handleInputChange}
+                className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 rounded-md shadow-sm focus:ring-2 focus:ring-kredivo-primary"
+              />
             </div>
+            <Button
+              onClick={onFetch}
+              disabled={loading}
+              className="w-full md:w-auto justify-center"
+            >
+              {loading ? "Fetching..." : "Fetch Logs"}
+            </Button>
+          </div>
         </div>
+
+        <div className="divide-y divide-gray-200 dark:divide-gray-700">
+          {loading && (
+            <div className="text-center p-8">Loading JumpCloud logs...</div>
+          )}
+          {error && (
+            <div className="text-center p-8 text-red-500">Error: {error}</div>
+          )}
+          {!loading && !error && (!logs || logs.length === 0) && (
+            <div className="text-center p-8">
+              No JumpCloud logs found for the selected criteria.
+            </div>
+          )}
+
+          {!loading &&
+            !error &&
+            logs &&
+            logs.map((log) => (
+              <div key={log.id} className="p-4">
+                <div className="flex items-start gap-4">
+                  {/* Icon */}
+                  <div>{getEventIcon(log.event_type, log.success)}</div>
+
+                  {/* Main content */}
+                  <div className="flex-grow">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <p className="font-semibold text-gray-800 dark:text-gray-200 capitalize">
+                          {formatPrimaryInfo(log)}
+                        </p>
+                        <div className="flex items-center gap-4 text-sm text-gray-500 dark:text-gray-400 mt-1">
+                          <span className="flex items-center gap-1.5">
+                            <MapPin size={14} />{" "}
+                            {log.geoip?.country_code || "N/A"}
+                          </span>
+                          <span className="flex items-center gap-1.5">
+                            <Server size={14} /> {log.client_ip || "N/A"}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="text-right flex-shrink-0 ml-4">
+                        <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                          {new Date(log.timestamp).toLocaleString()}
+                        </p>
+                        <p
+                          className={`text-xs font-bold text-right ${
+                            log.success ? "text-green-600" : "text-red-600"
+                          }`}
+                        >
+                          {log.success ? "Success" : "Failed"}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Collapsible details */}
+                    <CollapsibleDetails log={log} />
+                  </div>
+                </div>
+              </div>
+            ))}
+        </div>
+      </div>
     );
-});
+  }
+);

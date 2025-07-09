@@ -94,6 +94,13 @@ export const EmployeeDetailPage = ({
   const [platformStatuses, setPlatformStatuses] = useState([]);
   const [isLoadingPlatforms, setIsLoadingPlatforms] = useState(true);
 
+  const [jcLogParams, setJcLogParams] = useState({
+    startTime: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+      .toISOString()
+      .split("T")[0],
+    limit: 100,
+  });
+
   const [tabData, setTabData] = useState({
     jumpcloud: { data: [], loading: false, error: null, fetched: false },
     google: { data: [], loading: false, error: null, fetched: false },
@@ -172,32 +179,45 @@ export const EmployeeDetailPage = ({
   }, [fetchInitialData, setDynamicCrumbs, employeeId]);
 
   const fetchLogData = useCallback(
-    (tabKey) => {
+    (tabKey, force = false) => {
       if (
         !permissions.includes("log:read:platform") ||
-        tabData[tabKey]?.fetched ||
-        tabData[tabKey]?.loading
+        (!force && (tabData[tabKey]?.fetched || tabData[tabKey]?.loading))
       ) {
         return;
       }
 
       const token = localStorage.getItem("accessToken");
-      const logEndpoints = {
-        jumpcloud: `/api/employees/${employeeId}/jumpcloud-logs`,
-        google: `/api/employees/${employeeId}/google-logs`,
-        slack: `/api/employees/${employeeId}/slack-logs`,
-        timeline: `/api/employees/${employeeId}/unified-timeline`,
-      };
+      let url;
+      const baseUrl = `${process.env.REACT_APP_API_BASE_URL}/api/employees/${employeeId}`;
 
-      const url = logEndpoints[tabKey];
-      if (!url) return;
+      switch (tabKey) {
+        case "jumpcloud":
+          const params = new URLSearchParams({
+            startTime: new Date(jcLogParams.startTime).toISOString(),
+            limit: jcLogParams.limit,
+          });
+          url = `${baseUrl}/jumpcloud-logs?${params.toString()}`;
+          break;
+        case "google":
+          url = `${baseUrl}/google-logs`;
+          break;
+        case "slack":
+          url = `${baseUrl}/slack-logs`;
+          break;
+        case "timeline":
+          url = `${baseUrl}/unified-timeline`;
+          break;
+        default:
+          return;
+      }
 
       setTabData((prev) => ({
         ...prev,
         [tabKey]: { ...prev[tabKey], loading: true },
       }));
 
-      fetch(`${process.env.REACT_APP_API_BASE_URL}${url}`, {
+      fetch(url, {
         headers: { Authorization: `Bearer ${token}` },
       })
         .then((res) =>
@@ -221,8 +241,12 @@ export const EmployeeDetailPage = ({
           }));
         });
     },
-    [employeeId, permissions, tabData]
+    [employeeId, permissions, tabData, jcLogParams]
   );
+
+  const handleFetchJcLogs = () => {
+    fetchLogData("jumpcloud", true);
+  };
 
   const handleTabClick = (tabId) => {
     setActiveTab(tabId);
@@ -372,6 +396,9 @@ export const EmployeeDetailPage = ({
                   logs={tabData.jumpcloud.data}
                   loading={tabData.jumpcloud.loading}
                   error={tabData.jumpcloud.error}
+                  params={jcLogParams}
+                  onParamsChange={setJcLogParams}
+                  onFetch={handleFetchJcLogs}
                 />
               </Section>
               <Section
@@ -492,6 +519,9 @@ export const EmployeeDetailPage = ({
                     logs={tabData.jumpcloud.data}
                     loading={tabData.jumpcloud.loading}
                     error={tabData.jumpcloud.error}
+                    params={jcLogParams}
+                    onParamsChange={setJcLogParams}
+                    onFetch={handleFetchJcLogs}
                   />
                 </div>
                 <div

@@ -94,70 +94,93 @@ export const ProfilePage = ({
   const [isChangePasswordModalOpen, setIsChangePasswordModalOpen] =
     useState(false);
 
+  const [jcLogParams, setJcLogParams] = useState({
+    startTime: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+      .toISOString()
+      .split("T")[0],
+    limit: 100,
+  });
+
   const [tabData, setTabData] = useState({
-    jumpcloud: { data: null, loading: true, error: null, fetched: false },
-    google: { data: null, loading: true, error: null, fetched: false },
-    slack: { data: null, loading: true, error: null, fetched: false },
-    timeline: { data: null, loading: true, error: null, fetched: false },
+    jumpcloud: { data: null, loading: false, error: null, fetched: false },
+    google: { data: null, loading: false, error: null, fetched: false },
+    slack: { data: null, loading: false, error: null, fetched: false },
+    timeline: { data: null, loading: false, error: null, fetched: false },
   });
 
   const [isJiraModalOpen, setIsJiraModalOpen] = useState(false);
   const [selectedTicketId, setSelectedTicketId] = useState(null);
 
   const fetchLogData = useCallback(
-    async (tabKey) => {
+    (tabKey, force = false) => {
       if (
         !employee ||
         !permissions.includes("log:read:platform") ||
-        tabData[tabKey]?.fetched ||
-        tabData[tabKey]?.loading
+        (!force && (tabData[tabKey]?.fetched || tabData[tabKey]?.loading))
       ) {
         return;
       }
 
       const token = localStorage.getItem("accessToken");
-      const logEndpoints = {
-        jumpcloud: `/api/employees/${employee.id}/jumpcloud-logs`,
-        google: `/api/employees/${employee.id}/google-logs`,
-        slack: `/api/employees/${employee.id}/slack-logs`,
-        timeline: `/api/employees/${employee.id}/unified-timeline`,
-      };
+      const baseUrl = `${process.env.REACT_APP_API_BASE_URL}/api/employees/${employee.id}`;
+      let url;
 
-      const url = logEndpoints[tabKey];
-      if (!url) return;
+      switch (tabKey) {
+        case "jumpcloud":
+          const params = new URLSearchParams({
+            startTime: new Date(jcLogParams.startTime).toISOString(),
+            limit: jcLogParams.limit,
+          });
+          url = `${baseUrl}/jumpcloud-logs?${params.toString()}`;
+          break;
+        case "google":
+          url = `${baseUrl}/google-logs`;
+          break;
+        case "slack":
+          url = `${baseUrl}/slack-logs`;
+          break;
+        case "timeline":
+          url = `${baseUrl}/unified-timeline`;
+          break;
+        default:
+          return;
+      }
 
       setTabData((prev) => ({
         ...prev,
         [tabKey]: { ...prev[tabKey], loading: true },
       }));
-      try {
-        const response = await fetch(
-          `${process.env.REACT_APP_API_BASE_URL}${url}`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-        if (!response.ok) {
-          const err = await response.json();
-          throw new Error(err.message || `Failed to fetch ${tabKey} logs.`);
-        }
-        const data = await response.json();
-        setTabData((prev) => ({
-          ...prev,
-          [tabKey]: { data, loading: false, error: null, fetched: true },
-        }));
-      } catch (err) {
-        setTabData((prev) => ({
-          ...prev,
-          [tabKey]: {
-            data: [],
-            loading: false,
-            error: err.message,
-            fetched: true,
-          },
-        }));
-      }
+
+      fetch(url, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+        .then((res) =>
+          res.ok ? res.json() : res.json().then((err) => Promise.reject(err))
+        )
+        .then((data) => {
+          setTabData((prev) => ({
+            ...prev,
+            [tabKey]: { data, loading: false, error: null, fetched: true },
+          }));
+        })
+        .catch((err) => {
+          setTabData((prev) => ({
+            ...prev,
+            [tabKey]: {
+              data: [],
+              loading: false,
+              error: err.message,
+              fetched: true,
+            },
+          }));
+        });
     },
-    [employee, permissions, tabData]
+    [employee, permissions, tabData, jcLogParams]
   );
+
+  const handleFetchJcLogs = () => {
+    fetchLogData("jumpcloud", true);
+  };
 
   const fetchInitialData = useCallback(async () => {
     if (!employee) return;
@@ -176,15 +199,7 @@ export const ProfilePage = ({
       .then((statusData) => setPlatformStatuses(statusData))
       .catch((err) => console.error("Failed to fetch platform statuses:", err))
       .finally(() => setIsLoadingPlatforms(false));
-
-    // Eager load for mobile, lazy load for desktop
-    if (!isDesktop && permissions.includes("log:read:platform")) {
-      fetchLogData("jumpcloud");
-      fetchLogData("google");
-      fetchLogData("slack");
-      fetchLogData("timeline");
-    }
-  }, [employee, onLogout, permissions, isDesktop, fetchLogData]);
+  }, [employee, onLogout]);
 
   useEffect(() => {
     if (employee) {
@@ -192,12 +207,17 @@ export const ProfilePage = ({
     }
   }, [employee, fetchInitialData]);
 
+  useEffect(() => {
+    if (
+      employee &&
+      ["jumpcloud", "google", "slack", "timeline"].includes(activeTab)
+    ) {
+      fetchLogData(activeTab);
+    }
+  }, [employee, activeTab, fetchLogData]);
+
   const handleTabClick = (tabId) => {
     setActiveTab(tabId);
-    // Lazy load on desktop when tab is clicked
-    if (isDesktop) {
-      fetchLogData(tabId);
-    }
   };
 
   const handleTicketClick = (ticketId) => {
@@ -347,6 +367,9 @@ export const ProfilePage = ({
                     logs={tabData.jumpcloud.data}
                     loading={tabData.jumpcloud.loading}
                     error={tabData.jumpcloud.error}
+                    params={jcLogParams}
+                    onParamsChange={setJcLogParams}
+                    onFetch={handleFetchJcLogs}
                   />
                 </Section>
                 <Section
@@ -460,6 +483,9 @@ export const ProfilePage = ({
                       logs={tabData.jumpcloud.data}
                       loading={tabData.jumpcloud.loading}
                       error={tabData.jumpcloud.error}
+                      params={jcLogParams}
+                      onParamsChange={setJcLogParams}
+                      onFetch={handleFetchJcLogs}
                     />
                   </div>
                   <div

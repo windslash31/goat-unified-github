@@ -1,3 +1,4 @@
+// packages/server/src/services/employeeService.js
 const db = require("../config/db");
 const { logActivity } = require("./logService");
 
@@ -589,44 +590,42 @@ const getPlatformStatuses = async (employeeId) => {
   });
 };
 
-const getJumpCloudLogs = async (employeeId) => {
-  if (!process.env.JUMPCLOUD_API_KEY)
+const getJumpCloudLogs = async (employeeId, startTime, limit) => {
+  if (!process.env.JUMPCLOUD_API_KEY) {
     throw new Error("Server configuration error for JumpCloud.");
+  }
 
   const employeeEmailRes = await db.query(
     "SELECT employee_email FROM employees WHERE id = $1",
     [employeeId]
   );
-  if (employeeEmailRes.rows.length === 0)
+  if (employeeEmailRes.rows.length === 0) {
     throw new Error("Employee not found.");
-
+  }
   const email = employeeEmailRes.rows[0].employee_email;
-  const findUserUrl = `https://console.jumpcloud.com/api/systemusers?filter=email:eq:${encodeURIComponent(
-    email
-  )}`;
-  const findUserResponse = await fetch(findUserUrl, {
-    headers: {
-      "x-api-key": process.env.JUMPCLOUD_API_KEY,
-      Accept: "application/json",
-    },
-  });
-  if (!findUserResponse.ok)
-    throw new Error(`JumpCloud API Error: ${findUserResponse.status}.`);
-
-  const { results: users } = await findUserResponse.json();
-  if (!users || users.length === 0) return [];
-  if (!users[0].username) return [];
+  const user = await jumpcloudService.getUser(email);
+  if (!user || !user.username) {
+    return [];
+  }
 
   const eventsUrl = "https://api.jumpcloud.com/insights/directory/v1/events";
-  const startTime = new Date(
-    Date.now() - 90 * 24 * 60 * 60 * 1000
-  ).toISOString();
-  const body = JSON.stringify({
+
+  const body = {
     service: ["all"],
-    start_time: startTime,
     sort: "DESC",
-    search_term: { and: [{ username: users[0].username }] },
-  });
+    search_term: {
+      and: [{ "initiated_by.username": user.username }],
+    },
+    limit: Math.max(10, Math.min(parseInt(limit, 10) || 100, 1000)),
+  };
+
+  if (startTime) {
+    body.start_time = startTime;
+  } else {
+    body.start_time = new Date(
+      Date.now() - 90 * 24 * 60 * 60 * 1000
+    ).toISOString();
+  }
 
   const eventsResponse = await fetch(eventsUrl, {
     method: "POST",
@@ -635,10 +634,12 @@ const getJumpCloudLogs = async (employeeId) => {
       "Content-Type": "application/json",
       Accept: "application/json",
     },
-    body,
+    body: JSON.stringify(body),
   });
-  if (!eventsResponse.ok)
+
+  if (!eventsResponse.ok) {
     throw new Error(`JumpCloud Events API Error: ${eventsResponse.status}.`);
+  }
 
   return eventsResponse.json();
 };
