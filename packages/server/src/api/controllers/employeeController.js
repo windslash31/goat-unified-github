@@ -65,12 +65,13 @@ const getPlatformStatuses = async (req, res, next) => {
 
 const getJumpCloudLogs = async (req, res, next) => {
   try {
-    const { startTime, endTime, limit } = req.query; // Added endTime
+    const { startTime, endTime, limit, service } = req.query; // Added service
     const logs = await employeeService.getJumpCloudLogs(
       req.params.id,
       startTime,
-      endTime, // Pass endTime to the service
-      limit
+      endTime,
+      limit,
+      service // Pass service to the service function
     );
     res.json(logs);
   } catch (error) {

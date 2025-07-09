@@ -4,6 +4,7 @@ import {
   ChevronDown,
   Database,
   FileLock,
+  Filter,
   Fingerprint,
   KeyRound,
   MapPin,
@@ -13,6 +14,8 @@ import {
   UserCheck,
   UserX,
 } from "lucide-react";
+import { Button } from "../../components/ui/Button";
+import { CustomSelect } from "../../components/ui/CustomSelect"; // Import CustomSelect
 
 // A dedicated badge for the log status
 const LogStatusBadge = ({ success }) => {
@@ -131,6 +134,8 @@ export const JumpCloudLogPage = memo(({ logs, loading, error }) => {
           const isExpanded = expandedLogRowId === log.id;
           const hasAuthContext =
             log.auth_context && Object.keys(log.auth_context).length > 0;
+          const isSuccess =
+            log.event_type === "sso_auth" ? log.sso_token_success : log.success;
           return (
             <div
               key={log.id}
@@ -142,7 +147,7 @@ export const JumpCloudLogPage = memo(({ logs, loading, error }) => {
               >
                 <div className="flex items-start gap-4">
                   <div className="mt-1 flex-shrink-0">
-                    {getEventIcon(log.event_type, log.success)}
+                    {getEventIcon(log.event_type, isSuccess)}
                   </div>
                   <div className="flex-grow min-w-0">
                     <div className="flex justify-between items-start">
@@ -150,7 +155,7 @@ export const JumpCloudLogPage = memo(({ logs, loading, error }) => {
                         {formatPrimaryInfo(log)}
                       </p>
                       <div className="flex-shrink-0 flex items-center gap-2">
-                        <LogStatusBadge success={log.success} />
+                        <LogStatusBadge success={isSuccess} />
                         <ChevronDown
                           className={`w-5 h-5 text-gray-400 transition-transform ${
                             isExpanded ? "rotate-180" : ""

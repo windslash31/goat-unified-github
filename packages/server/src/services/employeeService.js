@@ -657,7 +657,13 @@ const getPlatformStatuses = async (employeeId) => {
   });
 };
 
-const getJumpCloudLogs = async (employeeId, startTime, endTime, limit) => {
+const getJumpCloudLogs = async (
+  employeeId,
+  startTime,
+  endTime,
+  limit,
+  service = "all"
+) => {
   if (!process.env.JUMPCLOUD_API_KEY) {
     throw new Error("Server configuration error for JumpCloud.");
   }
@@ -683,7 +689,7 @@ const getJumpCloudLogs = async (employeeId, startTime, endTime, limit) => {
     : Math.max(10, Math.min(parsedLimit, 1000));
 
   const body = {
-    service: ["all"],
+    service: [service], // Use the service parameter
     sort: "DESC",
     search_term: {
       and: [{ "initiated_by.username": user.username }],

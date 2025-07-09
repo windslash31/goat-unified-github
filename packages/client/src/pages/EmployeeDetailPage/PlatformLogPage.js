@@ -12,6 +12,23 @@ const platformOptions = [
   { id: "slack", name: "Slack" },
 ];
 
+const jumpCloudServiceOptions = [
+  { id: "all", name: "All" },
+  { id: "access_management", name: "Access Management" },
+  { id: "alert", name: "Alert" },
+  { id: "directory", name: "Directory" },
+  { id: "ldap", name: "LDAP" },
+  { id: "mdm", name: "MDM" },
+  { id: "notifications", name: "Notifications" },
+  { id: "password_manager", name: "Password Manager" },
+  { id: "object_storage", name: "Object Storage" },
+  { id: "radius", name: "RADIUS" },
+  { id: "reports", name: "Reports" },
+  { id: "software", name: "Software" },
+  { id: "sso", name: "SSO" },
+  { id: "systems", name: "Systems" },
+];
+
 export const PlatformLogPage = ({ employeeId, onLogout }) => {
   const [selectedPlatform, setSelectedPlatform] = useState("jumpcloud");
   const [logData, setLogData] = useState({
@@ -28,6 +45,7 @@ export const PlatformLogPage = ({ employeeId, onLogout }) => {
       .split("T")[0],
     endTime: new Date().toISOString().split("T")[0],
     limit: 100,
+    service: "all", // Add service to the filter state
   });
 
   const fetchLogData = useCallback(async () => {
@@ -49,6 +67,7 @@ export const PlatformLogPage = ({ employeeId, onLogout }) => {
           startTime: filterParams.startTime,
           endTime: filterParams.endTime,
           limit: filterParams.limit,
+          service: filterParams.service, // Include service in the request
         });
         url = `${baseUrl}/jumpcloud-logs?${params.toString()}`;
         break;
@@ -92,14 +111,13 @@ export const PlatformLogPage = ({ employeeId, onLogout }) => {
     setFilterParams((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
-  const handleLimitChange = (value) => {
-    setFilterParams((prev) => ({ ...prev, limit: value }));
+  const handleSelectChange = (name, value) => {
+    setFilterParams((prev) => ({ ...prev, [name]: value }));
   };
 
   const LogViewer = useMemo(() => {
     switch (selectedPlatform) {
       case "jumpcloud":
-        // Pass only relevant props to JumpCloudLogPage
         return (
           <JumpCloudLogPage
             logs={logData.data}
@@ -132,7 +150,6 @@ export const PlatformLogPage = ({ employeeId, onLogout }) => {
     }
   }, [selectedPlatform, logData]);
 
-  // JumpCloud-specific constants for filters
   const maxDate = new Date().toISOString().split("T")[0];
   const minDate = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000)
     .toISOString()
@@ -166,7 +183,35 @@ export const PlatformLogPage = ({ employeeId, onLogout }) => {
             <h4 className="font-semibold text-md mb-2 flex items-center gap-2">
               <Filter size={16} /> JumpCloud Filters
             </h4>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
+              <div>
+                <label
+                  htmlFor="service"
+                  className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                >
+                  Service
+                </label>
+                <CustomSelect
+                  id="service"
+                  options={jumpCloudServiceOptions}
+                  value={filterParams.service}
+                  onChange={(val) => handleSelectChange("service", val)}
+                />
+              </div>
+              <div>
+                <label
+                  htmlFor="limit"
+                  className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                >
+                  Limit
+                </label>
+                <CustomSelect
+                  id="limit"
+                  options={limitOptions}
+                  value={filterParams.limit}
+                  onChange={(val) => handleSelectChange("limit", val)}
+                />
+              </div>
               <div>
                 <label
                   htmlFor="startTime"
@@ -202,22 +247,6 @@ export const PlatformLogPage = ({ employeeId, onLogout }) => {
                   onChange={handleFilterChange}
                   className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 rounded-md shadow-sm focus:ring-2 focus:ring-kredivo-primary"
                 />
-              </div>
-              <div>
-                <label
-                  htmlFor="limit"
-                  className="block text-sm font-medium text-gray-700 dark:text-gray-300"
-                >
-                  Limit
-                </label>
-                <div className="mt-1">
-                  <CustomSelect
-                    id="limit"
-                    options={limitOptions}
-                    value={filterParams.limit}
-                    onChange={handleLimitChange}
-                  />
-                </div>
               </div>
             </div>
           </div>
