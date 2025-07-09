@@ -6,24 +6,19 @@ import {
   HardDrive,
   ChevronDown,
   Bot,
-  MessageSquare,
-  Shield,
   KeyRound,
 } from "lucide-react";
 import { EmployeeDetailHeader } from "./EmployeeDetailPage/EmployeeDetailHeader";
 import { EmployeeDetailsTab } from "./EmployeeDetailPage/EmployeeDetailsTab";
 import { EmployeeApplicationsTab } from "./EmployeeDetailPage/EmployeeApplicationsTab";
-import { JumpCloudLogPage } from "./EmployeeDetailPage/JumpcloudLogPage";
 import { JiraTicketModal } from "../components/ui/JiraTicketModal";
 import { WelcomePage } from "../components/ui/WelcomePage";
 import { AccessDeniedPage } from "../components/ui/AccessDeniedPage";
-import { GoogleLogPage } from "./EmployeeDetailPage/GoogleLogPage";
-import { SlackLogPage } from "./EmployeeDetailPage/SlackLogPage";
 import { UnifiedTimelinePage } from "./EmployeeDetailPage/UnifiedTimelinePage";
 import { Button } from "../components/ui/Button";
 import { ChangePasswordModal } from "../components/ui/ChangePasswordModal";
 import { motion } from "framer-motion";
-import { useMediaQuery } from "../hooks/useMediaQuery";
+import { PlatformLogPage } from "./EmployeeDetailPage/PlatformLogPage"; // Import the new component
 
 const Section = ({ id, title, children, icon }) => (
   <div
@@ -89,87 +84,50 @@ export const ProfilePage = ({
   user,
 }) => {
   const [activeTab, setActiveTab] = useState("details");
-  const isDesktop = useMediaQuery("(min-width: 768px)");
   const [platformStatuses, setPlatformStatuses] = useState([]);
   const [isLoadingPlatforms, setIsLoadingPlatforms] = useState(true);
   const [isChangePasswordModalOpen, setIsChangePasswordModalOpen] =
     useState(false);
 
-  const [jcLogParams, setJcLogParams] = useState({
-    startTime: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
-      .toISOString()
-      .split("T")[0],
-    endTime: new Date().toISOString().split("T")[0],
-    limit: 100,
-  });
-
   const [tabData, setTabData] = useState({
-    jumpcloud: { data: null, loading: false, error: null, fetched: false },
-    google: { data: null, loading: false, error: null, fetched: false },
-    slack: { data: null, loading: false, error: null, fetched: false },
     timeline: { data: null, loading: false, error: null, fetched: false },
   });
 
   const [isJiraModalOpen, setIsJiraModalOpen] = useState(false);
   const [selectedTicketId, setSelectedTicketId] = useState(null);
 
-  const fetchLogData = useCallback(
-    (tabKey, force = false) => {
+  const fetchTimelineData = useCallback(
+    (force = false) => {
       if (
         !employee ||
         !permissions.includes("log:read:platform") ||
-        (!force && (tabData[tabKey]?.fetched || tabData[tabKey]?.loading))
+        (!force && (tabData.timeline.fetched || tabData.timeline.loading))
       ) {
         return;
       }
 
       const token = localStorage.getItem("accessToken");
-      const baseUrl = `${process.env.REACT_APP_API_BASE_URL}/api/employees/${employee.id}`;
-      let url;
-
-      switch (tabKey) {
-        case "jumpcloud":
-          const params = new URLSearchParams({
-            startTime: jcLogParams.startTime,
-            endTime: jcLogParams.endTime,
-            limit: jcLogParams.limit,
-          });
-          url = `${baseUrl}/jumpcloud-logs?${params.toString()}`;
-          break;
-        case "google":
-          url = `${baseUrl}/google-logs`;
-          break;
-        case "slack":
-          url = `${baseUrl}/slack-logs`;
-          break;
-        case "timeline":
-          url = `${baseUrl}/unified-timeline`;
-          break;
-        default:
-          return;
-      }
+      let url = `${process.env.REACT_APP_API_BASE_URL}/api/employees/${employee.id}/unified-timeline`;
 
       setTabData((prev) => ({
         ...prev,
-        [tabKey]: { ...prev[tabKey], loading: true },
+        timeline: { ...prev.timeline, loading: true },
       }));
 
-      fetch(url, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
+      fetch(url, { headers: { Authorization: `Bearer ${token}` } })
         .then((res) =>
           res.ok ? res.json() : res.json().then((err) => Promise.reject(err))
         )
         .then((data) => {
           setTabData((prev) => ({
             ...prev,
-            [tabKey]: { data, loading: false, error: null, fetched: true },
+            timeline: { data, loading: false, error: null, fetched: true },
           }));
         })
         .catch((err) => {
           setTabData((prev) => ({
             ...prev,
-            [tabKey]: {
+            timeline: {
               data: [],
               loading: false,
               error: err.message,
@@ -178,12 +136,8 @@ export const ProfilePage = ({
           }));
         });
     },
-    [employee, permissions, tabData, jcLogParams]
+    [employee, permissions, tabData.timeline]
   );
-
-  const handleFetchJcLogs = () => {
-    fetchLogData("jumpcloud", true);
-  };
 
   const fetchInitialData = useCallback(async () => {
     if (!employee) return;
@@ -211,13 +165,10 @@ export const ProfilePage = ({
   }, [employee, fetchInitialData]);
 
   useEffect(() => {
-    if (
-      employee &&
-      ["jumpcloud", "google", "slack", "timeline"].includes(activeTab)
-    ) {
-      fetchLogData(activeTab);
+    if (employee && activeTab === "timeline") {
+      fetchTimelineData();
     }
-  }, [employee, activeTab, fetchLogData]);
+  }, [employee, activeTab, fetchTimelineData]);
 
   const handleTabClick = (tabId) => {
     setActiveTab(tabId);
@@ -249,21 +200,9 @@ export const ProfilePage = ({
       permission: true,
     },
     {
-      id: "profile-jumpcloud-section",
-      label: "JumpCloud Log",
+      id: "profile-platform-logs-section",
+      label: "Platform Logs",
       icon: <HardDrive className="w-4 h-4" />,
-      permission: permissions.includes("log:read:platform"),
-    },
-    {
-      id: "profile-google-section",
-      label: "Google Workspace Log",
-      icon: <Shield className="w-4 h-4" />,
-      permission: permissions.includes("log:read:platform"),
-    },
-    {
-      id: "profile-slack-section",
-      label: "Slack Log",
-      icon: <MessageSquare className="w-4 h-4" />,
       permission: permissions.includes("log:read:platform"),
     },
     {
@@ -290,8 +229,7 @@ export const ProfilePage = ({
           : "border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
       }`}
     >
-      {" "}
-      {icon} {label}{" "}
+      {icon} {label}
     </button>
   );
 
@@ -317,8 +255,7 @@ export const ProfilePage = ({
             variant="secondary"
             className="mt-4 md:mt-0"
           >
-            <KeyRound className="w-4 h-4 mr-2" />
-            Change Password
+            <KeyRound className="w-4 h-4 mr-2" /> Change Password
           </Button>
         </div>
         <div className="p-4 sm:p-6 space-y-6">
@@ -329,7 +266,6 @@ export const ProfilePage = ({
             permissions={permissions}
             isOwnProfile={true}
           />
-
           <InPageDropdownNav
             sections={pageSections}
             onScrollTo={handleScrollToSection}
@@ -362,39 +298,13 @@ export const ProfilePage = ({
             {permissions.includes("log:read:platform") && (
               <>
                 <Section
-                  id="profile-jumpcloud-section"
-                  title="JumpCloud Log"
+                  id="profile-platform-logs-section"
+                  title="Platform Logs"
                   icon={<HardDrive className="w-5 h-5" />}
                 >
-                  <JumpCloudLogPage
-                    logs={tabData.jumpcloud.data}
-                    loading={tabData.jumpcloud.loading}
-                    error={tabData.jumpcloud.error}
-                    params={jcLogParams}
-                    onParamsChange={setJcLogParams}
-                    onFetch={handleFetchJcLogs}
-                  />
-                </Section>
-                <Section
-                  id="profile-google-section"
-                  title="Google Workspace Log"
-                  icon={<Shield className="w-5 h-5" />}
-                >
-                  <GoogleLogPage
-                    logs={tabData.google.data}
-                    loading={tabData.google.loading}
-                    error={tabData.google.error}
-                  />
-                </Section>
-                <Section
-                  id="profile-slack-section"
-                  title="Slack Log"
-                  icon={<MessageSquare className="w-5 h-5" />}
-                >
-                  <SlackLogPage
-                    logs={tabData.slack.data}
-                    loading={tabData.slack.loading}
-                    error={tabData.slack.error}
+                  <PlatformLogPage
+                    employeeId={employee.id}
+                    onLogout={onLogout}
                   />
                 </Section>
                 <Section
@@ -425,23 +335,12 @@ export const ProfilePage = ({
                   label="Apps & Platforms"
                   icon={<LayoutGrid className="w-4 h-4" />}
                 />
-
                 {permissions.includes("log:read:platform") && (
                   <>
                     <TabButton
-                      id="jumpcloud"
-                      label="JumpCloud Log"
+                      id="platform-logs"
+                      label="Platform Logs"
                       icon={<HardDrive className="w-4 h-4" />}
-                    />
-                    <TabButton
-                      id="google"
-                      label="Google Workspace"
-                      icon={<Shield className="w-4 h-4" />}
-                    />
-                    <TabButton
-                      id="slack"
-                      label="Slack"
-                      icon={<MessageSquare className="w-4 h-4" />}
                     />
                     <TabButton
                       id="timeline"
@@ -479,38 +378,12 @@ export const ProfilePage = ({
                 <>
                   <div
                     style={{
-                      display: activeTab === "jumpcloud" ? "block" : "none",
+                      display: activeTab === "platform-logs" ? "block" : "none",
                     }}
                   >
-                    <JumpCloudLogPage
-                      logs={tabData.jumpcloud.data}
-                      loading={tabData.jumpcloud.loading}
-                      error={tabData.jumpcloud.error}
-                      params={jcLogParams}
-                      onParamsChange={setJcLogParams}
-                      onFetch={handleFetchJcLogs}
-                    />
-                  </div>
-                  <div
-                    style={{
-                      display: activeTab === "google" ? "block" : "none",
-                    }}
-                  >
-                    <GoogleLogPage
-                      logs={tabData.google.data}
-                      loading={tabData.google.loading}
-                      error={tabData.google.error}
-                    />
-                  </div>
-                  <div
-                    style={{
-                      display: activeTab === "slack" ? "block" : "none",
-                    }}
-                  >
-                    <SlackLogPage
-                      logs={tabData.slack.data}
-                      loading={tabData.slack.loading}
-                      error={tabData.slack.error}
+                    <PlatformLogPage
+                      employeeId={employee.id}
+                      onLogout={onLogout}
                     />
                   </div>
                   <div
