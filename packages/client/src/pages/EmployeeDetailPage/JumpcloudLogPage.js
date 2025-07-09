@@ -2,7 +2,6 @@ import React, { memo, useState } from "react";
 import {
   AppWindow,
   ChevronDown,
-  ChevronUp,
   Database,
   FileLock,
   Filter,
@@ -259,10 +258,9 @@ export const JumpCloudLogPage = memo(
                     </div>
                   </button>
                   {isExpanded && (
-                    <div className="pl-10 pt-3">
+                    <div className="pt-3">
                       <div className="p-3 bg-gray-100 dark:bg-gray-900/70 rounded-lg shadow-inner">
                         <dl className="divide-y divide-gray-200 dark:divide-gray-700">
-                          {/* --- THIS IS THE SECTION THAT WAS MISSING --- */}
                           <DetailSectionHeader>Event</DetailSectionHeader>
                           <DetailItem label="Event Type" isMono>
                             {log.event_type}
