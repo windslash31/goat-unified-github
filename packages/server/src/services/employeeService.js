@@ -1,5 +1,6 @@
 const db = require("../config/db");
 const { logActivity } = require("./logService");
+const Papa = require("papaparse");
 
 // External Platform Services
 const jumpcloudService = require("./jumpcloudService");
@@ -852,10 +853,10 @@ const getLicenseDetails = async (employeeId) => {
   }
 
   const platformChecks = {
-    google: googleWorkspaceService.getUserLicense(employee.employee_email),
-    jumpcloud: jumpcloudService.getUser(employee.employee_email),
-    slack: slackService.getUser(employee.employee_email),
-    atlassian: atlassianService.getUser(employee.employee_email),
+    google: googleWorkspaceService.getUserStatus(employee.employee_email),
+    jumpcloud: jumpcloudService.getUserStatus(employee.employee_email),
+    slack: slackService.getUserStatus(employee.employee_email),
+    atlassian: atlassianService.getUserStatus(employee.employee_email),
   };
 
   const results = await Promise.all(
@@ -909,18 +910,174 @@ const getLicenseDetails = async (employeeId) => {
 };
 
 const bulkImportEmployees = async (fileBuffer, actorId, reqContext) => {
-  // This is a placeholder for the actual implementation
-  // In a real scenario, you would parse the CSV from the buffer and process it.
-  console.log(
-    "Bulk import service called. In a real app, this would process the CSV."
-  );
-  return {
-    message:
-      "Bulk import functionality is not yet fully implemented on the backend.",
-    created: 0,
-    updated: 0,
-    errors: [{ message: "Backend implementation pending." }],
-  };
+  const client = await db.pool.connect();
+  const results = { created: 0, updated: 0, errors: [] };
+
+  // Convert buffer to string for parsing
+  const csvString = fileBuffer.toString("utf-8");
+
+  // Parse CSV data using papaparse
+  const parsedData = Papa.parse(csvString, {
+    header: true,
+    skipEmptyLines: true,
+  });
+
+  if (parsedData.errors.length > 0) {
+    results.errors.push({
+      message: `CSV parsing error: ${parsedData.errors[0].message}`,
+    });
+    return results;
+  }
+
+  try {
+    await client.query("BEGIN");
+
+    for (const [index, row] of parsedData.data.entries()) {
+      const rowNum = index + 2; // CSV rows are typically 1-indexed, +1 for header
+      const { first_name, last_name, employee_email } = row;
+
+      // Validate required fields
+      if (!first_name || !last_name || !employee_email) {
+        results.errors.push({
+          row: rowNum,
+          message:
+            "Missing required fields: first_name, last_name, and employee_email are mandatory.",
+        });
+        continue;
+      }
+
+      // Check if employee exists
+      const existingEmployeeResult = await client.query(
+        "SELECT id FROM employees WHERE employee_email = $1",
+        [employee_email]
+      );
+      const existingEmployee = existingEmployeeResult.rows[0];
+
+      // Resolve foreign keys from names (similar to createEmployeeFromTicket)
+      const resolvedIds = {};
+      if (row.manager_email) {
+        const res = await client.query(
+          "SELECT id FROM employees WHERE employee_email ILIKE $1",
+          [row.manager_email]
+        );
+        if (res.rows.length > 0) resolvedIds.manager_id = res.rows[0].id;
+      }
+      if (row.legal_entity_name) {
+        const res = await client.query(
+          "SELECT id FROM legal_entities WHERE name ILIKE $1",
+          [row.legal_entity_name]
+        );
+        if (res.rows.length > 0) resolvedIds.legal_entity_id = res.rows[0].id;
+      }
+      if (row.office_location_name) {
+        const res = await client.query(
+          "SELECT id FROM office_locations WHERE name ILIKE $1",
+          [row.office_location_name]
+        );
+        if (res.rows.length > 0)
+          resolvedIds.office_location_id = res.rows[0].id;
+      }
+      if (row.employee_type_name) {
+        const res = await client.query(
+          "SELECT id FROM employee_types WHERE name ILIKE $1",
+          [row.employee_type_name]
+        );
+        if (res.rows.length > 0) resolvedIds.employee_type_id = res.rows[0].id;
+      }
+      if (row.employee_sub_type_name) {
+        const res = await client.query(
+          "SELECT id FROM employee_sub_types WHERE name ILIKE $1",
+          [row.employee_sub_type_name]
+        );
+        if (res.rows.length > 0)
+          resolvedIds.employee_sub_type_id = res.rows[0].id;
+      }
+
+      // Prepare data object, combining row data and resolved IDs
+      const employeeData = { ...row, ...resolvedIds };
+
+      // Whitelist fields to prevent inserting unwanted columns from the CSV
+      const allowedFields = [
+        "first_name",
+        "last_name",
+        "middle_name",
+        "employee_email",
+        "position_name",
+        "position_level",
+        "join_date",
+        "asset_name",
+        "onboarding_ticket",
+        "manager_id",
+        "legal_entity_id",
+        "office_location_id",
+        "employee_type_id",
+        "employee_sub_type_id",
+      ];
+
+      if (existingEmployee) {
+        // UPDATE logic
+        const updateFields = allowedFields
+          .filter((field) => employeeData[field] !== undefined)
+          .map((field, i) => `"${field}" = $${i + 2}`)
+          .join(", ");
+
+        if (updateFields) {
+          const updateValues = allowedFields
+            .filter((field) => employeeData[field] !== undefined)
+            .map((field) => employeeData[field]);
+
+          await client.query(
+            `UPDATE employees SET ${updateFields} WHERE id = $1`,
+            [existingEmployee.id, ...updateValues]
+          );
+          results.updated++;
+        }
+      } else {
+        // CREATE logic
+        const insertColumns = allowedFields.filter(
+          (field) => employeeData[field] !== undefined
+        );
+
+        if (insertColumns.length > 0) {
+          const insertValues = insertColumns.map(
+            (field) => employeeData[field]
+          );
+          const valuePlaceholders = insertColumns
+            .map((_, i) => `$${i + 1}`)
+            .join(", ");
+
+          await client.query(
+            `INSERT INTO employees (${insertColumns.join(
+              ", "
+            )}) VALUES (${valuePlaceholders})`,
+            insertValues
+          );
+          results.created++;
+        }
+      }
+    }
+
+    await logActivity(
+      actorId,
+      "EMPLOYEE_BULK_IMPORT",
+      { results },
+      reqContext,
+      client
+    );
+
+    await client.query("COMMIT");
+  } catch (err) {
+    await client.query("ROLLBACK");
+    console.error("Bulk import transaction failed:", err);
+    results.errors.push({
+      message:
+        "A server error occurred during the import. The entire operation was rolled back.",
+    });
+  } finally {
+    client.release();
+  }
+
+  return results;
 };
 
 module.exports = {
