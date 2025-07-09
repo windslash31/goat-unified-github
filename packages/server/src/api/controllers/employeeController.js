@@ -1,3 +1,4 @@
+// packages/server/src/api/controllers/employeeController.js
 const employeeService = require("../../services/employeeService");
 const { logActivity } = require("../../services/logService");
 const { Parser } = require("json2csv");
@@ -308,6 +309,30 @@ const bulkImportEmployees = async (req, res, next) => {
   }
 };
 
+const getEmployeeImportTemplate = (req, res) => {
+  const headers = [
+    "first_name",
+    "last_name",
+    "middle_name",
+    "employee_email",
+    "position_name",
+    "position_level",
+    "join_date",
+    "asset_name",
+    "onboarding_ticket",
+    "manager_email",
+    "legal_entity_name",
+    "office_location_name",
+    "employee_type_name",
+    "employee_sub_type_name",
+    "application_access",
+  ];
+  const csv = headers.join(",");
+  res.header("Content-Type", "text/csv");
+  res.attachment("employee_import_template.csv");
+  res.send(csv);
+};
+
 module.exports = {
   listEmployees,
   getEmployee,
@@ -327,4 +352,5 @@ module.exports = {
   exportEmployees,
   getLicenseDetails,
   bulkImportEmployees,
+  getEmployeeImportTemplate,
 };

@@ -66,6 +66,14 @@ router.post(
   employeeController.bulkImportEmployees
 );
 
+// --- NEW: Route for downloading the import template ---
+router.get(
+  "/template/csv",
+  authenticateToken,
+  authorize("employee:create"),
+  employeeController.getEmployeeImportTemplate
+);
+
 router.get(
   "/:id",
   authenticateToken,

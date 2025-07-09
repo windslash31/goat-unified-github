@@ -59,38 +59,23 @@ export const EmployeeImportModal = ({ isOpen, onClose }) => {
     }
   };
 
-  // --- NEW FUNCTION to Download CSV Template ---
-  const handleDownloadTemplate = () => {
-    const headers = [
-      "first_name",
-      "last_name",
-      "middle_name",
-      "employee_email",
-      "position_name",
-      "position_level",
-      "join_date",
-      "asset_name",
-      "onboarding_ticket",
-      "manager_email",
-      "legal_entity_name",
-      "office_location_name",
-      "employee_type_name",
-      "employee_sub_type_name",
-      "application_access",
-    ];
-
-    const csvContent = headers.join(",");
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const link = document.createElement("a");
-    const url = URL.createObjectURL(blob);
-
-    link.setAttribute("href", url);
-    link.setAttribute("download", "employee_import_template.csv");
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  const handleDownloadTemplate = async () => {
+    try {
+      const response = await api.get("/api/employees/template/csv", {
+        responseType: "blob", // Important for file downloads
+      });
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", "employee_import_template.csv");
+      document.body.appendChild(link);
+      link.click();
+      link.parentNode.removeChild(link);
+    } catch (error) {
+      toast.error("Failed to download template.");
+      console.error("Template download error:", error);
+    }
   };
-  // ---------------------------------------------
 
   const handleClose = () => {
     setFile(null);
