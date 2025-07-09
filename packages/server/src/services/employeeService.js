@@ -216,7 +216,6 @@ const getEmployeesForExport = async (filters) => {
     queryParams.push(`%${jobTitle}%`);
   }
   if (manager) {
-    // Use the 'manager' alias here
     whereClauses.push(`manager.employee_email ILIKE $${paramIndex++}`);
     queryParams.push(`%${manager}%`);
   }
@@ -266,7 +265,7 @@ const getEmployeesForExport = async (filters) => {
                 WHERE eaa.employee_id = e.id
             ) as application_access
         FROM employees e
-        LEFT JOIN employees manager ON e.manager_id = m.id
+        LEFT JOIN employees manager ON e.manager_id = manager.id
         LEFT JOIN legal_entities le ON e.legal_entity_id = le.id
         LEFT JOIN office_locations ol ON e.office_location_id = ol.id
         LEFT JOIN employee_types et ON e.employee_type_id = et.id
@@ -609,7 +608,6 @@ const getJumpCloudLogs = async (employeeId, startTime, endTime, limit) => {
 
   const eventsUrl = "https://api.jumpcloud.com/insights/directory/v1/events";
 
-  // Ensure limit is a valid number within the allowed range
   const parsedLimit = parseInt(limit, 10);
   const effectiveLimit = isNaN(parsedLimit)
     ? 100
@@ -627,7 +625,6 @@ const getJumpCloudLogs = async (employeeId, startTime, endTime, limit) => {
   if (startTime) {
     body.start_time = new Date(startTime).toISOString();
   } else {
-    // Default to 90 days ago if no start time
     body.start_time = new Date(
       Date.now() - 90 * 24 * 60 * 60 * 1000
     ).toISOString();
@@ -816,7 +813,6 @@ const createApplicationAccess = async (ticketData, actorId, reqContext) => {
         `;
     await client.query(query, [employeeId, applicationId, role, jira_ticket]);
 
-    // This will now trigger the timestamp update on the main employee record
     await client.query(
       "UPDATE employees SET updated_at = NOW() WHERE id = $1",
       [employeeId]
@@ -856,9 +852,9 @@ const getLicenseDetails = async (employeeId) => {
   }
 
   const platformChecks = {
-    google: googleService.getUserLicense(employee.employee_email),
+    google: googleWorkspaceService.getUserLicense(employee.employee_email),
     jumpcloud: jumpcloudService.getUser(employee.employee_email),
-    slack: slackService.getUser(employee.employee_email), // FIX: Changed getUserByEmail to getUser
+    slack: slackService.getUser(employee.employee_email),
     atlassian: atlassianService.getUser(employee.employee_email),
   };
 
@@ -912,6 +908,21 @@ const getLicenseDetails = async (employeeId) => {
   return results;
 };
 
+const bulkImportEmployees = async (fileBuffer, actorId, reqContext) => {
+  // This is a placeholder for the actual implementation
+  // In a real scenario, you would parse the CSV from the buffer and process it.
+  console.log(
+    "Bulk import service called. In a real app, this would process the CSV."
+  );
+  return {
+    message:
+      "Bulk import functionality is not yet fully implemented on the backend.",
+    created: 0,
+    updated: 0,
+    errors: [{ message: "Backend implementation pending." }],
+  };
+};
+
 module.exports = {
   getEmployeeById,
   getEmployees,
@@ -929,4 +940,5 @@ module.exports = {
   updateOffboardingFromTicket,
   createApplicationAccess,
   getLicenseDetails,
+  bulkImportEmployees,
 };
