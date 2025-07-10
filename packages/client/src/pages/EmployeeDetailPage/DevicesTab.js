@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import api from "../../api/api";
 import { Smartphone, Laptop, Server, CheckCircle, XCircle } from "lucide-react";
 import { DeviceDetailModal } from "../../components/ui/DeviceDetailModal"; // Import the new modal
+import { DeviceCardSkeleton } from "../../components/ui/DeviceCardSkeleton"; // Import the skeleton
 
 const fetchEmployeeDevices = async (employeeId) => {
   const { data } = await api.get(`/api/employees/${employeeId}/devices`);
@@ -69,20 +70,32 @@ export const DevicesTab = ({ employeeId }) => {
     queryFn: () => fetchEmployeeDevices(employeeId),
   });
 
-  if (isLoading)
-    return <div className="text-center p-6">Loading device details...</div>;
-  if (error)
+  if (isLoading) {
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {/* Show 3 skeleton cards while loading */}
+        <DeviceCardSkeleton />
+        <DeviceCardSkeleton />
+        <DeviceCardSkeleton />
+      </div>
+    );
+  }
+
+  if (error) {
     return (
       <div className="text-center p-6 text-red-500">
         Could not fetch device details.
       </div>
     );
-  if (!devices || devices.length === 0)
+  }
+
+  if (!devices || devices.length === 0) {
     return (
       <div className="text-center p-6 text-gray-500">
         No devices found for this employee.
       </div>
     );
+  }
 
   return (
     <>
