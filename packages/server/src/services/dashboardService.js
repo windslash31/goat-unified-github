@@ -1,21 +1,22 @@
-const db = require('../config/db');
+const db = require("../config/db");
 
 const getDashboardStats = async () => {
-    const statsQuery = `
+  const statsQuery = `
         SELECT
-            COUNT(*) as total_employees,
-            SUM(CASE WHEN get_employee_status(is_active, access_cut_off_date_at_date) = 'Active' THEN 1 ELSE 0 END) as active_employees,
-            SUM(CASE WHEN get_employee_status(is_active, access_cut_off_date_at_date) = 'For Escalation' THEN 1 ELSE 0 END) as for_escalation_employees,
-            SUM(CASE WHEN get_employee_status(is_active, access_cut_off_date_at_date) = 'Inactive' THEN 1 ELSE 0 END) as inactive_employees,
-            (SELECT COUNT(*) FROM activity_logs WHERE timestamp > NOW() - INTERVAL '7 days') as recent_activities
-        FROM employees;
+            (SELECT COUNT(*) FROM employees) as total_employees,
+            (SELECT COUNT(*) FROM employees WHERE get_employee_status(is_active, access_cut_off_date_at_date) = 'Active') as active_employees,
+            (SELECT COUNT(*) FROM employees WHERE get_employee_status(is_active, access_cut_off_date_at_date) = 'For Escalation') as for_escalation_employees,
+            (SELECT COUNT(*) FROM employees WHERE get_employee_status(is_active, access_cut_off_date_at_date) = 'Inactive') as inactive_employees,
+            (SELECT COUNT(*) FROM users) as total_users
+        FROM employees
+        LIMIT 1;
     `;
-    const result = await db.query(statsQuery);
-    return result.rows[0];
+  const result = await db.query(statsQuery);
+  return result.rows[0];
 };
 
 const getRecentActivity = async () => {
-    const query = `
+  const query = `
         SELECT
             al.id,
             al.action_type,
@@ -30,12 +31,12 @@ const getRecentActivity = async () => {
             al.timestamp DESC
         LIMIT 5;
     `;
-    const result = await db.query(query);
-    return result.rows;
+  const result = await db.query(query);
+  return result.rows;
 };
 
 const getRecentTickets = async () => {
-    const query = `
+  const query = `
         SELECT id, first_name, last_name, ticket_id, ticket_type FROM (
             (SELECT id, first_name, last_name, onboarding_ticket as ticket_id, 'Onboarding' as ticket_type, created_at as sort_date FROM employees WHERE onboarding_ticket IS NOT NULL)
             UNION ALL
@@ -45,12 +46,37 @@ const getRecentTickets = async () => {
         ORDER BY sort_date DESC
         LIMIT 5;
     `;
-    const result = await db.query(query);
-    return result.rows;
+  const result = await db.query(query);
+  return result.rows;
+};
+
+const getLicenseStats = async () => {
+  // This is a placeholder. In a real scenario, you'd query a table
+  // or an external API for license counts.
+  return [
+    { name: "Google Workspace", used: 150, total: 200 },
+    { name: "Atlassian", used: 120, total: 150 },
+    { name: "Slack", used: 180, total: 200 },
+  ];
+};
+
+const getEmployeeDistribution = async () => {
+  const query = `
+        SELECT ol.name, COUNT(e.id) as count
+        FROM employees e
+        JOIN office_locations ol ON e.office_location_id = ol.id
+        WHERE e.is_active = TRUE
+        GROUP BY ol.name
+        ORDER BY count DESC;
+    `;
+  const result = await db.query(query);
+  return result.rows;
 };
 
 module.exports = {
-    getDashboardStats,
-    getRecentActivity,
-    getRecentTickets
+  getDashboardStats,
+  getRecentActivity,
+  getRecentTickets,
+  getLicenseStats,
+  getEmployeeDistribution,
 };
