@@ -1,4 +1,7 @@
-const { getActivityLogs } = require("../../services/logService");
+const {
+  getActivityLogs,
+  getActivityLogFilterOptions,
+} = require("../../services/logService");
 const { Parser } = require("json2csv");
 
 const listActivityLogs = async (req, res, next) => {

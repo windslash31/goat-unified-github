@@ -25,7 +25,6 @@ export const EditEmployeeModal = ({ employee, onClose, onSave }) => {
     "employees/options/employee_sub_types"
   );
 
-  // ... rest of the component
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     setFormData((prev) => ({
