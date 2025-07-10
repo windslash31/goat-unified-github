@@ -1,3 +1,5 @@
+// packages/client/src/pages/SettingsPage.js
+
 import React from "react";
 import { useNavigate, Outlet, useLocation } from "react-router-dom";
 import { User, Shield, ChevronRight, Briefcase } from "lucide-react";
@@ -38,9 +40,14 @@ export const SettingsPage = () => {
   const canViewUsers = permissions.includes("admin:view_users");
   const canViewRoles = permissions.includes("admin:view_roles");
 
-  // Only show the settings cards on the main /settings page
   const isSettingsHome = location.pathname === "/settings";
 
+  // If we are on a sub-page, just render the Outlet directly
+  if (!isSettingsHome) {
+    return <Outlet />;
+  }
+
+  // Otherwise, render the main settings menu page
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -57,34 +64,30 @@ export const SettingsPage = () => {
           Manage application users and their permissions.
         </p>
       </div>
-      {isSettingsHome ? (
-        <div className="max-w-2xl mx-auto space-y-4">
-          {canViewUsers && (
-            <SettingsCard
-              title="User Management"
-              description="Create users and assign them to roles."
-              icon={<User className="w-6 h-6" />}
-              path="/settings/users"
-            />
-          )}
-          {canViewRoles && (
-            <SettingsCard
-              title="Roles & Permissions"
-              description="Define what users can see and do."
-              icon={<Shield className="w-6 h-6" />}
-              path="/settings/roles"
-            />
-          )}
+      <div className="max-w-2xl mx-auto space-y-4">
+        {canViewUsers && (
           <SettingsCard
-            title="Application Management"
-            description="Add or remove internal applications."
-            icon={<Briefcase className="w-6 h-6" />}
-            path="/settings/applications"
+            title="User Management"
+            description="Create users and assign them to roles."
+            icon={<User className="w-6 h-6" />}
+            path="/settings/users"
           />
-        </div>
-      ) : (
-        <Outlet />
-      )}
+        )}
+        {canViewRoles && (
+          <SettingsCard
+            title="Roles & Permissions"
+            description="Define what users can see and do."
+            icon={<Shield className="w-6 h-6" />}
+            path="/settings/roles"
+          />
+        )}
+        <SettingsCard
+          title="Application Management"
+          description="Add or remove internal applications."
+          icon={<Briefcase className="w-6 h-6" />}
+          path="/settings/applications"
+        />
+      </div>
     </motion.div>
   );
 };

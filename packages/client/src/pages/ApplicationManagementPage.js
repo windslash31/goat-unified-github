@@ -1,9 +1,11 @@
+// packages/client/src/pages/ApplicationManagementPage.js
 import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import { PlusCircle, Edit, Trash2 } from "lucide-react";
 import { Button } from "../components/ui/Button";
 import api from "../api/api";
+import { motion } from "framer-motion"; // Import motion
 
 const fetchApplications = async () => {
   const { data } = await api.get("/api/applications");
@@ -69,8 +71,22 @@ export const ApplicationManagementPage = () => {
   if (isLoading) return <div>Loading applications...</div>;
 
   return (
-    <div className="p-6">
-      <h1 className="text-2xl font-bold mb-4">Manage Applications</h1>
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -20 }}
+      transition={{ duration: 0.3 }}
+      className="p-6"
+    >
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+          Manage Applications
+        </h1>
+        <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+          Add, remove, or edit internal applications available for access
+          requests.
+        </p>
+      </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
           <h2 className="text-lg font-semibold mb-2">Add New Application</h2>
@@ -151,6 +167,6 @@ export const ApplicationManagementPage = () => {
           </ul>
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 };
