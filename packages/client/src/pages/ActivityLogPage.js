@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useRef, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import {
@@ -20,13 +20,13 @@ import {
   HardDrive,
   PlusCircle,
   FilePlus,
+  Filter as FilterIcon,
 } from "lucide-react";
 import { Button } from "../components/ui/Button";
-import { CustomSelect } from "../components/ui/CustomSelect";
+import { FilterPopover } from "../components/ui/FilterPopover";
+import { FilterPills } from "../components/ui/FilterPills";
 import api from "../api/api";
 import { motion } from "framer-motion";
-
-// --- Helper Components for Log Details ---
 
 const formatValue = (value) => {
   if (value === null || typeof value === "undefined") return '""';
@@ -473,7 +473,14 @@ const ActivityLogItem = ({ log, roles, isExpanded, onToggle }) => {
 };
 
 export const ActivityLogPage = () => {
-  const [filters, setFilters] = useState({ actionType: "", actorEmail: "" });
+  const [filters, setFilters] = useState({
+    actionType: "",
+    actorEmail: "",
+    startDate: "",
+    endDate: "",
+  });
+  const [isFilterPopoverOpen, setIsFilterPopoverOpen] = useState(false);
+  const filterButtonRef = useRef(null);
   const [expandedLogRowId, setExpandedLogRowId] = useState(null);
 
   const { data: roles = [] } = useQuery({
@@ -515,17 +522,25 @@ export const ActivityLogPage = () => {
     }
   };
 
-  const handleFilterChange = (name, value) => {
-    setFilters((prev) => ({ ...prev, [name]: value }));
-  };
-
   const clearFilters = () => {
-    setFilters({ actionType: "", actorEmail: "" });
+    setFilters({ actionType: "", actorEmail: "", startDate: "", endDate: "" });
   };
 
   const toggleRowExpansion = (logId) => {
     setExpandedLogRowId(expandedLogRowId === logId ? null : logId);
   };
+
+  const popoverOptions = useMemo(
+    () => ({
+      actionTypes:
+        filterOptions?.actionTypes.map((a) => ({
+          id: a,
+          name: a.replace(/_/g, " "),
+        })) || [],
+      actors: filterOptions?.actors.map((a) => ({ id: a, name: a })) || [],
+    }),
+    [filterOptions]
+  );
 
   return (
     <motion.div
@@ -542,47 +557,46 @@ export const ActivityLogPage = () => {
             Recent events recorded in the system.
           </p>
         </div>
-        <Button
-          onClick={handleExport}
-          variant="secondary"
-          className="mt-4 sm:mt-0 w-full sm:w-auto justify-center"
-        >
-          <Download className="w-4 h-4 mr-2" /> Export to CSV
-        </Button>
-      </div>
-
-      <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg border dark:border-gray-600 mb-4 flex flex-col md:flex-row gap-4">
-        <div className="flex-1">
-          <label className="block text-sm font-medium mb-1">Action Type</label>
-          <CustomSelect
-            options={
-              filterOptions?.actionTypes.map((a) => ({
-                id: a,
-                name: a.replace(/_/g, " "),
-              })) || []
-            }
-            value={filters.actionType}
-            onChange={(val) => handleFilterChange("actionType", val)}
-            placeholder="All Actions"
-          />
-        </div>
-        <div className="flex-1">
-          <label className="block text-sm font-medium mb-1">Actor</label>
-          <CustomSelect
-            options={
-              filterOptions?.actors.map((a) => ({ id: a, name: a })) || []
-            }
-            value={filters.actorEmail}
-            onChange={(val) => handleFilterChange("actorEmail", val)}
-            placeholder="All Users"
-          />
-        </div>
-        <div className="flex items-end">
-          <Button onClick={clearFilters} variant="secondary">
-            Clear
+        <div className="flex items-center gap-2 mt-4 sm:mt-0 w-full sm:w-auto">
+          <div className="relative">
+            <button
+              ref={filterButtonRef}
+              onClick={() => setIsFilterPopoverOpen(!isFilterPopoverOpen)}
+              className="flex items-center gap-2 px-4 py-2 border rounded-md text-sm font-medium transition-colors bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700"
+            >
+              <FilterIcon size={16} />
+              <span>Filters</span>
+            </button>
+            {isFilterPopoverOpen && (
+              <FilterPopover
+                initialFilters={filters}
+                onApply={setFilters}
+                onClear={clearFilters}
+                onClose={() => setIsFilterPopoverOpen(false)}
+                options={popoverOptions}
+                buttonRef={filterButtonRef}
+                isActivityLog={true}
+              />
+            )}
+          </div>
+          <Button
+            onClick={handleExport}
+            variant="secondary"
+            className="w-full sm:w-auto justify-center"
+          >
+            <Download className="w-4 h-4 mr-2" /> Export
           </Button>
         </div>
       </div>
+
+      <FilterPills
+        filters={filters}
+        setFilters={setFilters}
+        setSearchInputValue={() => {}} // Not used here, but required by the component
+        options={popoverOptions}
+        onClear={clearFilters}
+        isActivityLog={true}
+      />
 
       <div className="mt-4 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
         <div className="divide-y divide-gray-200 dark:divide-gray-700">

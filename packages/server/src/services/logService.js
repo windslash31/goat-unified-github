@@ -28,6 +28,7 @@ const logActivity = async (
   reqContext = {},
   client = db
 ) => {
+  // This function remains unchanged
   try {
     let actorEmail = null;
     let actorFullName = null;
@@ -77,7 +78,7 @@ const logActivity = async (
 };
 
 const getActivityLogs = async (filters = {}) => {
-  const { limit = 100, actionType, actorEmail } = filters;
+  const { limit = 100, actionType, actorEmail, startDate, endDate } = filters;
 
   const whereClauses = [];
   const queryParams = [];
@@ -91,6 +92,18 @@ const getActivityLogs = async (filters = {}) => {
     whereClauses.push(`al.actor_email = $${paramIndex++}`);
     queryParams.push(actorEmail);
   }
+  // --- MODIFICATION START: Add date range filtering ---
+  if (startDate) {
+    whereClauses.push(`al.timestamp >= $${paramIndex++}`);
+    queryParams.push(startDate);
+  }
+  if (endDate) {
+    const inclusiveEndDate = new Date(endDate);
+    inclusiveEndDate.setDate(inclusiveEndDate.getDate() + 1);
+    whereClauses.push(`al.timestamp < $${paramIndex++}`);
+    queryParams.push(inclusiveEndDate.toISOString().split("T")[0]);
+  }
+  // --- MODIFICATION END ---
 
   const whereCondition =
     whereClauses.length > 0 ? `WHERE ${whereClauses.join(" AND ")}` : "";
@@ -114,6 +127,7 @@ const getActivityLogs = async (filters = {}) => {
 };
 
 const getActivityLogFilterOptions = async () => {
+  // This function remains unchanged
   const actionsQuery = db.query(
     "SELECT DISTINCT action_type FROM activity_logs ORDER BY action_type"
   );
@@ -135,5 +149,5 @@ const getActivityLogFilterOptions = async () => {
 module.exports = {
   logActivity,
   getActivityLogs,
-  getActivityLogFilterOptions, // Export the new function
+  getActivityLogFilterOptions,
 };
