@@ -157,4 +157,11 @@ router.post(
   employeeController.bulkDeactivateOnPlatforms
 );
 
+router.get(
+  "/:id/devices",
+  authenticateToken,
+  authorizeAdminOrSelf,
+  employeeController.getEmployeeDevices
+);
+
 module.exports = router;

@@ -19,7 +19,9 @@ import { EmployeeApplicationsTab } from "./EmployeeApplicationsTab";
 import { JiraTicketModal } from "../../components/ui/JiraTicketModal";
 import { LicensesTab } from "./LicensesTab";
 import { UnifiedTimelinePage } from "./UnifiedTimelinePage";
-import { PlatformLogPage } from "./PlatformLogPage"; // Import the new component
+import { PlatformLogPage } from "./PlatformLogPage";
+import { DevicesTab } from "./DevicesTab";
+import { Laptop } from "lucide-react";
 
 const Section = ({ id, title, children, icon }) => (
   <div
@@ -236,6 +238,12 @@ export const EmployeeDetailPage = ({
       permission: true,
     },
     {
+      id: "devices-section",
+      label: "Devices",
+      icon: <Laptop className="w-4 h-4" />,
+      permission: true,
+    },
+    {
       id: "apps-section",
       label: "Apps & Platforms",
       icon: <LayoutGrid className="w-4 h-4" />,
@@ -367,6 +375,11 @@ export const EmployeeDetailPage = ({
                 icon={<UserSquare className="w-4 h-4" />}
               />
               <TabButton
+                id="devices"
+                label="Devices"
+                icon={<Laptop className="w-4 h-4" />}
+              />
+              <TabButton
                 id="platforms"
                 label="Apps & Platforms"
                 icon={<LayoutGrid className="w-4 h-4" />}
@@ -402,6 +415,11 @@ export const EmployeeDetailPage = ({
                 permissions={permissions}
                 onTicketClick={handleTicketClick}
               />
+            </div>
+            <div
+              style={{ display: activeTab === "devices" ? "block" : "none" }}
+            >
+              <DevicesTab employeeId={employeeId} />
             </div>
             <div
               style={{ display: activeTab === "platforms" ? "block" : "none" }}

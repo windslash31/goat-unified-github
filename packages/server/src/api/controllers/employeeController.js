@@ -310,6 +310,16 @@ const getEmployeeImportTemplate = (req, res) => {
   res.send(csv);
 };
 
+const getEmployeeDevices = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const devices = await employeeService.getEmployeeDevices(id);
+    res.json(devices);
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   listEmployees,
   getEmployee,
@@ -330,4 +340,5 @@ module.exports = {
   getLicenseDetails,
   bulkImportEmployees,
   getEmployeeImportTemplate,
+  getEmployeeDevices,
 };

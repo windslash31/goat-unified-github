@@ -1167,6 +1167,37 @@ const bulkImportEmployees = async (fileBuffer, actorId, reqContext) => {
   return results;
 };
 
+const getEmployeeDevices = async (employeeId) => {
+  const employee = await getEmployeeById(employeeId);
+  if (!employee || !employee.employee_email) {
+    throw new Error("Employee not found or has no email.");
+  }
+
+  const jumpcloudUser = await jumpcloudService.getUser(employee.employee_email);
+  if (!jumpcloudUser) {
+    return [];
+  }
+
+  const associations = await jumpcloudService.getSystemAssociations(
+    jumpcloudUser.id
+  );
+  if (!associations || associations.length === 0) {
+    return [];
+  }
+
+  const systemIds = associations.map((assoc) => assoc.to.id);
+  if (systemIds.length === 0) {
+    return [];
+  }
+
+  const deviceDetailsPromises = systemIds.map((systemId) =>
+    jumpcloudService.getSystemDetails(systemId)
+  );
+
+  const devices = await Promise.all(deviceDetailsPromises);
+  return devices;
+};
+
 module.exports = {
   getEmployeeById,
   getEmployees,
@@ -1186,4 +1217,5 @@ module.exports = {
   createApplicationAccess,
   getLicenseDetails,
   bulkImportEmployees,
+  getEmployeeDevices,
 };

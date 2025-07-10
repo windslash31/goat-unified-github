@@ -18,7 +18,9 @@ import { UnifiedTimelinePage } from "./EmployeeDetailPage/UnifiedTimelinePage";
 import { Button } from "../components/ui/Button";
 import { ChangePasswordModal } from "../components/ui/ChangePasswordModal";
 import { motion } from "framer-motion";
-import { PlatformLogPage } from "./EmployeeDetailPage/PlatformLogPage"; // Import the new component
+import { PlatformLogPage } from "./EmployeeDetailPage/PlatformLogPage";
+import { DevicesTab } from "./EmployeeDetailPage/DevicesTab";
+import { Laptop } from "lucide-react";
 
 const Section = ({ id, title, children, icon }) => (
   <div
@@ -194,6 +196,12 @@ export const ProfilePage = ({
       permission: true,
     },
     {
+      id: "profile-devices-section",
+      label: "Devices",
+      icon: <Laptop className="w-4 h-4" />,
+      permission: true,
+    },
+    {
       id: "profile-apps-section",
       label: "Apps & Platforms",
       icon: <LayoutGrid className="w-4 h-4" />,
@@ -331,6 +339,12 @@ export const ProfilePage = ({
                   icon={<UserSquare className="w-4 h-4" />}
                 />
                 <TabButton
+                  id="devices"
+                  label="Devices"
+                  icon={<Laptop className="w-4 h-4" />}
+                />
+
+                <TabButton
                   id="platforms"
                   label="Apps & Platforms"
                   icon={<LayoutGrid className="w-4 h-4" />}
@@ -361,6 +375,11 @@ export const ProfilePage = ({
                   permissions={permissions}
                   onTicketClick={handleTicketClick}
                 />
+              </div>
+              <div
+                style={{ display: activeTab === "devices" ? "block" : "none" }}
+              >
+                <DevicesTab employeeId={employee.id} />
               </div>
               <div
                 style={{

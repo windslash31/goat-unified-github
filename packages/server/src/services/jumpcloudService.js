@@ -61,8 +61,49 @@ const getUserStatus = async (email) => {
   }
 };
 
+const getSystemAssociations = async (userId) => {
+  if (!API_KEY) {
+    throw new Error("JumpCloud API key is not configured.");
+  }
+  const url = `https://console.jumpcloud.com/api/v2/users/${userId}/associations?targets=system`;
+  const response = await fetch(url, {
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+      "x-api-key": API_KEY,
+    },
+  });
+  if (!response.ok) {
+    throw new Error(`JumpCloud API Error: ${response.statusText}`);
+  }
+  const data = await response.json();
+  return data;
+};
+
+const getSystemDetails = async (systemId) => {
+  if (!API_KEY) {
+    throw new Error("JumpCloud API key is not configured.");
+  }
+  const url = `https://console.jumpcloud.com/api/systems/${systemId}`;
+  const response = await fetch(url, {
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+      "x-api-key": API_KEY,
+    },
+  });
+  if (!response.ok) {
+    throw new Error(`JumpCloud API Error: ${response.statusText}`);
+  }
+  const data = await response.json();
+  return data;
+};
+
+// Add the new functions to the exports
 module.exports = {
   suspendUser,
   getUserStatus,
   getUser,
+  getSystemAssociations,
+  getSystemDetails,
 };
