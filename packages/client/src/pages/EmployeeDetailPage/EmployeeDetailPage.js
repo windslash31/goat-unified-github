@@ -1,16 +1,15 @@
 // packages/client/src/pages/EmployeeDetailPage/EmployeeDetailPage.js
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   UserSquare,
   LayoutGrid,
   HardDrive,
   AlertTriangle,
-  ChevronDown,
   Bot,
-  MessageSquare,
-  Shield,
   BookLock,
+  Laptop,
+  MoreVertical,
 } from "lucide-react";
 import { useBreadcrumb } from "../../context/BreadcrumbContext";
 import { EmployeeDetailHeader } from "./EmployeeDetailHeader";
@@ -21,62 +20,8 @@ import { LicensesTab } from "./LicensesTab";
 import { UnifiedTimelinePage } from "./UnifiedTimelinePage";
 import { PlatformLogPage } from "./PlatformLogPage";
 import { DevicesTab } from "./DevicesTab";
-import { Laptop } from "lucide-react";
-
-const Section = ({ id, title, children, icon }) => (
-  <div
-    id={id}
-    className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 scroll-mt-24"
-  >
-    <h3 className="flex items-center gap-2 text-lg font-semibold text-gray-900 dark:text-white p-4 border-b border-gray-200 dark:border-gray-700">
-      {icon}
-      {title}
-    </h3>
-    <div className="p-4 sm:p-6">{children}</div>
-  </div>
-);
-
-const InPageDropdownNav = ({ sections, onScrollTo }) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const handleSelect = (sectionId) => {
-    onScrollTo(sectionId);
-    setIsOpen(false);
-  };
-  return (
-    <div className="md:hidden sticky top-0 z-20 bg-gray-50 dark:bg-gray-900 py-2 -mx-4 px-4 border-b border-gray-200 dark:border-gray-700">
-      <div className="relative">
-        <button
-          onClick={() => setIsOpen(!isOpen)}
-          className="w-full flex items-center justify-between px-4 py-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm text-sm font-medium"
-        >
-          <span>Jump to section...</span>
-          <ChevronDown
-            className={`w-5 h-5 transition-transform ${
-              isOpen ? "rotate-180" : ""
-            }`}
-          />
-        </button>
-        {isOpen && (
-          <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-gray-800 border dark:border-gray-700 rounded-lg shadow-lg z-20">
-            <ul className="divide-y divide-gray-200 dark:divide-gray-700">
-              {sections.map((section) => (
-                <li key={section.id}>
-                  <button
-                    onClick={() => handleSelect(section.id)}
-                    className="w-full flex items-center gap-3 text-left px-4 py-3 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
-                  >
-                    {section.icon}
-                    {section.label}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
+import { motion, AnimatePresence } from "framer-motion";
+import { useMediaQuery } from "../../hooks/useMediaQuery";
 
 export const EmployeeDetailPage = ({
   onEdit,
@@ -93,6 +38,9 @@ export const EmployeeDetailPage = ({
   const [activeTab, setActiveTab] = useState("details");
   const [platformStatuses, setPlatformStatuses] = useState([]);
   const [isLoadingPlatforms, setIsLoadingPlatforms] = useState(true);
+  const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
+  const moreMenuRef = useRef(null);
+  const isDesktop = useMediaQuery("(min-width: 768px)");
 
   const [tabData, setTabData] = useState({
     timeline: { data: [], loading: false, error: null, fetched: false },
@@ -100,6 +48,67 @@ export const EmployeeDetailPage = ({
 
   const [isJiraModalOpen, setIsJiraModalOpen] = useState(false);
   const [selectedTicketId, setSelectedTicketId] = useState(null);
+
+  const allTabs = [
+    {
+      id: "details",
+      label: "Details",
+      icon: <UserSquare size={16} />,
+      permission: true,
+    },
+    {
+      id: "devices",
+      label: "Devices",
+      icon: <Laptop size={16} />,
+      permission: true,
+    },
+    {
+      id: "platforms",
+      label: "Apps & Platforms",
+      shortLabel: "Access",
+      icon: <LayoutGrid size={16} />,
+      permission: true,
+    },
+    {
+      id: "licenses",
+      label: "Licenses",
+      icon: <BookLock size={16} />,
+      permission: true,
+    },
+    {
+      id: "platform-logs",
+      label: "Platform Logs",
+      shortLabel: "Logs",
+      icon: <HardDrive size={16} />,
+      permission: permissions.includes("log:read:platform"),
+    },
+    {
+      id: "timeline",
+      label: "Unified Timeline",
+      shortLabel: "Timeline",
+      icon: <Bot size={16} />,
+      permission: permissions.includes("log:read:platform"),
+    },
+  ].filter((tab) => tab.permission);
+
+  const VISIBLE_TABS_COUNT = 3;
+  const visibleTabs = isDesktop
+    ? allTabs
+    : allTabs.slice(0, VISIBLE_TABS_COUNT);
+  const overflowTabs = isDesktop ? [] : allTabs.slice(VISIBLE_TABS_COUNT);
+  const isActiveTabInMoreMenu = overflowTabs.some(
+    (tab) => tab.id === activeTab
+  );
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (moreMenuRef.current && !moreMenuRef.current.contains(event.target)) {
+        setIsMoreMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const fetchInitialData = useCallback(() => {
     const token = localStorage.getItem("accessToken");
@@ -213,6 +222,7 @@ export const EmployeeDetailPage = ({
 
   const handleTabClick = (tabId) => {
     setActiveTab(tabId);
+    setIsMoreMenuOpen(false);
     if (tabId === "timeline") {
       fetchTimelineData();
     }
@@ -225,75 +235,63 @@ export const EmployeeDetailPage = ({
     }
   };
 
-  const handleScrollToSection = (sectionId) => {
-    const element = document.getElementById(sectionId);
-    element?.scrollIntoView({ behavior: "smooth", block: "start" });
-  };
+  const TabButton = ({ id, label, shortLabel, icon }) => (
+    <button
+      onClick={() => handleTabClick(id)}
+      className={`flex-shrink-0 flex items-center gap-2 py-3 px-4 border-b-2 font-semibold text-sm transition-colors whitespace-nowrap ${
+        activeTab === id
+          ? "border-kredivo-primary text-kredivo-primary"
+          : "border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+      }`}
+    >
+      {icon} {isDesktop ? label : shortLabel || label}
+    </button>
+  );
 
-  const pageSections = [
-    {
-      id: "details-section",
-      label: "Details",
-      icon: <UserSquare className="w-4 h-4" />,
-      permission: true,
-    },
-    {
-      id: "devices-section",
-      label: "Devices",
-      icon: <Laptop className="w-4 h-4" />,
-      permission: true,
-    },
-    {
-      id: "apps-section",
-      label: "Apps & Platforms",
-      icon: <LayoutGrid className="w-4 h-4" />,
-      permission: true,
-    },
-    {
-      id: "licenses-section",
-      label: "Licenses",
-      icon: <BookLock className="w-4 h-4" />,
-      permission: true,
-    },
-    {
-      id: "platform-logs-section",
-      label: "Platform Logs",
-      icon: <HardDrive className="w-4 h-4" />,
-      permission: permissions.includes("log:read:platform"),
-    },
-    {
-      id: "timeline-section",
-      label: "Unified Timeline",
-      icon: <Bot className="w-4 h-4" />,
-      permission: permissions.includes("log:read:platform"),
-    },
-  ].filter((s) => s.permission);
+  const TabContent = (
+    <div className="mt-6">
+      {activeTab === "details" && (
+        <EmployeeDetailsTab
+          employee={employee}
+          navigate={navigate}
+          permissions={permissions}
+          onTicketClick={handleTicketClick}
+        />
+      )}
+      {activeTab === "devices" && <DevicesTab employeeId={employeeId} />}
+      {activeTab === "platforms" && (
+        <EmployeeApplicationsTab
+          applications={employee.applications || []}
+          platformStatuses={platformStatuses}
+          isLoading={isLoadingPlatforms}
+          onTicketClick={handleTicketClick}
+        />
+      )}
+      {activeTab === "licenses" && <LicensesTab employeeId={employeeId} />}
+      {activeTab === "platform-logs" && (
+        <PlatformLogPage employeeId={employeeId} onLogout={onLogout} />
+      )}
+      {activeTab === "timeline" && (
+        <UnifiedTimelinePage
+          events={tabData.timeline.data}
+          loading={tabData.timeline.loading}
+          error={tabData.timeline.error}
+        />
+      )}
+    </div>
+  );
 
   if (loading)
     return <div className="p-6 text-center">Loading employee profile...</div>;
   if (pageError)
     return (
       <div className="p-6 text-center text-red-500">
-        {" "}
         <AlertTriangle className="mx-auto w-12 h-12 mb-4" />{" "}
         <h2 className="text-xl font-semibold">Could not load employee data</h2>{" "}
         <p>{pageError}</p>{" "}
       </div>
     );
   if (!employee) return null;
-
-  const TabButton = ({ id, label, icon }) => (
-    <button
-      onClick={() => handleTabClick(id)}
-      className={`flex items-center gap-2 py-3 px-4 border-b-2 font-semibold text-sm transition-colors whitespace-nowrap ${
-        activeTab === id
-          ? "border-kredivo-primary text-kredivo-primary"
-          : "border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
-      }`}
-    >
-      {icon} {label}
-    </button>
-  );
 
   return (
     <>
@@ -305,164 +303,61 @@ export const EmployeeDetailPage = ({
           permissions={permissions}
           isOwnProfile={false}
         />
-        <InPageDropdownNav
-          sections={pageSections}
-          onScrollTo={handleScrollToSection}
-        />
 
-        <div className="space-y-6 md:hidden">
-          <Section
-            id="details-section"
-            title="Details"
-            icon={<UserSquare className="w-5 h-5" />}
-          >
-            <EmployeeDetailsTab
-              employee={employee}
-              navigate={navigate}
-              permissions={permissions}
-              onTicketClick={handleTicketClick}
-            />
-          </Section>
-          <Section
-            id="apps-section"
-            title="Apps & Platforms"
-            icon={<LayoutGrid className="w-5 h-5" />}
-          >
-            <EmployeeApplicationsTab
-              applications={employee.applications || []}
-              platformStatuses={platformStatuses}
-              isLoading={isLoadingPlatforms}
-              onTicketClick={handleTicketClick}
-            />
-          </Section>
-          <Section
-            id="licenses-section"
-            title="Licenses"
-            icon={<BookLock className="w-5 h-5" />}
-          >
-            <LicensesTab employeeId={employeeId} />
-          </Section>
-          {permissions.includes("log:read:platform") && (
-            <>
-              <Section
-                id="platform-logs-section"
-                title="Platform Logs"
-                icon={<HardDrive className="w-5 h-5" />}
-              >
-                <PlatformLogPage employeeId={employeeId} onLogout={onLogout} />
-              </Section>
-              <Section
-                id="timeline-section"
-                title="Unified Timeline"
-                icon={<Bot className="w-5 h-5" />}
-              >
-                <UnifiedTimelinePage
-                  events={tabData.timeline.data}
-                  loading={tabData.timeline.loading}
-                  error={tabData.timeline.error}
-                />
-              </Section>
-            </>
-          )}
-        </div>
-
-        <div className="hidden md:block">
-          <div className="border-b border-gray-200 dark:border-gray-700 overflow-x-auto">
-            <nav className="-mb-px flex space-x-4">
-              <TabButton
-                id="details"
-                label="Details"
-                icon={<UserSquare className="w-4 h-4" />}
-              />
-              <TabButton
-                id="devices"
-                label="Devices"
-                icon={<Laptop className="w-4 h-4" />}
-              />
-              <TabButton
-                id="platforms"
-                label="Apps & Platforms"
-                icon={<LayoutGrid className="w-4 h-4" />}
-              />
-              <TabButton
-                id="licenses"
-                label="Licenses"
-                icon={<BookLock className="w-4 h-4" />}
-              />
-              {permissions.includes("log:read:platform") && (
-                <>
-                  <TabButton
-                    id="platform-logs"
-                    label="Platform Logs"
-                    icon={<HardDrive className="w-4 h-4" />}
-                  />
-                  <TabButton
-                    id="timeline"
-                    label="Unified Timeline"
-                    icon={<Bot className="w-4 h-4" />}
-                  />
-                </>
-              )}
+        <div className="border-b border-gray-200 dark:border-gray-700">
+          <div className="flex justify-between items-center">
+            <nav
+              className="-mb-px flex items-center overflow-x-auto"
+              aria-label="Tabs"
+            >
+              {visibleTabs.map((tab) => (
+                <TabButton key={tab.id} {...tab} />
+              ))}
             </nav>
-          </div>
-          <div className="mt-6">
-            <div
-              style={{ display: activeTab === "details" ? "block" : "none" }}
-            >
-              <EmployeeDetailsTab
-                employee={employee}
-                navigate={navigate}
-                permissions={permissions}
-                onTicketClick={handleTicketClick}
-              />
-            </div>
-            <div
-              style={{ display: activeTab === "devices" ? "block" : "none" }}
-            >
-              <DevicesTab employeeId={employeeId} />
-            </div>
-            <div
-              style={{ display: activeTab === "platforms" ? "block" : "none" }}
-            >
-              <EmployeeApplicationsTab
-                applications={employee.applications || []}
-                platformStatuses={platformStatuses}
-                isLoading={isLoadingPlatforms}
-                onTicketClick={handleTicketClick}
-              />
-            </div>
-            <div
-              style={{ display: activeTab === "licenses" ? "block" : "none" }}
-            >
-              <LicensesTab employeeId={employeeId} />
-            </div>
-            {permissions.includes("log:read:platform") && (
-              <>
-                <div
-                  style={{
-                    display: activeTab === "platform-logs" ? "block" : "none",
-                  }}
+
+            {overflowTabs.length > 0 && (
+              <div ref={moreMenuRef} className="relative ml-auto pl-2">
+                <button
+                  onClick={() => setIsMoreMenuOpen((prev) => !prev)}
+                  className={`flex-shrink-0 flex items-center gap-2 py-3 px-4 border-b-2 font-semibold text-sm transition-colors whitespace-nowrap ${
+                    isActiveTabInMoreMenu
+                      ? "border-kredivo-primary text-kredivo-primary"
+                      : "border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+                  }`}
                 >
-                  <PlatformLogPage
-                    employeeId={employeeId}
-                    onLogout={onLogout}
-                  />
-                </div>
-                <div
-                  style={{
-                    display: activeTab === "timeline" ? "block" : "none",
-                  }}
-                >
-                  <UnifiedTimelinePage
-                    events={tabData.timeline.data}
-                    loading={tabData.timeline.loading}
-                    error={tabData.timeline.error}
-                  />
-                </div>
-              </>
+                  <MoreVertical size={16} /> More
+                </button>
+                <AnimatePresence>
+                  {isMoreMenuOpen && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      className="origin-top-right absolute right-0 mt-2 w-56 rounded-md shadow-lg bg-white dark:bg-gray-800 ring-1 ring-black ring-opacity-5 focus:outline-none z-10"
+                    >
+                      <div className="py-1">
+                        {overflowTabs.map((tab) => (
+                          <button
+                            key={tab.id}
+                            onClick={() => handleTabClick(tab.id)}
+                            className={`w-full text-left flex items-center gap-3 px-4 py-2 text-sm ${
+                              activeTab === tab.id
+                                ? "bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white"
+                                : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                            }`}
+                          >
+                            {tab.icon} {tab.shortLabel || tab.label}
+                          </button>
+                        ))}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
             )}
           </div>
         </div>
+        {TabContent}
       </div>
       {isJiraModalOpen && (
         <JiraTicketModal

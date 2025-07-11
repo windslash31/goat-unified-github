@@ -49,15 +49,23 @@ const suspendUser = async (email) => {
 const getUserStatus = async (email) => {
   try {
     const user = await getUser(email);
-    if (!user) return { platform: "JumpCloud", status: "Not Found" };
+    if (!user)
+      return { platform: "JumpCloud", status: "Not Found", email: email };
 
+    // --- MODIFICATION: Return the username instead of the email ---
     return {
       platform: "JumpCloud",
+      email: user.username, // Changed from user.email to user.username
       status: user.suspended ? "Suspended" : "Active",
       details: `Username: ${user.username}`,
     };
   } catch (error) {
-    return { platform: "JumpCloud", status: "Error", message: error.message };
+    return {
+      platform: "JumpCloud",
+      status: "Error",
+      email: email,
+      message: error.message,
+    };
   }
 };
 
@@ -99,7 +107,6 @@ const getSystemDetails = async (systemId) => {
   return data;
 };
 
-// Add the new functions to the exports
 module.exports = {
   suspendUser,
   getUserStatus,
