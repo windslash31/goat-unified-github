@@ -1,8 +1,7 @@
-const path = require('path');
+// packages/server/src/config/loadEnv.js
+const path = require("path");
 
-// --- FIX: Correct the path to go up three levels to the monorepo root ---
-const envPath = path.resolve(__dirname, '../../../../.env');
+// Go up three levels to the monorepo root to find the .env file
+const envPath = path.resolve(__dirname, "../../../../.env");
 
-console.log(`Loading environment variables from: ${envPath}`);
-
-require('dotenv').config({ path: envPath });
+require("dotenv").config({ path: envPath });
