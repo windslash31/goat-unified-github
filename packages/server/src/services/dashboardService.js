@@ -11,8 +11,15 @@ const getDashboardStats = async () => {
         FROM employees
         LIMIT 1;
     `;
-  const result = await db.query(statsQuery);
-  return result.rows[0];
+  try {
+    console.log("Attempting to query dashboard stats..."); // Add this
+    const result = await db.query(statsQuery);
+    console.log("Dashboard stats query successful."); // Add this
+    return result.rows[0];
+  } catch (error) {
+    console.error("Error during getDashboardStats DB query:", error); // Add this
+    throw error; // Re-throw to propagate to controller
+  }
 };
 
 const getRecentActivity = async () => {

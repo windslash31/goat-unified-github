@@ -23,15 +23,25 @@ const exportEmployees = async (req, res, next) => {
   }
 };
 
-const getEmployee = async (req, res, next) => {
+const getEmployee = async (req, res) => {
   try {
-    const employee = await employeeService.getEmployeeById(req.params.id);
-    if (!employee) {
-      return res.status(404).json({ message: "Employee not found." });
+    const { id } = req.params;
+    const employeeId = parseInt(id, 10);
+
+    if (isNaN(employeeId)) {
+      return res.status(400).send({ message: "Invalid employee ID" });
     }
-    res.json(employee);
+
+    const employee = await employeeService.getEmployeeById(employeeId);
+
+    if (!employee) {
+      return res.status(404).send({ message: "Employee not found" });
+    }
+
+    res.status(200).send(employee);
   } catch (error) {
-    next(error);
+    console.error("Error in getEmployee:", error);
+    res.status(500).send({ message: "Internal server error" });
   }
 };
 

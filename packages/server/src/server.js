@@ -43,7 +43,7 @@ app.use("/api", roleRoutes);
 app.use("/api", applicationRoutes);
 app.use("/api", dashboardRoutes);
 app.use("/api", logRoutes);
-app.use("/api", jiraRoutes);
+app.use("/api/jira", jiraRoutes);
 app.use("/api", userRoutes);
 
 // Global error handler
