@@ -71,7 +71,7 @@ const SettingsPage = lazy(() =>
 );
 
 const fetchMe = async () => {
-  const { data } = await api.get("/api/me");
+  const { data } = await api.get("/api/auth/me");
   return data;
 };
 

@@ -36,15 +36,15 @@ app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// API Routes
-app.use("/api", authRoutes);
-app.use("/api", employeeRoutes);
-app.use("/api", roleRoutes);
-app.use("/api", applicationRoutes);
-app.use("/api", dashboardRoutes);
-app.use("/api", logRoutes);
+// API Routes - CORRECTED
+app.use("/api/auth", authRoutes);
+app.use("/api/employees", employeeRoutes);
+app.use("/api/roles", roleRoutes);
+app.use("/api/applications", applicationRoutes);
+app.use("/api/dashboard", dashboardRoutes);
+app.use("/api/logs", logRoutes);
 app.use("/api/jira", jiraRoutes);
-app.use("/api", userRoutes);
+app.use("/api/users", userRoutes);
 
 // Global error handler
 app.use((err, req, res, next) => {
