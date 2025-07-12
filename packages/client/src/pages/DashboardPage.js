@@ -22,21 +22,18 @@ const fetchDashboardData = async () => {
 
 
 const StatCard = ({ title, value, icon, color }) => (
-  <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 flex items-center gap-4">
-    <div
-      className={`w-12 h-12 rounded-lg flex-shrink-0 flex items-center justify-center ${color}`}
-    >
-      {icon}
-    </div>
-    <div>
-      <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
-        {title}
-      </p>
-      <p className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white">
-        {value}
-      </p>
-    </div>
-  </div>
+  <motion.div
+      whileHover={{ translateY: -5, boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)" }}
+      className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 flex items-center gap-4 cursor-pointer"
+  >
+      <div className={`w-12 h-12 rounded-lg flex-shrink-0 flex items-center justify-center ${color}`}>
+          {icon}
+      </div>
+      <div>
+          <p className="text-sm font-medium text-gray-500 dark:text-gray-400">{title}</p>
+          <p className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white">{value}</p>
+      </div>
+  </motion.div>
 );
 
 const BarChart = ({ data, title }) => (
@@ -111,35 +108,52 @@ const AlertsPanel = ({ forEscalationCount }) => (
   </div>
 );
 
+const ActivityListItem = ({ log }) => {
+  const getIcon = (action) => {
+      if (action.includes("LOGIN")) return <LogIn className="w-5 h-5 text-green-500" />;
+      if (action.includes("LOGOUT")) return <LogOut className="w-5 h-5 text-gray-500" />;
+      if (action.includes("CREATE")) return <UserPlus className="w-5 h-5 text-blue-500" />;
+      return <Activity className="w-5 h-5 text-gray-400" />;
+  };
+
+  return (
+      <div className="flex items-center gap-4 py-2">
+          <div className="w-9 h-9 rounded-lg bg-gray-100 dark:bg-gray-700 flex items-center justify-center flex-shrink-0">
+              {getIcon(log.action_type)}
+          </div>
+          <div>
+              <p className="text-sm">
+                  {log.action_type.replace(/_/g, " ")} by{' '}
+                  <span className="font-semibold">{log.actor_email || "System"}</span>
+              </p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                  {new Date(log.timestamp).toLocaleString()}
+              </p>
+          </div>
+      </div>
+  );
+};
+
 export const DashboardPage = () => {
   const { data, isLoading, error } = useQuery({
-    queryKey: ["dashboardData"],
-    queryFn: fetchDashboardData,
+      queryKey: ["dashboardData"],
+      queryFn: fetchDashboardData,
   });
 
   if (isLoading) return <DashboardSkeleton />;
+  if (error) return <div className="p-6 text-center text-red-500">Could not load dashboard data.</div>;
 
-  if (error)
-    return (
-      <div className="p-6 text-center text-red-500">
-        Could not load dashboard data.
-      </div>
-    );
-
-  const { stats, recentActivity, recentTickets, licenseStats, distribution } =
-    data || {};
+  const { stats, recentActivity, recentTickets, licenseStats, distribution } = data || {};
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -20 }}
-      transition={{ duration: 0.3 }}
-      className="p-4 sm:p-6"
-    >
-      <h1 className="text-2xl font-bold mb-6 text-gray-900 dark:text-white">
-        Dashboard
-      </h1>
+      <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -20 }}
+          transition={{ duration: 0.3 }}
+          className="p-4 sm:p-6"
+      >
+          <h1 className="text-2xl font-bold mb-6 text-gray-900 dark:text-white">Dashboard</h1>
 
       {stats && (
         <>
@@ -179,81 +193,53 @@ export const DashboardPage = () => {
         </>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        <div className="lg:col-span-8 space-y-6">
-          {licenseStats && (
-            <BarChart data={licenseStats} title="License Utilization" />
-          )}
-          {distribution && (
-            <DistributionList
-              data={distribution}
-              title="Active Employees by Location"
-            />
-          )}
-        </div>
+<div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                <div className="lg:col-span-8 space-y-6">
+                    {licenseStats && <BarChart data={licenseStats} title="License Utilization" />}
+                    {distribution && <DistributionList data={distribution} title="Active Employees by Location" />}
+                </div>
 
-        <div className="lg:col-span-4 space-y-6">
-          {recentActivity && (
-            <div>
-              <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                <Activity /> Recent Activity
-              </h2>
-              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 space-y-4">
-                {recentActivity.map((log) => (
-                  <div key={log.id} className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 flex-shrink-0"></div>
-                    <div>
-                      <p className="text-sm">
-                        {log.action_type.replace(/_/g, " ")} by{" "}
-                        <span className="font-semibold">
-                          {log.actor_email || "System"}
-                        </span>
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        {new Date(log.timestamp).toLocaleString()}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                <div className="lg:col-span-4 space-y-6">
+                    {recentActivity && (
+                        <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+                            <h2 className="text-lg font-semibold mb-2 flex items-center gap-2">
+                                <Activity /> Recent Activity
+                            </h2>
+                            <div className="space-y-2">
+                                {recentActivity.map((log) => (
+                                    <ActivityListItem key={log.id} log={log} />
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                    {recentTickets && (
+                         <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+                            <h2 className="text-lg font-semibold mb-2 flex items-center gap-2">
+                                <Ticket /> Recent Tickets
+                            </h2>
+                            <div className="space-y-2">
+                                {recentTickets.map((ticket) => (
+                                    <div key={`${ticket.ticket_type}-${ticket.id}`} className="flex items-center gap-4 py-2">
+                                        <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                                            ticket.ticket_type === 'Onboarding' ? 'bg-green-100' : 'bg-red-100'
+                                        }`}>
+                                            <Ticket className={`w-5 h-5 ${
+                                                ticket.ticket_type === 'Onboarding' ? 'text-green-600' : 'text-red-600'
+                                            }`} />
+                                        </div>
+                                        <div>
+                                            <p className="text-sm">
+                                                <span className="font-semibold">{ticket.ticket_type}:</span> {ticket.first_name} {ticket.last_name}
+                                            </p>
+                                            <p className="text-xs text-gray-500 dark:text-gray-400">{ticket.ticket_id}</p>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
             </div>
-          )}
-          {recentTickets && (
-            <div>
-              <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                <Ticket /> Recent Tickets
-              </h2>
-              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 space-y-4">
-                {recentTickets.map((ticket) => (
-                  <div
-                    key={`${ticket.ticket_type}-${ticket.id}`}
-                    className="flex items-center gap-3"
-                  >
-                    <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 flex-shrink-0"></div>
-                    <div>
-                      <p className="text-sm">
-                        <span
-                          className={`font-semibold ${
-                            ticket.ticket_type === "Onboarding"
-                              ? "text-green-500"
-                              : "text-red-500"
-                          }`}
-                        >
-                          {ticket.ticket_type}:
-                        </span>{" "}
-                        {ticket.first_name} {ticket.last_name}
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        {ticket.ticket_id}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    </motion.div>
-  );
+        </motion.div>
+    );
 };
