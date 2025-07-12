@@ -11,7 +11,10 @@ import {
   Globe,
   BarChart2,
   Bell,
-} from "lucide-react";
+  LogIn,
+  LogOut,
+  UserPlus,
+} from "lucide-react"; // I've added LogIn, LogOut, and UserPlus here
 import { motion } from "framer-motion";
 import { DashboardSkeleton } from "../components/ui/DashboardSkeleton";
 
