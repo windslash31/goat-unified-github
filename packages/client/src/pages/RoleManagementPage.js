@@ -13,6 +13,7 @@ import { Button } from "../components/ui/Button";
 import { useAuthStore } from "../stores/authStore";
 import api from "../api/api";
 import { motion } from "framer-motion";
+import { RoleManagementSkeleton } from '../components/ui/RoleManagementSkeleton';
 
 const permissionGroups = [
   {
@@ -456,10 +457,8 @@ export const RoleManagementPage = ({ onLogout }) => {
     }
   };
 
-  if (loading)
-    return (
-      <div className="p-6 text-center">Loading Roles & Permissions...</div>
-    );
+  if (loading) return <RoleManagementSkeleton />;
+
   if (error)
     return (
       <div className="p-6 text-center text-red-500">

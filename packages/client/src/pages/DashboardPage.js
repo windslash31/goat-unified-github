@@ -13,13 +13,13 @@ import {
   Bell,
 } from "lucide-react";
 import { motion } from "framer-motion";
+import { DashboardSkeleton } from "../components/ui/DashboardSkeleton";
 
 const fetchDashboardData = async () => {
   const { data } = await api.get("/api/dashboard");
   return data;
 };
 
-// --- Sub-Components for the Dashboard ---
 
 const StatCard = ({ title, value, icon, color }) => (
   <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 flex items-center gap-4">
@@ -117,8 +117,8 @@ export const DashboardPage = () => {
     queryFn: fetchDashboardData,
   });
 
-  if (isLoading)
-    return <div className="p-6 text-center">Loading dashboard...</div>;
+  if (isLoading) return <DashboardSkeleton />;
+
   if (error)
     return (
       <div className="p-6 text-center text-red-500">

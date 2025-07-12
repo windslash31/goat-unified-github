@@ -27,6 +27,7 @@ import { FilterPopover } from "../components/ui/FilterPopover";
 import { FilterPills } from "../components/ui/FilterPills";
 import api from "../api/api";
 import { motion } from "framer-motion";
+import { ActivityLogSkeleton } from "../components/ui/ActivityLogSkeleton";
 
 const formatValue = (value) => {
   if (value === null || typeof value === "undefined") return '""';
@@ -541,7 +542,11 @@ export const ActivityLogPage = () => {
     }),
     [filterOptions]
   );
-
+  
+  if (isLoadingLogs) {
+    return <ActivityLogSkeleton />;
+  }
+  
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -600,10 +605,7 @@ export const ActivityLogPage = () => {
 
       <div className="mt-4 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
         <div className="divide-y divide-gray-200 dark:divide-gray-700">
-          {isLoadingLogs ? (
-            <div className="p-6 text-center">Loading logs...</div>
-          ) : (
-            (logData || []).map((log) => (
+          {(logData || []).map((log) => (
               <ActivityLogItem
                 key={log.id}
                 log={log}
@@ -612,7 +614,7 @@ export const ActivityLogPage = () => {
                 onToggle={() => toggleRowExpansion(log.id)}
               />
             ))
-          )}
+          }
           {!isLoadingLogs && (!logData || logData.length === 0) && (
             <div className="p-6 text-center text-gray-500">
               No activity found for the selected filters.

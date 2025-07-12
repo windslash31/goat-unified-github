@@ -1,4 +1,3 @@
-// packages/client/src/pages/ProfilePage.js
 import React, { useState, useCallback, useEffect, useRef } from "react";
 import {
   UserSquare,
@@ -22,6 +21,15 @@ import { motion, AnimatePresence } from "framer-motion";
 import { PlatformLogPage } from "./EmployeeDetailPage/PlatformLogPage";
 import { DevicesTab } from "./EmployeeDetailPage/DevicesTab";
 import { useMediaQuery } from "../hooks/useMediaQuery";
+import { useQuery } from "@tanstack/react-query";
+import { useAuthStore } from "../stores/authStore";
+import api from "../api/api";
+import { EmployeeDetailSkeleton } from "../components/ui/EmployeeDetailSkeleton";
+
+const fetchMe = async () => {
+  const { data } = await api.get("/api/me");
+  return data;
+};
 
 export const ProfilePage = ({
   employee,
@@ -31,6 +39,7 @@ export const ProfilePage = ({
   onLogout,
   user,
 }) => {
+  const { isAuthenticated } = useAuthStore();
   const [activeTab, setActiveTab] = useState("details");
   const [platformStatuses, setPlatformStatuses] = useState([]);
   const [isLoadingPlatforms, setIsLoadingPlatforms] = useState(true);
@@ -46,6 +55,13 @@ export const ProfilePage = ({
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
   const moreMenuRef = useRef(null);
   const isDesktop = useMediaQuery("(min-width: 768px)");
+
+  const { data: currentUserEmployeeRecord, isLoading: isLoadingMe } = useQuery({
+    queryKey: ["me"],
+    queryFn: fetchMe,
+    enabled: isAuthenticated,
+    staleTime: 1000 * 60 * 5,
+  });
 
   const allTabs = [
     {
@@ -187,6 +203,8 @@ export const ProfilePage = ({
       setIsJiraModalOpen(true);
     }
   };
+
+  if (isLoadingMe) return <EmployeeDetailSkeleton />;
 
   if (!permissions.includes("profile:read:own")) {
     return <AccessDeniedPage />;
