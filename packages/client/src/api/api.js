@@ -63,7 +63,7 @@ api.interceptors.response.use(
       isRefreshing = true;
 
       try {
-        const { data } = await api.post("/auth/refresh");
+        const { data } = await api.post("/api/auth/refresh");
 
         useAuthStore.getState().setRefreshedTokens(data.accessToken);
 
