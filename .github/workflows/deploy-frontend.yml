@@ -15,6 +15,9 @@ jobs:
       - name: Install Dependencies and Build
         working-directory: ./packages/client
         run: npm ci && npm run build
+        env:
+          VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL }}
+          VITE_JIRA_BASE_URL: ${{ secrets.VITE_JIRA_BASE_URL }}
       - uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: '${{ secrets.GITHUB_TOKEN }}'
