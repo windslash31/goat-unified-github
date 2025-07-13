@@ -13,6 +13,7 @@ const jiraRoutes = require("./api/routes/jira");
 const userRoutes = require("./api/routes/users");
 
 const app = express();
+app.set('trust proxy', 1);
 
 const whitelist = ["http://localhost:3000", config.clientUrl];
 
