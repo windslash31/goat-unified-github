@@ -16,7 +16,7 @@ export const StatusQuickFilters = ({ currentStatus, onStatusChange }) => {
                         : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
                     }`}
                 >
-                    {capitalize(status).replace('_', ' ')}
+                    {status === 'escalation' ? 'For Escalation' : capitalize(status)}
                 </button>
             ))}
         </div>

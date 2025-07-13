@@ -33,7 +33,7 @@ export const FilterPopover = ({
     { id: "all", name: "All" },
     { id: "active", name: "Active" },
     { id: "inactive", name: "Inactive" },
-    { id: "invited", name: "Invited" },
+    { id: "escalation", name: "Escalation" },
   ];
 
   useLayoutEffect(() => {

@@ -9,6 +9,7 @@ const StatusBadgeComponent = ({ status }) => {
       case "Inactive":
         return "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300";
       case "For Escalation":
+      case "Escalation":
         // Using a distinct style for "For Escalation" status.
         return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300";
       default:
