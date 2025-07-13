@@ -21,7 +21,7 @@ const login = async (req, res, next) => {
     res.cookie("refreshToken", refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production", // Use secure cookies in production
-      sameSite: "strict", // Or 'lax' depending on your needs
+      sameSite: "none", // Or 'lax' depending on your needs
       path: "/api", // Important to scope the cookie to your API routes
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     });
