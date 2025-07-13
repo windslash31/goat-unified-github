@@ -5,7 +5,8 @@ import toast from "react-hot-toast";
 import { PlusCircle, Edit, Trash2 } from "lucide-react";
 import { Button } from "../components/ui/Button";
 import api from "../api/api";
-import { motion } from "framer-motion"; // Import motion
+import { motion } from "framer-motion";
+import { ApplicationManagementSkeleton } from "../components/ui/ApplicationManagementSkeleton";
 
 const fetchApplications = async () => {
   const { data } = await api.get("/api/applications");
@@ -68,7 +69,7 @@ export const ApplicationManagementPage = () => {
     }
   };
 
-  if (isLoading) return <div>Loading applications...</div>;
+  if (isLoading) return <ApplicationManagementSkeleton />;
 
   return (
     <motion.div

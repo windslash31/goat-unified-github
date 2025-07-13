@@ -25,7 +25,7 @@ export const useAuthStore = create((set, get) => ({
 
   login: async (email, password) => {
     try {
-      const { data } = await api.post("/api/login", { email, password });
+      const { data } = await api.post("/api/auth/login", { email, password });
 
       if (!data.accessToken) {
         throw new Error("Login response did not include an access token.");
@@ -57,7 +57,7 @@ export const useAuthStore = create((set, get) => ({
     try {
       // The httpOnly cookie will be cleared by the server.
       // We no longer need to send the refresh token.
-      await api.post("/api/logout");
+      await api.post("/api/auth/logout");
     } catch (error) {
       console.error(
         "Logout API call failed, proceeding with client-side logout.",

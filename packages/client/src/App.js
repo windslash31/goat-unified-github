@@ -1,4 +1,3 @@
-// packages/client/src/App.js
 import React, { useState, useEffect, useCallback, Suspense, lazy } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -17,6 +16,14 @@ import { AccessDeniedPage } from "./components/ui/AccessDeniedPage";
 import { useAuthStore } from "./stores/authStore";
 import { ProtectedRoute } from "./components/auth/ProtectedRoute";
 import api from "./api/api";
+
+import { DashboardSkeleton } from "./components/ui/DashboardSkeleton";
+import { EmployeeDetailSkeleton } from "./components/ui/EmployeeDetailSkeleton";
+import { EmployeeListSkeleton } from "./components/ui/EmployeeListSkeleton";
+import { RoleManagementSkeleton } from "./components/ui/RoleManagementSkeleton";
+import { UserManagementSkeleton } from "./components/ui/UserManagementSkeleton";
+import { ActivityLogSkeleton } from "./components/ui/ActivityLogSkeleton";
+import { ApplicationManagementSkeleton } from "./components/ui/ApplicationManagementSkeleton";
 
 // Lazy load page components for code splitting
 const LoginPage = lazy(() =>
@@ -71,7 +78,7 @@ const SettingsPage = lazy(() =>
 );
 
 const fetchMe = async () => {
-  const { data } = await api.get("/api/me");
+  const { data } = await api.get("/api/auth/me");
   return data;
 };
 
@@ -255,10 +262,12 @@ const AppContent = () => {
 
   if (!isAuthenticated) {
     return (
-      <Routes>
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="*" element={<Navigate to="/login" replace />} />
-      </Routes>
+        <Suspense fallback={<div className="flex h-screen w-screen items-center justify-center text-lg">Loading...</div>}>
+            <Routes>
+                <Route path="/login" element={<LoginPage />} />
+                <Route path="*" element={<Navigate to="/login" replace />} />
+            </Routes>
+        </Suspense>
     );
   }
 
@@ -267,9 +276,7 @@ const AppContent = () => {
   }
 
   if (!user) {
-    return (
-      <div className="p-6 text-center text-lg">Loading Application...</div>
-    );
+    return <DashboardSkeleton />;
   }
 
   return (
@@ -286,67 +293,73 @@ const AppContent = () => {
           }
         >
           <Route element={<ProtectedRoute permission="dashboard:view" />}>
-            <Route path="/dashboard" element={<DashboardPage />} />
+            <Route path="/dashboard" element={<Suspense fallback={<DashboardSkeleton />}><DashboardPage /></Suspense>} />
           </Route>
 
           <Route
             path="/profile"
             element={
-              <ProfilePage
-                employee={currentUserEmployeeRecord}
-                permissions={user.permissions}
-                onEdit={handleOpenEditModal}
-                onDeactivate={handleOpenDeactivateModal}
-                onLogout={handleLogout}
-                user={user}
-              />
+              <Suspense fallback={<EmployeeDetailSkeleton />}>
+                <ProfilePage
+                    employee={currentUserEmployeeRecord}
+                    permissions={user.permissions}
+                    onEdit={handleOpenEditModal}
+                    onDeactivate={handleOpenDeactivateModal}
+                    onLogout={handleLogout}
+                    user={user}
+                />
+              </Suspense>
             }
           />
 
           <Route
             path="/employees"
             element={
-              <EmployeeListPage
-                employees={employeeData?.employees || []}
-                isLoading={isLoadingEmployees}
-                filters={filters}
-                setFilters={setFilters}
-                pagination={pagination}
-                setPagination={setPagination}
-                sorting={sorting}
-                setSorting={setSorting}
-                onEdit={handleOpenEditModal}
-                onDeactivate={handleOpenDeactivateModal}
-              />
+              <Suspense fallback={<EmployeeListSkeleton count={10}/>}>
+                <EmployeeListPage
+                    employees={employeeData?.employees || []}
+                    isLoading={isLoadingEmployees}
+                    filters={filters}
+                    setFilters={setFilters}
+                    pagination={pagination}
+                    setPagination={setPagination}
+                    sorting={sorting}
+                    setSorting={setSorting}
+                    onEdit={handleOpenEditModal}
+                    onDeactivate={handleOpenDeactivateModal}
+                />
+              </Suspense>
             }
           />
           <Route
             path="/employees/:employeeId"
             element={
-              <EmployeeDetailPage
-                onEdit={handleOpenEditModal}
-                onDeactivate={handleOpenDeactivateModal}
-                permissions={user.permissions}
-                onLogout={handleLogout}
-              />
+              <Suspense fallback={<EmployeeDetailSkeleton />}>
+                <EmployeeDetailPage
+                    onEdit={handleOpenEditModal}
+                    onDeactivate={handleOpenDeactivateModal}
+                    permissions={user.permissions}
+                    onLogout={handleLogout}
+                />
+              </Suspense>
             }
           />
 
           <Route element={<ProtectedRoute permission="log:read" />}>
             <Route
               path="/logs/activity"
-              element={<ActivityLogPage onLogout={handleLogout} />}
+              element={<Suspense fallback={<ActivityLogSkeleton />}><ActivityLogPage onLogout={handleLogout} /></Suspense>}
             />
           </Route>
 
           <Route path="/access-denied" element={<AccessDeniedPage />} />
 
           <Route path="/settings" element={<SettingsPage />}>
-            <Route path="users" element={<UserManagementPage />} />
-            <Route path="roles" element={<RoleManagementPage />} />
+            <Route path="users" element={<Suspense fallback={<UserManagementSkeleton />}><UserManagementPage /></Suspense>} />
+            <Route path="roles" element={<Suspense fallback={<RoleManagementSkeleton />}><RoleManagementPage /></Suspense>} />
             <Route
               path="applications"
-              element={<ApplicationManagementPage />}
+              element={<Suspense fallback={<ApplicationManagementSkeleton />}><ApplicationManagementPage /></Suspense>}
             />
           </Route>
 
@@ -386,15 +399,7 @@ export default function App() {
     <ThemeProvider>
       <BrowserRouter>
         <BreadcrumbProvider>
-          <Suspense
-            fallback={
-              <div className="flex h-screen w-screen items-center justify-center text-lg">
-                Loading Page...
-              </div>
-            }
-          >
             <AppContent />
-          </Suspense>
         </BreadcrumbProvider>
       </BrowserRouter>
     </ThemeProvider>

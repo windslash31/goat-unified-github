@@ -7,7 +7,6 @@ const DetailRowComponent = ({ icon, label, value }) => {
         {icon}
         {label}
       </span>
-      {/* MODIFIED: The default value is now a dash '—' for a cleaner look. */}
       <div className="text-gray-800 dark:text-gray-200 text-right">
         {value || "—"}
       </div>

@@ -1,13 +1,21 @@
 const { WebClient } = require("@slack/web-api");
 
-// Throw an error at startup if the token is missing from the .env file.
-if (!process.env.SLACK_BOT_TOKEN) {
-  throw new Error(
-    "Slack Bot Token is not defined. Please set SLACK_BOT_TOKEN in your .env file."
-  );
-}
-
-const web = new WebClient(process.env.SLACK_BOT_TOKEN);
+// -- MODIFICATION START: LAZY INITIALIZATION --
+// We will initialize the client inside the functions that use it
+// to ensure environment variables are loaded.
+let web;
+const getWebClient = () => {
+  if (!web) {
+    if (!process.env.SLACK_BOT_TOKEN) {
+      throw new Error(
+        "Slack Bot Token is not defined. Please set SLACK_BOT_TOKEN in your .env file."
+      );
+    }
+    web = new WebClient(process.env.SLACK_BOT_TOKEN);
+  }
+  return web;
+};
+// -- MODIFICATION END --
 
 const getUserStatus = async (email) => {
   if (!email) {
@@ -20,7 +28,8 @@ const getUserStatus = async (email) => {
   }
 
   try {
-    const result = await web.users.lookupByEmail({ email });
+    const client = getWebClient(); // Use the getter function
+    const result = await client.users.lookupByEmail({ email });
     if (result.ok && result.user) {
       return {
         platform: "Slack",
@@ -56,7 +65,8 @@ const getUserStatus = async (email) => {
 
 const deactivateUser = async (email) => {
   try {
-    const result = await web.users.lookupByEmail({ email });
+    const client = getWebClient(); // Use the getter function
+    const result = await client.users.lookupByEmail({ email });
     if (result.ok && result.user) {
       // Placeholder for admin.users.setInactive
       return {
@@ -86,7 +96,8 @@ const deactivateUser = async (email) => {
 const getAuditLogs = async (email) => {
   // This is a placeholder implementation.
   try {
-    const userResult = await web.users.lookupByEmail({ email });
+    const client = getWebClient(); // Use the getter function
+    const userResult = await client.users.lookupByEmail({ email });
     if (userResult.ok && userResult.user) {
       // const logResult = await web.admin.audit.v1.logs({ action: 'user_login', actors: result.user.id });
       // For this example, we return mock data based on your UI.
