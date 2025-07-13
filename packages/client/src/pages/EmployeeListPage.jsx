@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   Search,
@@ -24,13 +24,14 @@ import { Pagination } from "../components/ui/Pagination";
 import { StatusQuickFilters } from "../components/ui/StatusQuickFilters";
 import { FilterPills } from "../components/ui/FilterPills";
 import { EmptyState } from "../components/ui/EmptyState";
-import { useDebounce } from "../hooks/useDebounce";
 import { useFetchFilterOptions } from "../hooks/useFetchFilterOptions";
 import { useMediaQuery } from "../hooks/useMediaQuery";
+import { useEmployeeTable } from "../hooks/useEmployeeTable"; // Import the new hook
 import { motion } from "framer-motion";
 import api from "../api/api";
 import { EmployeeImportModal } from "../components/ui/EmployeeImportModal";
 import { EmployeeListSkeleton } from "../components/ui/EmployeeListSkeleton";
+
 
 const MobileList = React.memo(({ employees }) => (
   <div className="divide-y divide-gray-200 dark:divide-gray-700">
@@ -297,62 +298,37 @@ const DesktopTable = React.memo(
   }
 );
 
-export const EmployeeListPage = ({
-  employees,
-  isLoading,
-  filters,
-  setFilters,
-  pagination,
-  setPagination,
-  sorting,
-  setSorting,
-  onEdit,
-  onDeactivate,
-}) => {
+export const EmployeeListPage = ({ onEdit, onDeactivate }) => {
+    
+  const {
+      employees,
+      pagination,
+      setPagination,
+      sorting,
+      setSorting,
+      filters,
+      setFilters,
+      isLoading,
+      searchInputValue,
+      setSearchInputValue,
+  } = useEmployeeTable();
+    
   const [isFilterPopoverOpen, setIsFilterPopoverOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
-  const [searchInputValue, setSearchInputValue] = useState(filters.search);
-  const debouncedSearchTerm = useDebounce(searchInputValue, 500);
-  const [isDebouncing, setIsDebouncing] = useState(false);
   const filterButtonRef = useRef(null);
-  const token = localStorage.getItem("accessToken");
-
+  
   const [selectedRows, setSelectedRows] = useState(new Set());
   const [isBulkActionMenuOpen, setIsBulkActionMenuOpen] = useState(false);
 
   const isDesktop = useMediaQuery("(min-width: 768px)");
 
   const filterOptions = {
-    legalEntities: useFetchFilterOptions(
-      "employees/options/legal_entities",
-      token
-    ),
-    officeLocations: useFetchFilterOptions(
-      "employees/options/office_locations",
-      token
-    ),
-    employeeTypes: useFetchFilterOptions(
-      "employees/options/employee_types",
-      token
-    ),
-    employeeSubTypes: useFetchFilterOptions(
-      "employees/options/employee_sub_types",
-      token
-    ),
-    applications: useFetchFilterOptions("applications", token),
+    legalEntities: useFetchFilterOptions("employees/options/legal_entities"),
+    officeLocations: useFetchFilterOptions("employees/options/office_locations"),
+    employeeTypes: useFetchFilterOptions("employees/options/employee_types"),
+    employeeSubTypes: useFetchFilterOptions("employees/options/employee_sub_types"),
+    applications: useFetchFilterOptions("applications"),
   };
-
-  useEffect(() => {
-    setIsDebouncing(true);
-    const handler = setTimeout(() => {
-      setFilters((prev) => ({ ...prev, search: debouncedSearchTerm }));
-      if (pagination.currentPage !== 1) {
-        setPagination((prev) => ({ ...prev, currentPage: 1 }));
-      }
-      setIsDebouncing(false);
-    }, 500);
-    return () => clearTimeout(handler);
-  }, [debouncedSearchTerm, setFilters, setPagination, pagination.currentPage]);
 
   useEffect(() => {
     setSelectedRows(new Set());
@@ -446,7 +422,7 @@ export const EmployeeListPage = ({
     });
   };
 
-  if (isLoading && !isDebouncing) {
+  if (isLoading) {
     return (
       <div className="p-4 sm:p-6">
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
@@ -519,7 +495,7 @@ export const EmployeeListPage = ({
                   onChange={(e) => setSearchInputValue(e.target.value)}
                   className="w-full sm:w-64 pl-10 pr-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-kredivo-primary focus:outline-none"
                 />
-                {isDebouncing && (
+                {isLoading && (
                   <Loader className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-gray-400" />
                 )}
               </div>
