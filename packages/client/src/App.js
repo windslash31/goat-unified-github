@@ -281,25 +281,26 @@ const AppContent = () => {
 
   return (
     <>
-      <Routes location={location} key={location.pathname}>
-        <Route
-          element={
-            <MainLayout
-              onLogout={handleLogout}
-              permissions={user.permissions}
-              breadcrumbs={getBreadcrumbs()}
-              user={user}
-            />
-          }
-        >
-          <Route element={<ProtectedRoute permission="dashboard:view" />}>
-            <Route path="/dashboard" element={<Suspense fallback={<DashboardSkeleton />}><DashboardPage /></Suspense>} />
-          </Route>
-
+      {/* --- MODIFICATION: Added Suspense wrapper with a fallback --- */}
+      <Suspense fallback={<DashboardSkeleton />}>
+        <Routes location={location} key={location.pathname}>
           <Route
-            path="/profile"
             element={
-              <Suspense fallback={<EmployeeDetailSkeleton />}>
+              <MainLayout
+                onLogout={handleLogout}
+                permissions={user.permissions}
+                breadcrumbs={getBreadcrumbs()}
+                user={user}
+              />
+            }
+          >
+            <Route element={<ProtectedRoute permission="dashboard:view" />}>
+              <Route path="/dashboard" element={<DashboardPage />} />
+            </Route>
+  
+            <Route
+              path="/profile"
+              element={
                 <ProfilePage
                     employee={currentUserEmployeeRecord}
                     permissions={user.permissions}
@@ -308,14 +309,12 @@ const AppContent = () => {
                     onLogout={handleLogout}
                     user={user}
                 />
-              </Suspense>
-            }
-          />
-
-          <Route
-            path="/employees"
-            element={
-              <Suspense fallback={<EmployeeListSkeleton count={10}/>}>
+              }
+            />
+  
+            <Route
+              path="/employees"
+              element={
                 <EmployeeListPage
                     employees={employeeData?.employees || []}
                     isLoading={isLoadingEmployees}
@@ -328,53 +327,51 @@ const AppContent = () => {
                     onEdit={handleOpenEditModal}
                     onDeactivate={handleOpenDeactivateModal}
                 />
-              </Suspense>
-            }
-          />
-          <Route
-            path="/employees/:employeeId"
-            element={
-              <Suspense fallback={<EmployeeDetailSkeleton />}>
+              }
+            />
+            <Route
+              path="/employees/:employeeId"
+              element={
                 <EmployeeDetailPage
                     onEdit={handleOpenEditModal}
                     onDeactivate={handleOpenDeactivateModal}
                     permissions={user.permissions}
                     onLogout={handleLogout}
                 />
-              </Suspense>
-            }
-          />
-
-          <Route element={<ProtectedRoute permission="log:read" />}>
+              }
+            />
+  
+            <Route element={<ProtectedRoute permission="log:read" />}>
+              <Route
+                path="/logs/activity"
+                element={<ActivityLogPage onLogout={handleLogout} />}
+              />
+            </Route>
+  
+            <Route path="/access-denied" element={<AccessDeniedPage />} />
+  
+            <Route path="/settings" element={<SettingsPage />}>
+              <Route path="users" element={<UserManagementPage />} />
+              <Route path="roles" element={<RoleManagementPage />} />
+              <Route
+                path="applications"
+                element={<ApplicationManagementPage />}
+              />
+            </Route>
+  
             <Route
-              path="/logs/activity"
-              element={<Suspense fallback={<ActivityLogSkeleton />}><ActivityLogPage onLogout={handleLogout} /></Suspense>}
+              path="/"
+              element={
+                user.permissions.includes("dashboard:view") ? (
+                  <Navigate to="/dashboard" replace />
+                ) : (
+                  <Navigate to="/profile" replace />
+                )
+              }
             />
           </Route>
-
-          <Route path="/access-denied" element={<AccessDeniedPage />} />
-
-          <Route path="/settings" element={<SettingsPage />}>
-            <Route path="users" element={<Suspense fallback={<UserManagementSkeleton />}><UserManagementPage /></Suspense>} />
-            <Route path="roles" element={<Suspense fallback={<RoleManagementSkeleton />}><RoleManagementPage /></Suspense>} />
-            <Route
-              path="applications"
-              element={<Suspense fallback={<ApplicationManagementSkeleton />}><ApplicationManagementPage /></Suspense>}
-            />
-          </Route>
-
-          <Route
-            path="/"
-            element={
-              user.permissions.includes("dashboard:view") ? (
-                <Navigate to="/dashboard" replace />
-              ) : (
-                <Navigate to="/profile" replace />
-              )
-            }
-          />
-        </Route>
-      </Routes>
+        </Routes>
+      </Suspense>
 
       {isEditModalOpen && (
         <EditEmployeeModal
