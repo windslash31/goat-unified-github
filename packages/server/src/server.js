@@ -30,14 +30,12 @@ const corsOptions = {
 
 // Middlewares
 app.use(helmet());
-// --- MODIFICATION: ADD THE COOKIE SECRET ---
 app.use(cookieParser(config.cookie.secret));
-// --- END MODIFICATION ---
 app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// API Routes - CORRECTED
+//routes
 app.use("/api/auth", authRoutes);
 app.use("/api/employees", employeeRoutes);
 app.use("/api/roles", roleRoutes);
