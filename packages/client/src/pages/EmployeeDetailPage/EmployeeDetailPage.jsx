@@ -118,7 +118,7 @@ export const EmployeeDetailPage = ({
     }
 
     setLoading(true);
-    fetch(`${process.env.REACT_APP_API_BASE_URL}/api/employees/${employeeId}`, {
+    fetch(`${import.meta.env.VITE_API_BASE_URL}/api/employees/${employeeId}`, {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((res) => {
@@ -148,7 +148,7 @@ export const EmployeeDetailPage = ({
 
     setIsLoadingPlatforms(true);
     fetch(
-      `${process.env.REACT_APP_API_BASE_URL}/api/employees/${employeeId}/platform-statuses`,
+      `${import.meta.env.VITE_API_BASE_URL}/api/employees/${employeeId}/platform-statuses`,
       { headers: { Authorization: `Bearer ${token}` } }
     )
       .then((res) => (res.ok ? res.json() : []))
@@ -162,7 +162,7 @@ export const EmployeeDetailPage = ({
 
     const token = localStorage.getItem("accessToken");
     if (token && employeeId) {
-      fetch(`${process.env.REACT_APP_API_BASE_URL}/api/employees/logs/view`, {
+      fetch(`${import.meta.env.VITE_API_BASE_URL}/api/employees/logs/view`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -188,7 +188,7 @@ export const EmployeeDetailPage = ({
       }
 
       const token = localStorage.getItem("accessToken");
-      let url = `${process.env.REACT_APP_API_BASE_URL}/api/employees/${employeeId}/unified-timeline`;
+      let url = `${import.meta.env.VITE_API_BASE_URL}/api/employees/${employeeId}/unified-timeline`;
 
       setTabData((prev) => ({
         ...prev,

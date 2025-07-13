@@ -28,7 +28,9 @@ import { FilterPills } from "../components/ui/FilterPills";
 import api from "../api/api";
 import { motion } from "framer-motion";
 import { ActivityLogSkeleton } from "../components/ui/ActivityLogSkeleton";
+import { CustomSelect } from "../components/ui/CustomSelect"; // Import CustomSelect
 
+// --- MODIFICATION: Moved helper components outside the main component ---
 const formatValue = (value) => {
   if (value === null || typeof value === "undefined") return '""';
   if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}/.test(value)) {
@@ -474,21 +476,32 @@ const ActivityLogItem = ({ log, roles, isExpanded, onToggle }) => {
 };
 
 export const ActivityLogPage = () => {
+  // --- MODIFICATION: Add 'limit' to the initial state ---
   const [filters, setFilters] = useState({
     actionType: "",
     actorEmail: "",
     startDate: "",
     endDate: "",
+    limit: 100, // Default limit
   });
   const [isFilterPopoverOpen, setIsFilterPopoverOpen] = useState(false);
   const filterButtonRef = useRef(null);
   const [expandedLogRowId, setExpandedLogRowId] = useState(null);
+
+  // --- MODIFICATION: Define options for the limit dropdown ---
+  const limitOptions = [
+    { id: 10, name: "10" },
+    { id: 100, name: "100" },
+    { id: 500, name: "500" },
+    { id: 1000, name: "1000" },
+  ];
 
   const { data: roles = [] } = useQuery({
     queryKey: ["roles"],
     queryFn: async () => (await api.get("/api/roles")).data,
   });
 
+  // The 'filters' object in the queryKey now includes the limit
   const { data: logData, isLoading: isLoadingLogs } = useQuery({
     queryKey: ["activityLogs", filters],
     queryFn: async () => {
@@ -523,8 +536,19 @@ export const ActivityLogPage = () => {
     }
   };
 
+  // --- MODIFICATION: Update clearFilters to reset the limit ---
   const clearFilters = () => {
-    setFilters({ actionType: "", actorEmail: "", startDate: "", endDate: "" });
+    setFilters({
+      actionType: "",
+      actorEmail: "",
+      startDate: "",
+      endDate: "",
+      limit: 100, // Reset to default
+    });
+  };
+
+  const handleLimitChange = (newLimit) => {
+      setFilters(prev => ({ ...prev, limit: newLimit }));
   };
 
   const toggleRowExpansion = (logId) => {
@@ -562,7 +586,16 @@ export const ActivityLogPage = () => {
             Recent events recorded in the system.
           </p>
         </div>
-        <div className="flex items-center gap-2 mt-4 sm:mt-0 w-full sm:w-auto">
+        {/* --- MODIFICATION: Added the limit dropdown --- */}
+        <div className="flex items-center gap-2 mt-4 sm:mt-0 w-full sm:w-auto flex-wrap">
+          <div className="w-40">
+             <CustomSelect
+                id="limit"
+                value={filters.limit}
+                options={limitOptions}
+                onChange={handleLimitChange}
+              />
+          </div>
           <div className="relative">
             <button
               ref={filterButtonRef}
@@ -570,7 +603,7 @@ export const ActivityLogPage = () => {
               className="flex items-center gap-2 px-4 py-2 border rounded-md text-sm font-medium transition-colors bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700"
             >
               <FilterIcon size={16} />
-              <span>Filters</span>
+              <span>Advanced</span>
             </button>
             {isFilterPopoverOpen && (
               <FilterPopover
@@ -587,7 +620,6 @@ export const ActivityLogPage = () => {
           <Button
             onClick={handleExport}
             variant="secondary"
-            className="w-full sm:w-auto justify-center"
           >
             <Download className="w-4 h-4 mr-2" /> Export
           </Button>
@@ -597,7 +629,7 @@ export const ActivityLogPage = () => {
       <FilterPills
         filters={filters}
         setFilters={setFilters}
-        setSearchInputValue={() => {}} // Not used here, but required by the component
+        setSearchInputValue={() => {}}
         options={popoverOptions}
         onClear={clearFilters}
         isActivityLog={true}
