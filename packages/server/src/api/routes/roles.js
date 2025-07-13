@@ -2,16 +2,21 @@ const express = require('express');
 const router = express.Router();
 const roleController = require('../controllers/roleController');
 const { authenticateToken, authorize } = require('../middleware/authMiddleware');
+const validate = require('../middleware/validateResource');
+const { 
+    createRoleSchema, 
+    updateRolePermissionsSchema, 
+    roleParamsSchema 
+} = require('../../utils/schemas/roleSchemas');
 
-// First, check if the user can view the page at all
 router.use(authenticateToken, authorize('admin:view_roles'));
 
-// Then, check for the 'role:manage' permission for any action that modifies data
 router.get('/with-permissions', roleController.listRolesAndPermissions);
 router.get('/permissions', roleController.listAllPermissions);
 router.get('/', roleController.listSimpleRoles);
-router.post('/', authorize('role:manage'), roleController.createRole);
-router.put('/:id/permissions', authorize('role:manage'), roleController.updateRolePermissions);
-router.delete('/:id', authorize('role:manage'), roleController.deleteRole);
+
+router.post('/', authorize('role:manage'), validate(createRoleSchema), roleController.createRole);
+router.put('/:id/permissions', authorize('role:manage'), validate(updateRolePermissionsSchema), roleController.updateRolePermissions);
+router.delete('/:id', authorize('role:manage'), validate(roleParamsSchema), roleController.deleteRole);
 
 module.exports = router;

@@ -2,6 +2,8 @@ const express = require("express");
 const router = express.Router();
 const rateLimit = require("express-rate-limit");
 const authController = require("../controllers/authController");
+const validate = require('../middleware/validateResource');
+const { loginSchema } = require('../../utils/schemas/authSchemas');
 const {
   authenticateToken,
   authorize,
@@ -31,7 +33,7 @@ const refreshTokenLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-router.post("/login", loginLimiter, authController.login);
+router.post("/login", loginLimiter, validate(loginSchema), authController.login);
 router.post("/refresh", refreshTokenLimiter, authController.refreshToken);
 router.post("/logout", authController.logout);
 router.get(

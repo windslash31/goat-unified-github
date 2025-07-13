@@ -1,14 +1,18 @@
-// packages/server/src/api/routes/users.js
 const express = require("express");
 const router = express.Router();
 const userController = require("../controllers/userController");
-const {
-  authenticateToken,
-  authorize,
-} = require("../middleware/authMiddleware");
+const { authenticateToken, authorize } = require("../middleware/authMiddleware");
 const rateLimit = require("express-rate-limit");
+const validate = require("../middleware/validateResource");
+const {
+  createUserSchema,
+  changePasswordSchema,
+  updateUserRoleSchema,
+  userParamsSchema,
+  generateApiKeySchema,
+  apiKeyParamsSchema,
+} = require("../../utils/schemas/userSchemas");
 
-// --- NEW: Limiter for sensitive user actions ---
 const userActionLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
   max: 15, // Limit each IP to 15 requests per hour for these sensitive actions
@@ -20,43 +24,42 @@ const userActionLimiter = rateLimit({
 router.post(
   "/change-password",
   authenticateToken,
+  validate(changePasswordSchema),
   userController.changePassword
 );
 
-// The page itself requires the new "view" permission
-router.get(
-  "/",
-  authenticateToken,
-  authorize("admin:view_users"),
-  userController.listUsers
-);
+router.get("/", authenticateToken, authorize("admin:view_users"), userController.listUsers);
 
-// Each action route is protected by its own specific permission
 router.post(
   "/",
   authenticateToken,
   authorize("user:create"),
+  validate(createUserSchema),
   userController.createUser
 );
 
-// Apply the new limiter to the password reset route
 router.post(
   "/:id/reset-password",
   authenticateToken,
-  userActionLimiter,
+  rateLimit({ windowMs: 60 * 60 * 1000, max: 15 }),
   authorize("user:reset_password"),
+  validate(userParamsSchema),
   userController.resetPassword
 );
+
 router.put(
   "/:id/role",
   authenticateToken,
   authorize("user:update:role"),
+  validate(updateUserRoleSchema),
   userController.updateUserRole
 );
+
 router.delete(
   "/:id",
   authenticateToken,
   authorize("user:delete"),
+  validate(userParamsSchema),
   userController.deleteUser
 );
 
@@ -65,20 +68,24 @@ router.get(
   "/:id/api-keys",
   authenticateToken,
   authorize("user:manage_api_keys"),
+  validate(userParamsSchema),
   userController.listApiKeys
 );
-// Apply the new limiter to the API key generation route
+
 router.post(
   "/:id/api-keys",
   authenticateToken,
-  userActionLimiter,
+  rateLimit({ windowMs: 60 * 60 * 1000, max: 15 }),
   authorize("user:manage_api_keys"),
+  validate(generateApiKeySchema),
   userController.generateApiKey
 );
+
 router.delete(
   "/api-keys/:keyId",
   authenticateToken,
   authorize("user:manage_api_keys"),
+  validate(apiKeyParamsSchema),
   userController.deleteApiKey
 );
 
