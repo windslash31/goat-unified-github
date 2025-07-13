@@ -9,11 +9,5 @@ export default defineConfig({
   },
   build: {
     outDir: 'build',
-  },
-  // Add this section to handle JSX in .js files
-  esbuild: {
-    loader: 'jsx',
-    include: /src\/.*\.js$/,
-    exclude: [],
-  },
+  }
 });
