@@ -1,6 +1,6 @@
-// packages/client/src/pages/EmployeeDetailPage/EmployeeDetailPage.js
-import React, { useState, useCallback, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import {
   UserSquare,
   LayoutGrid,
@@ -22,6 +22,24 @@ import { PlatformLogPage } from "./PlatformLogPage";
 import { DevicesTab } from "./DevicesTab";
 import { motion, AnimatePresence } from "framer-motion";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
+import api from "../../api/api";
+import { EmployeeDetailSkeleton } from "../../components/ui/EmployeeDetailSkeleton";
+
+const fetchEmployeeById = async (employeeId) => {
+  const { data } = await api.get(`/api/employees/${employeeId}`);
+  return data;
+};
+
+const fetchPlatformStatuses = async (employeeId) => {
+  const { data } = await api.get(`/api/employees/${employeeId}/platform-statuses`);
+  return data;
+};
+
+const fetchTimelineData = async (employeeId) => {
+    const { data } = await api.get(`/api/employees/${employeeId}/unified-timeline`);
+    return data;
+};
+
 
 export const EmployeeDetailPage = ({
   onEdit,
@@ -32,74 +50,62 @@ export const EmployeeDetailPage = ({
   const { employeeId } = useParams();
   const navigate = useNavigate();
   const { setDynamicCrumbs } = useBreadcrumb();
-  const [employee, setEmployee] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [pageError, setPageError] = useState(null);
   const [activeTab, setActiveTab] = useState("details");
-  const [platformStatuses, setPlatformStatuses] = useState([]);
-  const [isLoadingPlatforms, setIsLoadingPlatforms] = useState(true);
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
   const moreMenuRef = useRef(null);
   const isDesktop = useMediaQuery("(min-width: 768px)");
 
-  const [tabData, setTabData] = useState({
-    timeline: { data: [], loading: false, error: null, fetched: false },
-  });
-
   const [isJiraModalOpen, setIsJiraModalOpen] = useState(false);
   const [selectedTicketId, setSelectedTicketId] = useState(null);
 
+  const { 
+    data: employee, 
+    isLoading: isEmployeeLoading, 
+    error: pageError 
+  } = useQuery({
+    queryKey: ['employee', employeeId],
+    queryFn: () => fetchEmployeeById(employeeId),
+    enabled: !!employeeId,
+    onError: (err) => {
+        console.error("Failed to fetch employee:", err);
+    }
+  });
+
+  const { 
+    data: platformStatuses = [], 
+    isLoading: isLoadingPlatforms 
+  } = useQuery({
+    queryKey: ['platformStatuses', employeeId],
+    queryFn: () => fetchPlatformStatuses(employeeId),
+    enabled: !!employeeId,
+  });
+
+  const {
+      data: timelineData,
+      isLoading: isTimelineLoading,
+      error: timelineError,
+  } = useQuery({
+      queryKey: ['timeline', employeeId],
+      queryFn: () => fetchTimelineData(employeeId),
+      enabled: !!employeeId && activeTab === 'timeline', // Only fetch when tab is active
+  });
+
+  // --- TABS CONFIGURATION ---
   const allTabs = [
-    {
-      id: "details",
-      label: "Details",
-      icon: <UserSquare size={16} />,
-      permission: true,
-    },
-    {
-      id: "devices",
-      label: "Devices",
-      icon: <Laptop size={16} />,
-      permission: true,
-    },
-    {
-      id: "platforms",
-      label: "Apps & Platforms",
-      shortLabel: "Access",
-      icon: <LayoutGrid size={16} />,
-      permission: true,
-    },
-    {
-      id: "licenses",
-      label: "Licenses",
-      icon: <BookLock size={16} />,
-      permission: true,
-    },
-    {
-      id: "platform-logs",
-      label: "Platform Logs",
-      shortLabel: "Logs",
-      icon: <HardDrive size={16} />,
-      permission: permissions.includes("log:read:platform"),
-    },
-    {
-      id: "timeline",
-      label: "Unified Timeline",
-      shortLabel: "Timeline",
-      icon: <Bot size={16} />,
-      permission: permissions.includes("log:read:platform"),
-    },
+    { id: "details", label: "Details", icon: <UserSquare size={16} />, permission: true, },
+    { id: "devices", label: "Devices", icon: <Laptop size={16} />, permission: true, },
+    { id: "platforms", label: "Apps & Platforms", shortLabel: "Access", icon: <LayoutGrid size={16} />, permission: true, },
+    { id: "licenses", label: "Licenses", icon: <BookLock size={16} />, permission: true, },
+    { id: "platform-logs", label: "Platform Logs", shortLabel: "Logs", icon: <HardDrive size={16} />, permission: permissions.includes("log:read:platform"), },
+    { id: "timeline", label: "Unified Timeline", shortLabel: "Timeline", icon: <Bot size={16} />, permission: permissions.includes("log:read:platform"), },
   ].filter((tab) => tab.permission);
 
   const VISIBLE_TABS_COUNT = 3;
-  const visibleTabs = isDesktop
-    ? allTabs
-    : allTabs.slice(0, VISIBLE_TABS_COUNT);
+  const visibleTabs = isDesktop ? allTabs : allTabs.slice(0, VISIBLE_TABS_COUNT);
   const overflowTabs = isDesktop ? [] : allTabs.slice(VISIBLE_TABS_COUNT);
-  const isActiveTabInMoreMenu = overflowTabs.some(
-    (tab) => tab.id === activeTab
-  );
+  const isActiveTabInMoreMenu = overflowTabs.some((tab) => tab.id === activeTab);
 
+  // --- SIDE EFFECTS ---
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (moreMenuRef.current && !moreMenuRef.current.contains(event.target)) {
@@ -110,122 +116,31 @@ export const EmployeeDetailPage = ({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const fetchInitialData = useCallback(() => {
-    const token = localStorage.getItem("accessToken");
-    if (!token) {
-      onLogout();
-      return;
-    }
-
-    setLoading(true);
-    fetch(`${import.meta.env.VITE_API_BASE_URL}/api/employees/${employeeId}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then((res) => {
-        if (res.status === 404) throw new Error("Employee not found.");
-        if (!res.ok) throw new Error("Failed to fetch employee profile.");
-        return res.json();
-      })
-      .then((empData) => {
-        setEmployee(empData);
-        const fullName = [
-          empData.first_name,
-          empData.middle_name,
-          empData.last_name,
-        ]
-          .filter(Boolean)
-          .join(" ");
-        setDynamicCrumbs([
-          { name: "Employees", path: "/employees" },
-          { name: fullName, path: `/employees/${employeeId}` },
-        ]);
-      })
-      .catch((err) => {
-        console.error("Error fetching main employee data:", err);
-        setPageError(err.message);
-      })
-      .finally(() => setLoading(false));
-
-    setIsLoadingPlatforms(true);
-    fetch(
-      `${import.meta.env.VITE_API_BASE_URL}/api/employees/${employeeId}/platform-statuses`,
-      { headers: { Authorization: `Bearer ${token}` } }
-    )
-      .then((res) => (res.ok ? res.json() : []))
-      .then((statusData) => setPlatformStatuses(statusData))
-      .catch((err) => console.error("Failed to fetch platform statuses:", err))
-      .finally(() => setIsLoadingPlatforms(false));
-  }, [employeeId, onLogout, setDynamicCrumbs]);
-
   useEffect(() => {
-    fetchInitialData();
+    if (employee) {
+      const fullName = [employee.first_name, employee.middle_name, employee.last_name]
+        .filter(Boolean)
+        .join(" ");
+      setDynamicCrumbs([
+        { name: "Employees", path: "/employees" },
+        { name: fullName, path: `/employees/${employeeId}` },
+      ]);
 
-    const token = localStorage.getItem("accessToken");
-    if (token && employeeId) {
-      fetch(`${import.meta.env.VITE_API_BASE_URL}/api/employees/logs/view`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ targetEmployeeId: employeeId }),
-      }).catch((err) => console.error("Failed to log profile view:", err));
+      // Log the profile view
+      api.post('/api/employees/logs/view', { targetEmployeeId: employeeId })
+         .catch(err => console.error("Failed to log profile view:", err));
+
     }
-
     return () => {
       setDynamicCrumbs([]);
     };
-  }, [fetchInitialData, setDynamicCrumbs, employeeId]);
+  }, [employee, employeeId, setDynamicCrumbs]);
 
-  const fetchTimelineData = useCallback(
-    (force = false) => {
-      if (
-        !employeeId ||
-        !permissions.includes("log:read:platform") ||
-        (!force && (tabData.timeline.fetched || tabData.timeline.loading))
-      ) {
-        return;
-      }
 
-      const token = localStorage.getItem("accessToken");
-      let url = `${import.meta.env.VITE_API_BASE_URL}/api/employees/${employeeId}/unified-timeline`;
-
-      setTabData((prev) => ({
-        ...prev,
-        timeline: { ...prev.timeline, loading: true },
-      }));
-
-      fetch(url, { headers: { Authorization: `Bearer ${token}` } })
-        .then((res) =>
-          res.ok ? res.json() : res.json().then((err) => Promise.reject(err))
-        )
-        .then((data) => {
-          setTabData((prev) => ({
-            ...prev,
-            timeline: { data, loading: false, error: null, fetched: true },
-          }));
-        })
-        .catch((err) => {
-          setTabData((prev) => ({
-            ...prev,
-            timeline: {
-              data: [],
-              loading: false,
-              error: err.message,
-              fetched: true,
-            },
-          }));
-        });
-    },
-    [employeeId, permissions, tabData.timeline]
-  );
-
+  // --- HANDLER FUNCTIONS ---
   const handleTabClick = (tabId) => {
     setActiveTab(tabId);
     setIsMoreMenuOpen(false);
-    if (tabId === "timeline") {
-      fetchTimelineData();
-    }
   };
 
   const handleTicketClick = (ticketId) => {
@@ -235,6 +150,7 @@ export const EmployeeDetailPage = ({
     }
   };
 
+  // --- RENDER LOGIC ---
   const TabButton = ({ id, label, shortLabel, icon }) => (
     <button
       onClick={() => handleTabClick(id)}
@@ -250,48 +166,27 @@ export const EmployeeDetailPage = ({
 
   const TabContent = (
     <div className="mt-6">
-      {activeTab === "details" && (
-        <EmployeeDetailsTab
-          employee={employee}
-          navigate={navigate}
-          permissions={permissions}
-          onTicketClick={handleTicketClick}
-        />
-      )}
+      {activeTab === "details" && <EmployeeDetailsTab employee={employee} navigate={navigate} permissions={permissions} onTicketClick={handleTicketClick} />}
       {activeTab === "devices" && <DevicesTab employeeId={employeeId} />}
-      {activeTab === "platforms" && (
-        <EmployeeApplicationsTab
-          applications={employee.applications || []}
-          platformStatuses={platformStatuses}
-          isLoading={isLoadingPlatforms}
-          onTicketClick={handleTicketClick}
-        />
-      )}
+      {activeTab === "platforms" && <EmployeeApplicationsTab applications={employee.applications || []} platformStatuses={platformStatuses} isLoading={isLoadingPlatforms} onTicketClick={handleTicketClick}/>}
       {activeTab === "licenses" && <LicensesTab employeeId={employeeId} />}
-      {activeTab === "platform-logs" && (
-        <PlatformLogPage employeeId={employeeId} onLogout={onLogout} />
-      )}
-      {activeTab === "timeline" && (
-        <UnifiedTimelinePage
-          events={tabData.timeline.data}
-          loading={tabData.timeline.loading}
-          error={tabData.timeline.error}
-        />
-      )}
+      {activeTab === "platform-logs" && <PlatformLogPage employeeId={employeeId} onLogout={onLogout} />}
+      {activeTab === "timeline" && <UnifiedTimelinePage events={timelineData} loading={isTimelineLoading} error={timelineError} />}
     </div>
   );
 
-  if (loading)
-    return <div className="p-6 text-center">Loading employee profile...</div>;
+  if (isEmployeeLoading) return <EmployeeDetailSkeleton />;
+
   if (pageError)
     return (
       <div className="p-6 text-center text-red-500">
-        <AlertTriangle className="mx-auto w-12 h-12 mb-4" />{" "}
-        <h2 className="text-xl font-semibold">Could not load employee data</h2>{" "}
-        <p>{pageError}</p>{" "}
+        <AlertTriangle className="mx-auto w-12 h-12 mb-4" />
+        <h2 className="text-xl font-semibold">Could not load employee data</h2>
+        <p>{pageError.message || "An unexpected error occurred."}</p>
       </div>
     );
-  if (!employee) return null;
+  
+  if (!employee) return null; 
 
   return (
     <>
