@@ -13,11 +13,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install Dependencies and Build
-        working-directory: ./packages/client # <-- IMPORTANT: ADD THIS
+        working-directory: ./packages/client
         run: npm ci && npm run build
       - uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: '${{ secrets.GITHUB_TOKEN }}'
-          firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT_GOAT_UNIFIED_GITHUB }}' # This secret was created for you
+          firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT_GOAT_PROJECT_465601 }}' # This secret was created for you
           channelId: live
-          projectId: your-firebase-project-id # Replace with your Project ID
+          projectId: goat-project-465601
