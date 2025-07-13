@@ -4,13 +4,13 @@ on:
   push:
     branches:
       - main
-    paths:
-      - 'packages/server/**'
+      - development
+  workflow_dispatch: {}
 
 env:
-  PROJECT_ID: goat-project-465601
-  SERVICE_NAME: goat-backend
-  REGION: asia-southeast2
+  PROJECT_ID: goat-project-465601 # Your GCP Project ID
+  SERVICE_NAME: goat-backend      # Your Cloud Run service name
+  REGION: asia-southeast2         # Your service region
 
 jobs:
   deploy:
@@ -25,18 +25,20 @@ jobs:
         uses: 'google-github-actions/auth@v2'
         with:
           credentials_json: '${{ secrets.GCP_SA_KEY }}'
+
       - name: Set up Cloud SDK
         uses: 'google-github-actions/setup-gcloud@v2'
 
+      # This step now waits for the build to finish
       - name: Build and Push Docker Image
         run: |-
-          gcloud builds submit packages/server --tag ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/cloud-run-source-deploy/${{ env.SERVICE_NAME }}:${{ github.sha }} --async
+          gcloud builds submit packages/server --tag ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/cloud-run-source-deploy/${{ env.SERVICE_NAME }}:${{ github.sha }}
 
+      # This step now uses the correct 'flags' input
       - name: Deploy to Cloud Run
         uses: 'google-github-actions/deploy-cloudrun@v2'
         with:
           service: '${{ env.SERVICE_NAME }}'
           region: '${{ env.REGION }}'
           image: '${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/cloud-run-source-deploy/${{ env.SERVICE_NAME }}:${{ github.sha }}'
-          platform: 'managed'
-          allow-unauthenticated: true
+          flags: '--allow-unauthenticated'
