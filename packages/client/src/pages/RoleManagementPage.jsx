@@ -1,4 +1,3 @@
-// packages/client/src/pages/RoleManagementPage.js
 import React, { useState, useEffect, useCallback } from "react";
 import {
   PlusCircle,
@@ -330,7 +329,8 @@ export const RoleManagementPage = ({ onLogout }) => {
       setAllPermissions(permsRes.data);
     } catch (err) {
       console.error("Error:", err);
-      setError(err.message || "An unknown error occurred.");
+      const errorMessage = err.response?.data?.message || "Could not load page data.";
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -410,7 +410,8 @@ export const RoleManagementPage = ({ onLogout }) => {
       setHasUnsavedChanges(false);
       fetchData();
     } catch (error) {
-      toast.error("Could not save permissions.");
+      const errorMessage = error.response?.data?.message || "Could not save permissions.";
+      toast.error(errorMessage);
     } finally {
       setIsSaving(false);
     }
@@ -427,7 +428,8 @@ export const RoleManagementPage = ({ onLogout }) => {
       setNewRoleName("");
       fetchData();
     } catch (error) {
-      toast.error("Could not create role.");
+      const errorMessage = error.response?.data?.message || "Could not create role.";
+      toast.error(errorMessage);
     } finally {
       setIsCreatingRole(false);
     }
@@ -450,7 +452,8 @@ export const RoleManagementPage = ({ onLogout }) => {
       }
       fetchData();
     } catch (error) {
-      toast.error(error.response?.data?.message || "Could not delete role.");
+      const errorMessage = error.response?.data?.message || "Could not delete role.";
+      toast.error(errorMessage);
     } finally {
       setIsDeleteModalOpen(false);
       setRoleToDelete(null);

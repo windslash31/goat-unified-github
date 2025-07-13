@@ -23,6 +23,7 @@ import { DevicesTab } from "./EmployeeDetailPage/DevicesTab";
 import { useMediaQuery } from "../hooks/useMediaQuery";
 import { useQuery } from "@tanstack/react-query";
 import { useAuthStore } from "../stores/authStore";
+import { useModalStore } from "../stores/modalStore";
 import api from "../api/api";
 import { EmployeeDetailSkeleton } from "../components/ui/EmployeeDetailSkeleton";
 
@@ -34,12 +35,11 @@ const fetchMe = async () => {
 export const ProfilePage = ({
   employee,
   permissions,
-  onEdit,
-  onDeactivate,
   onLogout,
   user,
 }) => {
   const { isAuthenticated } = useAuthStore();
+  const { openModal } = useModalStore(); // Use the modal store
   const [activeTab, setActiveTab] = useState("details");
   const [platformStatuses, setPlatformStatuses] = useState([]);
   const [isLoadingPlatforms, setIsLoadingPlatforms] = useState(true);
@@ -129,7 +129,7 @@ export const ProfilePage = ({
       }
 
       const token = localStorage.getItem("accessToken");
-      let url = `${import.meta.env.VITE_API_BASE_URL}/api/employees/${employee.id}/unified-timeline`; // Changed from process.env.REACT_APP_API_BASE_URL
+      let url = `${import.meta.env.VITE_API_BASE_URL}/api/employees/${employee.id}/unified-timeline`;
 
       setTabData((prev) => ({
         ...prev,
@@ -171,7 +171,7 @@ export const ProfilePage = ({
 
     setIsLoadingPlatforms(true);
     fetch(
-      `${import.meta.env.VITE_API_BASE_URL}/api/employees/${employee.id}/platform-statuses`, // Changed from process.env.REACT_APP_API_BASE_URL
+      `${import.meta.env.VITE_API_BASE_URL}/api/employees/${employee.id}/platform-statuses`,
       { headers: { Authorization: `Bearer ${token}` } }
     )
       .then((res) => (res.ok ? res.json() : []))
@@ -202,6 +202,14 @@ export const ProfilePage = ({
       setSelectedTicketId(ticketId);
       setIsJiraModalOpen(true);
     }
+  };
+
+  const handleEdit = () => {
+    openModal('editEmployee', employee);
+  };
+
+  const handleDeactivate = () => {
+    openModal('deactivateEmployee', employee);
   };
 
   if (isLoadingMe) return <EmployeeDetailSkeleton />;
@@ -285,8 +293,8 @@ export const ProfilePage = ({
         <div className="p-4 sm:p-6 space-y-6">
           <EmployeeDetailHeader
             employee={employee}
-            onEdit={onEdit}
-            onDeactivate={onDeactivate}
+            onEdit={handleEdit}
+            onDeactivate={handleDeactivate}
             permissions={permissions}
             isOwnProfile={true}
           />
