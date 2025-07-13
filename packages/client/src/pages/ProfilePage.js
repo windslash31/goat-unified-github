@@ -129,7 +129,7 @@ export const ProfilePage = ({
       }
 
       const token = localStorage.getItem("accessToken");
-      let url = `${process.env.REACT_APP_API_BASE_URL}/api/employees/${employee.id}/unified-timeline`;
+      let url = `${import.meta.env.VITE_API_BASE_URL}/api/employees/${employee.id}/unified-timeline`; // Changed from process.env.REACT_APP_API_BASE_URL
 
       setTabData((prev) => ({
         ...prev,
@@ -171,7 +171,7 @@ export const ProfilePage = ({
 
     setIsLoadingPlatforms(true);
     fetch(
-      `${process.env.REACT_APP_API_BASE_URL}/api/employees/${employee.id}/platform-statuses`,
+      `${import.meta.env.VITE_API_BASE_URL}/api/employees/${employee.id}/platform-statuses`, // Changed from process.env.REACT_APP_API_BASE_URL
       { headers: { Authorization: `Bearer ${token}` } }
     )
       .then((res) => (res.ok ? res.json() : []))

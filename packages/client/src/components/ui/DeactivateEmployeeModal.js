@@ -35,7 +35,7 @@ export const DeactivateEmployeeModal = ({ employee, onClose, onDeactivateSuccess
         const token = localStorage.getItem('accessToken');
         
         try {
-            const response = await fetch(`${process.env.REACT_APP_API_BASE_URL}/api/employees/${employee.id}/deactivate`, {
+            const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/employees/${employee.id}/deactivate`, { // Changed from process.env.REACT_APP_API_BASE_URL
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify({ platforms: selectedPlatforms })

@@ -24,6 +24,9 @@ import { RoleManagementSkeleton } from "./components/ui/RoleManagementSkeleton";
 import { UserManagementSkeleton } from "./components/ui/UserManagementSkeleton";
 import { ActivityLogSkeleton } from "./components/ui/ActivityLogSkeleton";
 import { ApplicationManagementSkeleton } from "./components/ui/ApplicationManagementSkeleton";
+// --- MODIFICATION: Import the new skeleton ---
+import { SettingsSkeleton } from "./components/ui/SettingsSkeleton";
+
 
 // Lazy load page components for code splitting
 const LoginPage = lazy(() =>
@@ -354,7 +357,8 @@ const AppContent = () => {
 
           <Route path="/access-denied" element={<AccessDeniedPage />} />
 
-          <Route path="/settings" element={<SettingsPage />}>
+          {/* --- MODIFICATION: Updated Suspense fallbacks for settings routes --- */}
+          <Route path="/settings" element={<Suspense fallback={<SettingsSkeleton />}><SettingsPage /></Suspense>}>
             <Route path="users" element={<Suspense fallback={<UserManagementSkeleton />}><UserManagementPage /></Suspense>} />
             <Route path="roles" element={<Suspense fallback={<RoleManagementSkeleton />}><RoleManagementPage /></Suspense>} />
             <Route
