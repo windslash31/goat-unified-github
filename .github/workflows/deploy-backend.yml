@@ -5,7 +5,7 @@ on:
     branches:
       - main
       - development
-          paths:
+    paths:
       - 'packages/server/**'
   workflow_dispatch: {}
 
