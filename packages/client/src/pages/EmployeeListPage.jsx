@@ -1,3 +1,4 @@
+// src/pages/EmployeeListPage.jsx
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
@@ -26,12 +27,12 @@ import { FilterPills } from "../components/ui/FilterPills";
 import { EmptyState } from "../components/ui/EmptyState";
 import { useFetchFilterOptions } from "../hooks/useFetchFilterOptions";
 import { useMediaQuery } from "../hooks/useMediaQuery";
-import { useEmployeeTable } from "../hooks/useEmployeeTable"; // Import the new hook
+import { useEmployeeTable } from "../hooks/useEmployeeTable";
 import { motion } from "framer-motion";
 import api from "../api/api";
 import { EmployeeImportModal } from "../components/ui/EmployeeImportModal";
 import { EmployeeListSkeleton } from "../components/ui/EmployeeListSkeleton";
-
+import { useModalStore } from "../stores/modalStore";
 
 const MobileList = React.memo(({ employees }) => (
   <div className="divide-y divide-gray-200 dark:divide-gray-700">
@@ -73,13 +74,12 @@ const DesktopTable = React.memo(
     selectedRows,
     handleSelectAll,
     handleSelectRow,
-    onEdit,
-    onDeactivate,
   }) => {
     const parentRef = useRef(null);
     const [activeActionMenu, setActiveActionMenu] = useState(null);
     const actionMenuRef = useRef(null);
     const navigate = useNavigate();
+    const { openModal } = useModalStore();
 
     useEffect(() => {
       const handleClickOutside = (event) => {
@@ -259,7 +259,7 @@ const DesktopTable = React.memo(
                             <li>
                               <button
                                 onClick={() => {
-                                  onEdit(employee);
+                                  openModal('editEmployee', employee);
                                   setActiveActionMenu(null);
                                 }}
                                 className="w-full text-left flex items-center gap-3 px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700"
@@ -270,7 +270,7 @@ const DesktopTable = React.memo(
                             <li>
                               <button
                                 onClick={() => {
-                                  onDeactivate(employee);
+                                  openModal('deactivateEmployee', employee);
                                   setActiveActionMenu(null);
                                 }}
                                 className="w-full text-left flex items-center gap-3 px-4 py-2 text-sm text-red-500 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/50"
@@ -298,7 +298,7 @@ const DesktopTable = React.memo(
   }
 );
 
-export const EmployeeListPage = ({ onEdit, onDeactivate }) => {
+export const EmployeeListPage = () => {
     
   const {
       employees,
@@ -558,7 +558,6 @@ export const EmployeeListPage = ({ onEdit, onDeactivate }) => {
             currentStatus={filters.status}
             onStatusChange={(status) => {
               setFilters((prev) => ({ ...prev, status }));
-              setPagination((prev) => ({ ...prev, currentPage: 1 }));
             }}
           />
 
@@ -571,8 +570,6 @@ export const EmployeeListPage = ({ onEdit, onDeactivate }) => {
                 selectedRows={selectedRows}
                 handleSelectAll={handleSelectAll}
                 handleSelectRow={handleSelectRow}
-                onEdit={onEdit}
-                onDeactivate={onDeactivate}
               />
             ) : (
               <MobileList employees={employees} />
