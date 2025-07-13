@@ -27,7 +27,7 @@ export const CreateUserModal = ({ roles, onClose, onUserCreated }) => {
         const token = localStorage.getItem('accessToken');
         
         try {
-            const response = await fetch(`${process.env.REACT_APP_API_BASE_URL}/api/users`, {
+            const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/users`, { // Changed from process.env.REACT_APP_API_BASE_URL
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify(formData)

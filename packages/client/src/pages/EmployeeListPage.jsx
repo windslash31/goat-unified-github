@@ -151,7 +151,7 @@ const DesktopTable = React.memo(
                     employees.length > 0 &&
                     selectedRows.size === employees.length
                   }
-                  className="rounded"
+                  className="rounded accent-kredivo-primary"
                 />
               </th>
               <th className="px-6 py-3 w-[25%] text-left text-xs uppercase text-gray-500">
@@ -218,7 +218,7 @@ const DesktopTable = React.memo(
                       type="checkbox"
                       onChange={() => handleSelectRow(employee.id)}
                       checked={selectedRows.has(employee.id)}
-                      className="rounded"
+                      className="rounded accent-kredivo-primary"
                       onClick={(e) => e.stopPropagation()}
                     />
                   </td>
@@ -427,18 +427,11 @@ export const EmployeeListPage = ({
   };
 
   const handleBulkDeactivate = async () => {
-    const promise = fetch(
-      `${process.env.REACT_APP_API_BASE_URL}/api/employees/bulk-deactivate`,
+    const promise = api.post(
+      `/api/employees/bulk-deactivate`,
       {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          employeeIds: Array.from(selectedRows),
-          platforms: ["google", "slack", "jumpcloud", "atlassian"],
-        }),
+        employeeIds: Array.from(selectedRows),
+        platforms: ["google", "slack", "jumpcloud", "atlassian"],
       }
     );
 

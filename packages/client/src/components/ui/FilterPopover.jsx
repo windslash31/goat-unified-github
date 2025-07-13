@@ -4,21 +4,16 @@ import { Portal } from "./Portal";
 import { motion, AnimatePresence } from "framer-motion";
 
 const FilterDropdown = ({ label, name, value, onChange, options = [] }) => (
-  <div>
-    <label
-      htmlFor={name}
-      className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
-    >
-      {label}
-    </label>
-    <CustomSelect
-      id={name}
-      options={options}
-      value={value}
-      onChange={(val) => onChange({ target: { name, value: val } })}
-      placeholder="All"
-    />
-  </div>
+    <div>
+        <label htmlFor={name} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{label}</label>
+        <CustomSelect
+            id={name}
+            options={options}
+            value={value}
+            onChange={(val) => onChange({ target: { name, value: val } })}
+            placeholder="All"
+        />
+    </div>
 );
 
 export const FilterPopover = ({
@@ -38,7 +33,7 @@ export const FilterPopover = ({
     { id: "all", name: "All" },
     { id: "active", name: "Active" },
     { id: "inactive", name: "Inactive" },
-    { id: "invited", name: "Invited" },
+    { id: "escalation", name: "Escalation" },
   ];
 
   useLayoutEffect(() => {
@@ -113,21 +108,26 @@ export const FilterPopover = ({
 
   const renderEmployeeFilters = () => (
     <>
-      <FilterDropdown
-        label="Status"
-        name="status"
-        value={localFilters.status}
-        onChange={handleInputChange}
-        options={statusOptions}
-      />
-      <FilterDropdown
-        label="Internal Application"
-        name="application_id"
-        value={localFilters.application_id}
-        onChange={handleInputChange}
-        options={options.applications}
-      />
-      {/* ... other employee filters */}
+        <FilterDropdown label="Status" name="status" value={localFilters.status} onChange={handleInputChange} options={statusOptions} />
+        <FilterDropdown label="Internal Application" name="application_id" value={localFilters.application_id} onChange={handleInputChange} options={options.applications} />
+
+        <div className="border-t border-gray-200 dark:border-gray-700 pt-4 space-y-4">
+            <div>
+                <label htmlFor="jobTitle" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Job Title</label>
+                <input type="text" name="jobTitle" id="jobTitle" value={localFilters.jobTitle || ''} onChange={handleInputChange} className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 rounded-md focus:ring-2 focus:ring-kredivo-primary" placeholder="e.g., Engineer"/>
+            </div>
+            <div>
+                <label htmlFor="manager" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Manager Email</label>
+                <input type="text" name="manager" id="manager" value={localFilters.manager || ''} onChange={handleInputChange} className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 rounded-md focus:ring-2 focus:ring-kredivo-primary" placeholder="manager@example.com"/>
+            </div>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-gray-200 dark:border-gray-700 pt-4">
+            <FilterDropdown label="Legal Entity" name="legal_entity_id" value={localFilters.legal_entity_id} onChange={handleInputChange} options={options.legalEntities} />
+            <FilterDropdown label="Office Location" name="office_location_id" value={localFilters.office_location_id} onChange={handleInputChange} options={options.officeLocations} />
+            <FilterDropdown label="Employee Type" name="employee_type_id" value={localFilters.employee_type_id} onChange={handleInputChange} options={options.employeeTypes} />
+            <FilterDropdown label="Employee Sub-Type" name="employee_sub_type_id" value={localFilters.employee_sub_type_id} onChange={handleInputChange} options={options.employeeSubTypes} />
+        </div>
     </>
   );
 

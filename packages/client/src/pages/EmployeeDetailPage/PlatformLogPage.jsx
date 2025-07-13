@@ -59,7 +59,7 @@ export const PlatformLogPage = ({ employeeId, onLogout }) => {
     }
 
     let url;
-    const baseUrl = `${process.env.REACT_APP_API_BASE_URL}/api/employees/${employeeId}`;
+    const baseUrl = `${import.meta.env.VITE_API_BASE_URL}/api/employees/${employeeId}`; // Changed from process.env.REACT_APP_API_BASE_URL
 
     switch (selectedPlatform) {
       case "jumpcloud":

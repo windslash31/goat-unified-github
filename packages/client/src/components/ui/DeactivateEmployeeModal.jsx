@@ -35,7 +35,7 @@ export const DeactivateEmployeeModal = ({ employee, onClose, onDeactivateSuccess
         const token = localStorage.getItem('accessToken');
         
         try {
-            const response = await fetch(`${process.env.REACT_APP_API_BASE_URL}/api/employees/${employee.id}/deactivate`, {
+            const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/employees/${employee.id}/deactivate`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify({ platforms: selectedPlatforms })
@@ -87,25 +87,27 @@ export const DeactivateEmployeeModal = ({ employee, onClose, onDeactivateSuccess
                         </div>
                         
                         <div className="mt-6 space-y-4">
-                            <div className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-                                <label htmlFor="toggle-all" className="font-semibold text-sm">Suspend All Platforms</label>
-                                <button onClick={handleToggleAll} className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${selectedPlatforms.length === platforms.length ? 'bg-red-600' : 'bg-gray-300 dark:bg-gray-600'}`}>
-                                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${selectedPlatforms.length === platforms.length ? 'translate-x-6' : 'translate-x-1'}`} />
-                                </button>
-                            </div>
+                            <div className="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                                <div className="flex justify-between items-center mb-3">
+                                    <label htmlFor="toggle-all" className="font-semibold text-sm">Suspend All Platforms</label>
+                                    <button onClick={handleToggleAll} className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${selectedPlatforms.length === platforms.length ? 'bg-red-600' : 'bg-gray-300 dark:bg-gray-600'}`}>
+                                        <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${selectedPlatforms.length === platforms.length ? 'translate-x-6' : 'translate-x-1'}`} />
+                                    </button>
+                                </div>
 
-                            <div className="space-y-3">
-                                {platforms.map(platform => (
-                                    <div key={platform} className="flex justify-between items-center p-3 border dark:border-gray-600 rounded-lg">
-                                        <div className="flex items-center gap-3">
-                                            <PlatformIcon platform={platform} />
-                                            <span className="font-medium capitalize">{platform}</span>
+                                <div className="space-y-2 border-t border-gray-200 dark:border-gray-600 pt-3">
+                                    {platforms.map(platform => (
+                                        <div key={platform} className="flex justify-between items-center p-2 border dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800">
+                                            <div className="flex items-center gap-3">
+                                                <PlatformIcon platform={platform} />
+                                                <span className="font-medium capitalize">{platform}</span>
+                                            </div>
+                                            <button onClick={() => handleToggle(platform)} className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${selectedPlatforms.includes(platform) ? 'bg-red-600' : 'bg-gray-300 dark:bg-gray-600'}`}>
+                                                 <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${selectedPlatforms.includes(platform) ? 'translate-x-6' : 'translate-x-1'}`} />
+                                            </button>
                                         </div>
-                                        <button onClick={() => handleToggle(platform)} className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${selectedPlatforms.includes(platform) ? 'bg-red-600' : 'bg-gray-300 dark:bg-gray-600'}`}>
-                                             <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${selectedPlatforms.includes(platform) ? 'translate-x-6' : 'translate-x-1'}`} />
-                                        </button>
-                                    </div>
-                                ))}
+                                    ))}
+                                </div>
                             </div>
                         </div>
                     </div>

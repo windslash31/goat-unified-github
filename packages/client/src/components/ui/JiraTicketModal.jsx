@@ -8,7 +8,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 const fetchTicketDetails = async (ticketId, token) => {
     if (!ticketId || !token) return null;
-    const response = await fetch(`${process.env.REACT_APP_API_BASE_URL}/api/jira/ticket/${ticketId}`, {
+    const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/jira/ticket/${ticketId}`, { // Changed from process.env.REACT_APP_API_BASE_URL
         headers: { 'Authorization': `Bearer ${token}` }
     });
     if (!response.ok) {
@@ -41,7 +41,7 @@ export const JiraTicketModal = ({ ticketId, onClose }) => {
         if(error) toast.error(error.message);
     }, [error]);
 
-    const jiraBaseUrl = process.env.REACT_APP_JIRA_BASE_URL || `https://${process.env.ATLASSIAN_DOMAIN}/browse/`;
+    const jiraBaseUrl = import.meta.env.VITE_JIRA_BASE_URL || `https://${import.meta.env.VITE_ATLASSIAN_DOMAIN}/browse/`; // Changed from process.env
     
     return (
         <Portal>
