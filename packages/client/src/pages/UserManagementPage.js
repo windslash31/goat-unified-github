@@ -11,7 +11,8 @@ import { useAuthStore } from '../stores/authStore';
 import api from '../api/api';
 import { ApiKeyManagerModal } from '../components/ui/ApiKeyManagerModal';
 import { motion } from 'framer-motion';
-import { useMediaQuery } from '../hooks/useMediaQuery'; // Import the hook
+import { useMediaQuery } from '../hooks/useMediaQuery';
+import { UserManagementSkeleton } from '../components/ui/UserManagementSkeleton';
 
 // Mobile User Card Component
 const UserCard = ({ user, currentUser, roleOptions, permissions, onRoleChange, onApiKey, onResetPassword, onDelete }) => {
@@ -170,7 +171,7 @@ export const UserManagementPage = ({ onLogout }) => {
         }
     };
 
-    if (loading) return <div className="p-6">Loading...</div>;
+    if (loading) return <UserManagementSkeleton />;
 
     const roleOptions = roles.map(role => ({ id: role.id, name: role.name }));
 
