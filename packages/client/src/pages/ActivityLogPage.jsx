@@ -28,9 +28,8 @@ import { FilterPills } from "../components/ui/FilterPills";
 import api from "../api/api";
 import { motion } from "framer-motion";
 import { ActivityLogSkeleton } from "../components/ui/ActivityLogSkeleton";
-import { CustomSelect } from "../components/ui/CustomSelect"; // Import CustomSelect
+import { CustomSelect } from "../components/ui/CustomSelect";
 
-// --- MODIFICATION: Moved helper components outside the main component ---
 const formatValue = (value) => {
   if (value === null || typeof value === "undefined") return '""';
   if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}/.test(value)) {
