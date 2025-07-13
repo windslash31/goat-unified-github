@@ -63,11 +63,8 @@ api.interceptors.response.use(
       isRefreshing = true;
 
       try {
-        // The refresh token is sent via httpOnly cookie automatically.
-        // The request body is now empty.
-        const { data } = await api.post("/api/refresh");
+        const { data } = await api.post("/auth/refresh");
 
-        // The 'setRefreshedTokens' will now only handle the access token
         useAuthStore.getState().setRefreshedTokens(data.accessToken);
 
         api.defaults.headers.common["Authorization"] =

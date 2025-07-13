@@ -1,4 +1,3 @@
-// packages/server/src/api/routes/auth.js
 const express = require("express");
 const router = express.Router();
 const rateLimit = require("express-rate-limit");
@@ -26,7 +25,12 @@ const loginLimiter = rateLimit({
 
 // --- NEW: Limiter for token refresh ---
 const refreshTokenLimiter = rateLimit({
-  // ... (rest of the limiter is unchanged)
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 20, // Limit each IP to 20 refresh requests per windowMs
+  message:
+    "Too many token refresh requests from this IP, please try again after 15 minutes",
+  standardHeaders: true,
+  legacyHeaders: false,
 });
 
 router.post("/login", loginLimiter, authController.login);
