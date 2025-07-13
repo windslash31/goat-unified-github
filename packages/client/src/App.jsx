@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useCallback, Suspense, lazy } from "react";
+// src/App.jsx
+import React, { Suspense, lazy, useCallback, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  BrowserRouter,
   Routes,
   Route,
   useLocation,
@@ -14,6 +14,7 @@ import { EditEmployeeModal } from "./components/ui/EditEmployeeModal";
 import { DeactivateEmployeeModal } from "./components/ui/DeactivateEmployeeModal";
 import { AccessDeniedPage } from "./components/ui/AccessDeniedPage";
 import { useAuthStore } from "./stores/authStore";
+import { useModalStore } from "./stores/modalStore";
 import { ProtectedRoute } from "./components/auth/ProtectedRoute";
 import api from "./api/api";
 
@@ -24,9 +25,9 @@ import { RoleManagementSkeleton } from "./components/ui/RoleManagementSkeleton";
 import { UserManagementSkeleton } from "./components/ui/UserManagementSkeleton";
 import { ActivityLogSkeleton } from "./components/ui/ActivityLogSkeleton";
 import { ApplicationManagementSkeleton } from "./components/ui/ApplicationManagementSkeleton";
-
 import { SettingsSkeleton } from "./components/ui/SettingsSkeleton";
 
+// Lazy load page components for code splitting
 const LoginPage = lazy(() =>
   import("./pages/LoginPage").then((module) => ({ default: module.LoginPage }))
 );
@@ -83,75 +84,17 @@ const fetchMe = async () => {
   return data;
 };
 
-const fetchEmployees = async (filters, pagination, sorting) => {
-  const queryParams = new URLSearchParams({
-    page: pagination.currentPage,
-    limit: pagination.limit,
-    sortBy: sorting.sortBy,
-    sortOrder: sorting.sortOrder,
-  });
-  for (const key in filters) {
-    if (filters[key] && filters[key] !== "all") {
-      queryParams.append(key, filters[key]);
-    }
-  }
-  const { data } = await api.get(`/api/employees?${queryParams.toString()}`);
-  return data;
-};
-
 const AppContent = () => {
   const { isAuthenticated, user, logout, fetchUser } = useAuthStore();
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [isDeactivateModalOpen, setIsDeactivateModalOpen] = useState(false);
-  const [employeeToEdit, setEmployeeToEdit] = useState(null);
-
-  const [filters, setFilters] = useState({
-    status: "all",
-    search: "",
-    jobTitle: "",
-    manager: "",
-    legal_entity_id: "",
-    office_location_id: "",
-    employee_type_id: "",
-    employee_sub_type_id: "",
-    application_id: "",
-  });
-
-  const [pagination, setPagination] = useState({
-    currentPage: 1,
-    totalPages: 1,
-    totalCount: 0,
-    limit: 20,
-  });
-  const [sorting, setSorting] = useState({
-    sortBy: "first_name",
-    sortOrder: "asc",
-  });
+  const { modal, data: modalData, closeModal } = useModalStore();
+  const { dynamicCrumbs, setDynamicCrumbs } = useBreadcrumb();
 
   const location = useLocation();
   const queryClient = useQueryClient();
-  const { dynamicCrumbs, setDynamicCrumbs } = useBreadcrumb();
 
   useEffect(() => {
     fetchUser();
   }, [fetchUser]);
-
-  const handleOpenEditModal = (employee) => {
-    setEmployeeToEdit(employee);
-    setIsEditModalOpen(true);
-  };
-  const handleCloseEditModal = () => {
-    setIsEditModalOpen(false);
-    setEmployeeToEdit(null);
-  };
-  const handleOpenDeactivateModal = (employee) => {
-    setEmployeeToEdit(employee);
-    setIsDeactivateModalOpen(true);
-  };
-  const handleCloseDeactivateModal = () => {
-    setIsDeactivateModalOpen(false);
-    setEmployeeToEdit(null);
-  };
 
   const handleLogout = useCallback(async () => {
     await logout();
@@ -165,30 +108,12 @@ const AppContent = () => {
     staleTime: 1000 * 60 * 5,
   });
 
-  const {
-    data: employeeData,
-    isLoading: isLoadingEmployees,
-    error: employeesError,
-  } = useQuery({
-    queryKey: ["employees", filters, pagination.currentPage, sorting],
-    queryFn: () => fetchEmployees(filters, pagination, sorting),
-    enabled: isAuthenticated && location.pathname === "/employees",
-    keepPreviousData: true,
-    onSuccess: (data) => {
-      setPagination((prev) => ({
-        ...prev,
-        totalPages: data.totalPages,
-        totalCount: data.totalCount,
-      }));
-    },
-  });
-
   useEffect(() => {
-    if (meError || employeesError) {
-      console.error("A critical query failed:", meError || employeesError);
+    if (meError) {
+      console.error("A critical query failed:", meError);
       handleLogout();
     }
-  }, [meError, employeesError, handleLogout]);
+  }, [meError, handleLogout]);
 
   useEffect(() => {
     const nonDynamicPaths = [
@@ -214,20 +139,20 @@ const AppContent = () => {
     if (currentUserEmployeeRecord?.id === updatedEmployee.id) {
       queryClient.invalidateQueries({ queryKey: ["me"] });
     }
-    handleCloseEditModal();
+    closeModal();
   };
 
   const handleDeactivateSuccess = () => {
     queryClient.invalidateQueries({ queryKey: ["employees"] });
-    if (employeeToEdit) {
+    if (modalData) {
       queryClient.invalidateQueries({
-        queryKey: ["employee", employeeToEdit.id],
+        queryKey: ["employee", modalData.id],
       });
     }
-    handleCloseDeactivateModal();
+    closeModal();
   };
 
-  const getBreadcrumbs = () => {
+  const getBreadcrumbs = (dynamicCrumbs) => {
     const pathParts = location.pathname.split("/").filter((p) => p);
     const homeCrumb = { name: "Home", path: "/dashboard" };
 
@@ -236,27 +161,29 @@ const AppContent = () => {
     }
 
     const pageTitleMap = {
-      profile: { name: "Profile", path: "/profile" },
-      employees: { name: "Employees", path: "/employees" },
-      settings: { name: "Settings", path: "/settings" },
-      users: { name: "User Management", path: "/settings/users" },
-      roles: { name: "Roles & Permissions", path: "/settings/roles" },
-      "access-denied": { name: "Access Denied", path: "/access-denied" },
-      logs: { name: "Logs" },
-      activity: { name: "Activity Log", path: "/logs/activity" },
+        profile: { name: "Profile", path: "/profile" },
+        employees: { name: "Employees", path: "/employees" },
+        settings: { name: "Settings", path: "/settings" },
+        users: { name: "User Management", path: "/settings/users" },
+        roles: { name: "Roles & Permissions", path: "/settings/roles" },
+        applications: { name: "Application Management", path: "/settings/applications"},
+        "access-denied": { name: "Access Denied", path: "/access-denied" },
+        logs: { name: "Logs" },
+        activity: { name: "Activity Log", path: "/logs/activity" },
     };
 
-    const crumbs = [];
-    pathParts.forEach((part) => {
-      if (pageTitleMap[part]) {
-        crumbs.push(pageTitleMap[part]);
-      }
-    });
+    const crumbs = pathParts.reduce((acc, part) => {
+        const mappedCrumb = pageTitleMap[part];
+        if(mappedCrumb && mappedCrumb.path) {
+            acc.push(mappedCrumb);
+        }
+        return acc;
+    }, []);
 
     const finalCrumbs =
       dynamicCrumbs.length > 0
         ? [homeCrumb, ...dynamicCrumbs]
-        : [homeCrumb, ...crumbs.filter((c) => c.path)];
+        : [homeCrumb, ...crumbs];
 
     return finalCrumbs;
   };
@@ -288,7 +215,7 @@ const AppContent = () => {
             <MainLayout
               onLogout={handleLogout}
               permissions={user.permissions}
-              breadcrumbs={getBreadcrumbs()}
+              breadcrumbs={getBreadcrumbs(dynamicCrumbs)}
               user={user}
             />
           }
@@ -304,8 +231,6 @@ const AppContent = () => {
                 <ProfilePage
                     employee={currentUserEmployeeRecord}
                     permissions={user.permissions}
-                    onEdit={handleOpenEditModal}
-                    onDeactivate={handleOpenDeactivateModal}
                     onLogout={handleLogout}
                     user={user}
                 />
@@ -317,18 +242,7 @@ const AppContent = () => {
             path="/employees"
             element={
               <Suspense fallback={<EmployeeListSkeleton count={10}/>}>
-                <EmployeeListPage
-                    employees={employeeData?.employees || []}
-                    isLoading={isLoadingEmployees}
-                    filters={filters}
-                    setFilters={setFilters}
-                    pagination={pagination}
-                    setPagination={setPagination}
-                    sorting={sorting}
-                    setSorting={setSorting}
-                    onEdit={handleOpenEditModal}
-                    onDeactivate={handleOpenDeactivateModal}
-                />
+                <EmployeeListPage />
               </Suspense>
             }
           />
@@ -337,8 +251,6 @@ const AppContent = () => {
             element={
               <Suspense fallback={<EmployeeDetailSkeleton />}>
                 <EmployeeDetailPage
-                    onEdit={handleOpenEditModal}
-                    onDeactivate={handleOpenDeactivateModal}
                     permissions={user.permissions}
                     onLogout={handleLogout}
                 />
@@ -355,7 +267,6 @@ const AppContent = () => {
 
           <Route path="/access-denied" element={<AccessDeniedPage />} />
 
-          {/* --- MODIFICATION: Updated Suspense fallbacks for settings routes --- */}
           <Route path="/settings" element={<Suspense fallback={<SettingsSkeleton />}><SettingsPage /></Suspense>}>
             <Route path="users" element={<Suspense fallback={<UserManagementSkeleton />}><UserManagementPage /></Suspense>} />
             <Route path="roles" element={<Suspense fallback={<RoleManagementSkeleton />}><RoleManagementPage /></Suspense>} />
@@ -378,17 +289,17 @@ const AppContent = () => {
         </Route>
       </Routes>
 
-      {isEditModalOpen && (
+      {modal === 'editEmployee' && (
         <EditEmployeeModal
-          employee={employeeToEdit}
-          onClose={handleCloseEditModal}
+          employee={modalData}
+          onClose={closeModal}
           onSave={handleUpdateEmployee}
         />
       )}
-      {isDeactivateModalOpen && (
+      {modal === 'deactivateEmployee' && (
         <DeactivateEmployeeModal
-          employee={employeeToEdit}
-          onClose={handleCloseDeactivateModal}
+          employee={modalData}
+          onClose={closeModal}
           onDeactivateSuccess={handleDeactivateSuccess}
         />
       )}
@@ -399,11 +310,9 @@ const AppContent = () => {
 export default function App() {
   return (
     <ThemeProvider>
-      <BrowserRouter>
-        <BreadcrumbProvider>
-            <AppContent />
-        </BreadcrumbProvider>
-      </BrowserRouter>
+      <BreadcrumbProvider>
+          <AppContent />
+      </BreadcrumbProvider>
     </ThemeProvider>
   );
 }

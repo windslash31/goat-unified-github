@@ -24,6 +24,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
 import api from "../../api/api";
 import { EmployeeDetailSkeleton } from "../../components/ui/EmployeeDetailSkeleton";
+import { useModalStore } from "../../stores/modalStore"; 
 
 const fetchEmployeeById = async (employeeId) => {
   const { data } = await api.get(`/api/employees/${employeeId}`);
@@ -42,14 +43,13 @@ const fetchTimelineData = async (employeeId) => {
 
 
 export const EmployeeDetailPage = ({
-  onEdit,
-  onDeactivate,
   permissions,
   onLogout,
 }) => {
   const { employeeId } = useParams();
   const navigate = useNavigate();
   const { setDynamicCrumbs } = useBreadcrumb();
+  const { openModal } = useModalStore(); // Use the modal store
   const [activeTab, setActiveTab] = useState("details");
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
   const moreMenuRef = useRef(null);
@@ -126,7 +126,6 @@ export const EmployeeDetailPage = ({
         { name: fullName, path: `/employees/${employeeId}` },
       ]);
 
-      // Log the profile view
       api.post('/api/employees/logs/view', { targetEmployeeId: employeeId })
          .catch(err => console.error("Failed to log profile view:", err));
 
@@ -148,6 +147,14 @@ export const EmployeeDetailPage = ({
       setSelectedTicketId(ticketId);
       setIsJiraModalOpen(true);
     }
+  };
+
+  const handleEdit = () => {
+    openModal('editEmployee', employee);
+  };
+
+  const handleDeactivate = () => {
+    openModal('deactivateEmployee', employee);
   };
 
   // --- RENDER LOGIC ---
@@ -193,8 +200,8 @@ export const EmployeeDetailPage = ({
       <div className="p-4 sm:p-6 space-y-6">
         <EmployeeDetailHeader
           employee={employee}
-          onEdit={onEdit}
-          onDeactivate={onDeactivate}
+          onEdit={handleEdit}
+          onDeactivate={handleDeactivate}
           permissions={permissions}
           isOwnProfile={false}
         />

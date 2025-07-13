@@ -1,4 +1,3 @@
-// packages/client/src/pages/ApplicationManagementPage.js
 import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
@@ -30,7 +29,10 @@ export const ApplicationManagementPage = () => {
       queryClient.invalidateQueries(["applications"]);
       setNewAppName("");
     },
-    onError: () => toast.error("Failed to create application."),
+    onError: (err) => {
+      const errorMessage = err.response?.data?.message || "Failed to create application.";
+      toast.error(errorMessage);
+    },
   });
 
   const updateMutation = useMutation({
@@ -40,7 +42,10 @@ export const ApplicationManagementPage = () => {
       queryClient.invalidateQueries(["applications"]);
       setEditingApp(null);
     },
-    onError: () => toast.error("Failed to update application."),
+    onError: (err) => {
+        const errorMessage = err.response?.data?.message || "Failed to update application.";
+        toast.error(errorMessage);
+    },
   });
 
   const deleteMutation = useMutation({
@@ -49,7 +54,10 @@ export const ApplicationManagementPage = () => {
       toast.success("Application deleted!");
       queryClient.invalidateQueries(["applications"]);
     },
-    onError: () => toast.error("Failed to delete application."),
+    onError: (err) => {
+        const errorMessage = err.response?.data?.message || "Failed to delete application.";
+        toast.error(errorMessage);
+    },
   });
 
   const handleCreate = (e) => {
