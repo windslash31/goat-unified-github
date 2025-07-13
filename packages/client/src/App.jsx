@@ -24,11 +24,9 @@ import { RoleManagementSkeleton } from "./components/ui/RoleManagementSkeleton";
 import { UserManagementSkeleton } from "./components/ui/UserManagementSkeleton";
 import { ActivityLogSkeleton } from "./components/ui/ActivityLogSkeleton";
 import { ApplicationManagementSkeleton } from "./components/ui/ApplicationManagementSkeleton";
-// --- MODIFICATION: Import the new skeleton ---
+
 import { SettingsSkeleton } from "./components/ui/SettingsSkeleton";
 
-
-// Lazy load page components for code splitting
 const LoginPage = lazy(() =>
   import("./pages/LoginPage").then((module) => ({ default: module.LoginPage }))
 );

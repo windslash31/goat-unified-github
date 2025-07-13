@@ -16,17 +16,15 @@ const loginLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   skipSuccessfulRequests: true,
-  // --- THIS IS THE KEY CHANGE ---
   keyGenerator: (req) => {
     // Use the email address from the request body as the key
     return req.body.email;
   },
 });
 
-// --- NEW: Limiter for token refresh ---
 const refreshTokenLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 20, // Limit each IP to 20 refresh requests per windowMs
+  max: 20, // Limit each IP to 20 refresh requests
   message:
     "Too many token refresh requests from this IP, please try again after 15 minutes",
   standardHeaders: true,
