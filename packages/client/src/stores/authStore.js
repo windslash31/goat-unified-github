@@ -32,7 +32,6 @@ export const useAuthStore = create((set, get) => ({
       }
 
       localStorage.setItem("accessToken", data.accessToken);
-      // No need to handle refreshToken here anymore
 
       const decodedUser = JSON.parse(atob(data.accessToken.split(".")[1]));
 
