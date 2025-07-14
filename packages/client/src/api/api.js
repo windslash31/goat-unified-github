@@ -40,15 +40,14 @@ api.interceptors.response.use(
     const originalRequest = error.config;
 
     // --- REWRITTEN INTERCEPTOR LOGIC START ---
-    // This logic is now safer and handles all cases correctly.
     const isRetryable =
       error.response?.status === 401 && !originalRequest._retry;
+    // --- FIX: This now correctly identifies your login and refresh routes ---
     const isSpecialRoute =
-      originalRequest.url === "/api/login" ||
+      originalRequest.url === "/api/auth/login" ||
       originalRequest.url === "/api/auth/refresh";
 
-    // Only attempt a token refresh if the error is a 401, it's not a special route,
-    // and we haven't already tried to refresh this request.
+    // Only attempt a token refresh if the error is a 401 and it's NOT a login/refresh attempt.
     if (isRetryable && !isSpecialRoute) {
       if (isRefreshing) {
         return new Promise(function (resolve, reject) {
@@ -67,8 +66,7 @@ api.interceptors.response.use(
       isRefreshing = true;
 
       try {
-        // Using your correct refresh route
-        const { data } = await api.post("/api/auth/refresh");
+        const { data } = await api.post("/api/auth/refresh"); // Using your refresh route
 
         useAuthStore.getState().setRefreshedTokens(data.accessToken);
         api.defaults.headers.common["Authorization"] =
@@ -86,9 +84,8 @@ api.interceptors.response.use(
       }
     }
 
-    // For all other errors (including the 401 from the login page),
-    // we reject the promise immediately. This is the key change that
-    // allows the UI to receive the "Invalid credentials" error.
+    // For all other errors, including the 401 from the login page, reject immediately.
+    // This sends the original error back to the login form.
     return Promise.reject(error);
     // --- REWRITTEN INTERCEPTOR LOGIC END ---
   }
