@@ -1,13 +1,12 @@
-// packages/client/src/api/api.js
 import axios from "axios";
 import { useAuthStore } from "../stores/authStore";
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL, // Changed from process.env.REACT_APP_API_BASE_URL
+  baseURL: process.env.REACT_APP_API_BASE_URL,
   headers: {
     "Content-Type": "application/json",
   },
-  withCredentials: true, // This is crucial for sending cookies
+  withCredentials: true,
 });
 
 api.interceptors.request.use(
@@ -40,12 +39,18 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
-    // --- MODIFICATION: Do not retry for the login route ---
-    if (originalRequest.url === "/api/login") {
-      return Promise.reject(error);
-    }
-
-    if (error.response.status === 401 && !originalRequest._retry) {
+    // --- FIX START ---
+    // The previous logic had a potential crash if `error.response` was undefined (e.g., network error).
+    // This new, single conditional block is safer and clearer.
+    // It will only attempt a token refresh if:
+    // 1. The error is a 401 Unauthorized.
+    // 2. We haven't already tried to refresh for this request (`!originalRequest._retry`).
+    // 3. The failed request was NOT for the login endpoint.
+    if (
+      error.response?.status === 401 &&
+      !originalRequest._retry &&
+      originalRequest.url !== "/api/login"
+    ) {
       if (isRefreshing) {
         return new Promise(function (resolve, reject) {
           failedQueue.push({ resolve, reject });
@@ -63,7 +68,8 @@ api.interceptors.response.use(
       isRefreshing = true;
 
       try {
-        const { data } = await api.post("/api/auth/refresh");
+        // The refresh token is sent via httpOnly cookie automatically.
+        const { data } = await api.post("/api/refresh");
 
         useAuthStore.getState().setRefreshedTokens(data.accessToken);
 
@@ -81,6 +87,7 @@ api.interceptors.response.use(
         isRefreshing = false;
       }
     }
+
     return Promise.reject(error);
   }
 );
