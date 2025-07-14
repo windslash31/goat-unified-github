@@ -2,7 +2,7 @@ import axios from "axios";
 import { useAuthStore } from "../stores/authStore";
 
 const api = axios.create({
-  baseURL: process.env.REACT_APP_API_BASE_URL,
+  baseURL: import.meta.env.VITE_API_BASE_URL, // Kept your environment variable
   headers: {
     "Content-Type": "application/json",
   },
@@ -39,18 +39,17 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
-    // --- FIX START ---
-    // The previous logic had a potential crash if `error.response` was undefined (e.g., network error).
-    // This new, single conditional block is safer and clearer.
-    // It will only attempt a token refresh if:
-    // 1. The error is a 401 Unauthorized.
-    // 2. We haven't already tried to refresh for this request (`!originalRequest._retry`).
-    // 3. The failed request was NOT for the login endpoint.
-    if (
-      error.response?.status === 401 &&
-      !originalRequest._retry &&
-      originalRequest.url !== "/api/login"
-    ) {
+    // --- REWRITTEN INTERCEPTOR LOGIC START ---
+    // This logic is now safer and handles all cases correctly.
+    const isRetryable =
+      error.response?.status === 401 && !originalRequest._retry;
+    const isSpecialRoute =
+      originalRequest.url === "/api/login" ||
+      originalRequest.url === "/api/auth/refresh";
+
+    // Only attempt a token refresh if the error is a 401, it's not a special route,
+    // and we haven't already tried to refresh this request.
+    if (isRetryable && !isSpecialRoute) {
       if (isRefreshing) {
         return new Promise(function (resolve, reject) {
           failedQueue.push({ resolve, reject });
@@ -68,11 +67,10 @@ api.interceptors.response.use(
       isRefreshing = true;
 
       try {
-        // The refresh token is sent via httpOnly cookie automatically.
-        const { data } = await api.post("/api/refresh");
+        // Using your correct refresh route
+        const { data } = await api.post("/api/auth/refresh");
 
         useAuthStore.getState().setRefreshedTokens(data.accessToken);
-
         api.defaults.headers.common["Authorization"] =
           "Bearer " + data.accessToken;
         originalRequest.headers["Authorization"] = "Bearer " + data.accessToken;
@@ -88,7 +86,11 @@ api.interceptors.response.use(
       }
     }
 
+    // For all other errors (including the 401 from the login page),
+    // we reject the promise immediately. This is the key change that
+    // allows the UI to receive the "Invalid credentials" error.
     return Promise.reject(error);
+    // --- REWRITTEN INTERCEPTOR LOGIC END ---
   }
 );
 
