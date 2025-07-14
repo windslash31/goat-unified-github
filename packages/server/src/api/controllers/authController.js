@@ -1,6 +1,19 @@
-// packages/server/src/api/controllers/authController.js
 const authService = require("../../services/authService");
 const employeeService = require("../../services/employeeService");
+const config = require("../../config/config"); // Import config
+
+// --- HELPER FUNCTION FOR CONSISTENT COOKIE OPTIONS ---
+// This is the single source of truth for all cookie settings.
+const getCookieOptions = () => {
+  const isProduction = config.nodeEnv === "production";
+  return {
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: isProduction ? "None" : "lax",
+    path: "/api", // The cookie is valid for all API routes
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+  };
+};
 
 const login = async (req, res, next) => {
   try {
@@ -17,16 +30,9 @@ const login = async (req, res, next) => {
       reqContext
     );
 
-    // Set refresh token in an httpOnly cookie
-    res.cookie("refreshToken", refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production", // Use secure cookies in production
-      sameSite: "none", // Or 'lax' depending on your needs
-      path: "/api", // Important to scope the cookie to your API routes
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-    });
+    // Use the helper function
+    res.cookie("refreshToken", refreshToken, getCookieOptions());
 
-    // Only send the access token in the response body
     res.json({ accessToken });
   } catch (error) {
     if (
@@ -43,20 +49,14 @@ const logout = async (req, res, next) => {
   try {
     const authHeader = req.headers["authorization"];
     const accessToken = authHeader && authHeader.split(" ")[1];
-
-    // The refresh token is now in the cookie, which authService will handle
     const { refreshToken } = req.cookies;
     const reqContext = { ip: req.ip, userAgent: req.headers["user-agent"] };
 
     await authService.logout(accessToken, refreshToken, reqContext);
 
-    // Clear the httpOnly cookie on the client
-    res.clearCookie("refreshToken", {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-      path: "/api",
-    });
+    // Use the helper function for consistency when clearing
+    const clearOptions = { ...getCookieOptions(), maxAge: 0 };
+    res.clearCookie("refreshToken", clearOptions);
 
     res.status(204).send();
   } catch (error) {
@@ -66,25 +66,16 @@ const logout = async (req, res, next) => {
 
 const refreshToken = async (req, res, next) => {
   try {
-    // Read the refresh token from the cookie
     const { refreshToken: token } = req.cookies;
-
     if (!token) {
       return res.status(401).json({ message: "Refresh token is required." });
     }
     const { accessToken, refreshToken: newRefreshToken } =
       await authService.refreshAccessToken(token);
 
-    // Set the new refresh token in the cookie
-    res.cookie("refreshToken", newRefreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "none",
-      path: "/api",
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-    });
+    // Use the helper function to guarantee consistency
+    res.cookie("refreshToken", newRefreshToken, getCookieOptions());
 
-    // Send the new access token
     res.json({ accessToken });
   } catch (error) {
     res.status(403).json({ message: "Failed to refresh access token." });
