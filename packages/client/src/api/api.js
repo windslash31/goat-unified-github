@@ -9,8 +9,10 @@ const api = axios.create({
   withCredentials: true,
 });
 
+// Add the Authorization header to every request
 api.interceptors.request.use(
   (config) => {
+    // Use the state from the store, which is synced across tabs
     const token = useAuthStore.getState().accessToken;
     if (token) {
       config.headers["Authorization"] = `Bearer ${token}`;
@@ -20,79 +22,65 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-let failedQueue = [];
-
-const processQueue = (error, token = null) => {
-  failedQueue.forEach((prom) => {
-    if (error) {
-      prom.reject(error);
-    } else {
-      prom.resolve(token);
-    }
-  });
-  failedQueue = [];
-};
+// This variable will hold the promise of the token refresh.
+// It's null if no refresh is in progress.
+let refreshPromise = null;
 
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
 
+    // Check if the error is a 401 and we haven't retried yet.
     if (error.response?.status === 401 && !originalRequest._retry) {
-      // Prevent retrying for login or refresh routes to avoid loops.
-      if (
-        originalRequest.url === "/api/auth/login" ||
-        originalRequest.url === "/api/auth/refresh"
-      ) {
-        return Promise.reject(error);
-      }
-
       originalRequest._retry = true;
 
-      // --- ROBUST LOCKING MECHANISM START ---
-      const isRefreshing = localStorage.getItem("isRefreshing");
-
-      if (isRefreshing === "true") {
-        // If another tab is already refreshing, queue this request.
-        return new Promise(function (resolve, reject) {
-          failedQueue.push({ resolve, reject });
-        })
-          .then((token) => {
-            originalRequest.headers["Authorization"] = "Bearer " + token;
-            return api(originalRequest);
-          })
-          .catch((err) => {
-            return Promise.reject(err);
-          });
+      // If refreshPromise is not null, another request is already trying to refresh the token.
+      // We hook into that existing promise.
+      if (refreshPromise) {
+        try {
+          const newAccessToken = await refreshPromise;
+          originalRequest.headers["Authorization"] = `Bearer ${newAccessToken}`;
+          return api(originalRequest);
+        } catch (err) {
+          return Promise.reject(err);
+        }
       }
 
-      // This tab will now attempt to refresh. Set the lock.
-      localStorage.setItem("isRefreshing", "true");
+      // If refreshPromise is null, this is the first 401.
+      // We start the refresh process.
+      refreshPromise = new Promise(async (resolve, reject) => {
+        try {
+          console.log("Attempting to refresh token...");
+          const { data } = await api.post("/api/auth/refresh");
+          const newAccessToken = data.accessToken;
 
+          // IMPORTANT: Use the centralized store method to update the token.
+          // This will update localStorage and trigger the 'storage' event for other tabs.
+          useAuthStore.getState().setAccessToken(newAccessToken);
+
+          console.log("Token refreshed successfully.");
+          resolve(newAccessToken);
+        } catch (refreshError) {
+          console.error("Failed to refresh token, logging out.", refreshError);
+          // If refresh fails, log out from all tabs.
+          useAuthStore.getState().logout();
+          reject(refreshError);
+        } finally {
+          // Whether it succeeded or failed, reset the refreshPromise so the next 401 can trigger a new refresh.
+          refreshPromise = null;
+        }
+      });
+
+      // Now, retry the original request using the result of our new refreshPromise.
       try {
-        const { data } = await api.post("/api/auth/refresh");
-        const newAccessToken = data.accessToken;
-
-        // Use the centralized method from authStore to ensure the storage event fires for other tabs
-        useAuthStore.getState().setAccessToken(newAccessToken);
-        useAuthStore.getState().fetchUser(); // Update user info with new token
-
-        // Retry all queued requests with the new token
-        processQueue(null, newAccessToken);
-
-        // Retry the original request
+        const newAccessToken = await refreshPromise;
         originalRequest.headers["Authorization"] = `Bearer ${newAccessToken}`;
         return api(originalRequest);
-      } catch (refreshError) {
-        // If refresh fails, logout all tabs and reject all queued requests
-        processQueue(refreshError, null);
-        useAuthStore.getState().logout();
-        return Promise.reject(refreshError);
-      } finally {
-        // Always remove the lock
-        localStorage.removeItem("isRefreshing");
+      } catch (err) {
+        // This will catch the rejection from the refreshPromise if the refresh failed.
+        return Promise.reject(err);
       }
-      // --- ROBUST LOCKING MECHANISM END ---
     }
 
     return Promise.reject(error);

@@ -1,114 +1,88 @@
 import { create } from "zustand";
 import api from "../api/api";
 
+// Helper function to decode user from token
+const getUserFromToken = (token) => {
+  if (!token) return null;
+  try {
+    return JSON.parse(atob(token.split(".")[1]));
+  } catch (e) {
+    console.error("Failed to decode token:", e);
+    return null;
+  }
+};
+
 export const useAuthStore = create((set, get) => ({
   accessToken: localStorage.getItem("accessToken") || null,
-  user: null,
+  user: getUserFromToken(localStorage.getItem("accessToken")),
   isAuthenticated: !!localStorage.getItem("accessToken"),
 
   setAccessToken: (token) => {
-    // When the token is set, it's stored in localStorage,
-    // which will trigger the 'storage' event in other tabs.
     if (token) {
       localStorage.setItem("accessToken", token);
+      const user = getUserFromToken(token);
+      set({ accessToken: token, isAuthenticated: true, user });
     } else {
+      // This case handles logout
       localStorage.removeItem("accessToken");
+      set({ accessToken: null, isAuthenticated: false, user: null });
     }
-    set({ accessToken: token, isAuthenticated: !!token });
-  },
-
-  setRefreshedTokens: (accessToken) => {
-    localStorage.setItem("accessToken", accessToken);
-    const decodedUser = JSON.parse(atob(accessToken.split(".")[1]));
-    set({
-      accessToken,
-      user: decodedUser,
-      isAuthenticated: true,
-    });
   },
 
   login: async (email, password) => {
     try {
       const { data } = await api.post("/api/auth/login", { email, password });
-
-      if (!data.accessToken) {
-        throw new Error("Login response did not include an access token.");
-      }
-
-      // Use the setAccessToken method to ensure localStorage is updated
       get().setAccessToken(data.accessToken);
-      const decodedUser = JSON.parse(atob(data.accessToken.split(".")[1]));
-      set({ user: decodedUser });
     } catch (error) {
-      const errorMessage =
-        error.response?.data?.message || "An unknown error occurred.";
-      console.error("Client-side login processing error:", errorMessage);
-      get().logout(); // Ensure logout clears state via the centralized method
+      // Clear state on failed login
+      get().logout();
+      // Re-throw the error so the UI component can handle it (e.g., show an error message)
       throw error;
     }
   },
 
   logout: async () => {
+    // Optimistic logout: update UI immediately
+    const previousToken = get().accessToken;
+    get().setAccessToken(null);
+
     try {
-      // Only call the logout API if the user is currently authenticated
-      if (get().isAuthenticated) {
+      // Only call API if we were actually logged in
+      if (previousToken) {
         await api.post("/api/auth/logout");
       }
     } catch (error) {
       console.error(
-        "Logout API call failed, proceeding with client-side logout.",
+        "Logout API call failed, but client-side logout is complete.",
         error
       );
-    } finally {
-      // Use setAccessToken(null) to ensure the 'storage' event fires for other tabs
-      get().setAccessToken(null);
-      set({ user: null });
     }
   },
 
+  // This function is kept for manual calls if needed, but setAccessToken now handles user decoding.
   fetchUser: () => {
-    try {
-      const token = get().accessToken;
-      if (token && !get().user) {
-        const decodedUser = JSON.parse(atob(token.split(".")[1]));
-        set({ user: decodedUser });
-      }
-    } catch (e) {
-      console.error("Failed to decode token on load.", e);
-      get().logout();
-    }
+    set({ user: getUserFromToken(get().accessToken) });
   },
 }));
 
-// --- NEW: Cross-Tab Synchronization Logic ---
-// This function listens for changes to localStorage made by other tabs.
+// --- Cross-Tab Synchronization Logic ---
+// This remains the key to keeping tabs in sync.
 const handleStorageChange = (event) => {
+  // Only react to changes on the accessToken key
   if (event.key === "accessToken") {
+    console.log("Storage event detected. Syncing auth state.");
     const newAccessToken = event.newValue;
     const currentState = useAuthStore.getState();
 
-    // If the token in the event is different from the one in our current tab's state...
+    // If the state is different, update it.
     if (newAccessToken !== currentState.accessToken) {
-      if (newAccessToken) {
-        // Another tab logged in or refreshed the token. Sync this tab.
-        console.log("Auth state synced from another tab: Refresh/Login");
-        useAuthStore.setState({
-          accessToken: newAccessToken,
-          isAuthenticated: true,
-        });
-        currentState.fetchUser(); // Re-fetch user info with the new token
-      } else {
-        // Another tab logged out. Log this tab out too.
-        console.log("Auth state synced from another tab: Logout");
-        useAuthStore.setState({
-          accessToken: null,
-          user: null,
-          isAuthenticated: false,
-        });
-      }
+      currentState.setAccessToken(newAccessToken);
     }
   }
 };
 
-// Add the event listener when the app loads.
+// Listen for storage changes to sync auth state across tabs
 window.addEventListener("storage", handleStorageChange);
+
+// Initial fetch/check on app load
+useAuthStore.getState().fetchUser();

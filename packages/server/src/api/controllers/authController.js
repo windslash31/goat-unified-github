@@ -65,20 +65,32 @@ const logout = async (req, res, next) => {
 };
 
 const refreshToken = async (req, res, next) => {
+  const { refreshToken: token } = req.cookies;
+
+  if (!token) {
+    // This part is correct. No token, no access.
+    return res.status(401).json({ message: "Refresh token is required." });
+  }
+
   try {
-    const { refreshToken: token } = req.cookies;
-    if (!token) {
-      return res.status(401).json({ message: "Refresh token is required." });
-    }
     const { accessToken, refreshToken: newRefreshToken } =
       await authService.refreshAccessToken(token);
 
-    // Use the helper function to guarantee consistency
     res.cookie("refreshToken", newRefreshToken, getCookieOptions());
-
     res.json({ accessToken });
   } catch (error) {
-    res.status(403).json({ message: "Failed to refresh access token." });
+    if (
+      error.message.includes("Invalid refresh token") ||
+      error.message.includes("Token has been used") ||
+      error.message.includes("Token revoked")
+    ) {
+      res.clearCookie("refreshToken", { ...getCookieOptions(), maxAge: 0 });
+      return res
+        .status(403)
+        .json({ message: "Invalid refresh token. Please log in again." });
+    }
+
+    next(error);
   }
 };
 
