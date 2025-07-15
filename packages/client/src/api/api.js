@@ -2,7 +2,7 @@ import axios from "axios";
 import { useAuthStore } from "../stores/authStore";
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL, // Kept your environment variable
+  baseURL: import.meta.env.VITE_API_BASE_URL,
   headers: {
     "Content-Type": "application/json",
   },
@@ -20,7 +20,6 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-let isRefreshing = false;
 let failedQueue = [];
 
 const processQueue = (error, token = null) => {
@@ -39,17 +38,22 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
-    // --- REWRITTEN INTERCEPTOR LOGIC START ---
-    const isRetryable =
-      error.response?.status === 401 && !originalRequest._retry;
-    // --- FIX: This now correctly identifies your login and refresh routes ---
-    const isSpecialRoute =
-      originalRequest.url === "/api/auth/login" ||
-      originalRequest.url === "/api/auth/refresh";
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      // Prevent retrying for login or refresh routes to avoid loops.
+      if (
+        originalRequest.url === "/api/auth/login" ||
+        originalRequest.url === "/api/auth/refresh"
+      ) {
+        return Promise.reject(error);
+      }
 
-    // Only attempt a token refresh if the error is a 401 and it's NOT a login/refresh attempt.
-    if (isRetryable && !isSpecialRoute) {
-      if (isRefreshing) {
+      originalRequest._retry = true;
+
+      // --- ROBUST LOCKING MECHANISM START ---
+      const isRefreshing = localStorage.getItem("isRefreshing");
+
+      if (isRefreshing === "true") {
+        // If another tab is already refreshing, queue this request.
         return new Promise(function (resolve, reject) {
           failedQueue.push({ resolve, reject });
         })
@@ -62,32 +66,36 @@ api.interceptors.response.use(
           });
       }
 
-      originalRequest._retry = true;
-      isRefreshing = true;
+      // This tab will now attempt to refresh. Set the lock.
+      localStorage.setItem("isRefreshing", "true");
 
       try {
-        const { data } = await api.post("/api/auth/refresh"); // Using your refresh route
+        const { data } = await api.post("/api/auth/refresh");
+        const newAccessToken = data.accessToken;
 
-        useAuthStore.getState().setRefreshedTokens(data.accessToken);
-        api.defaults.headers.common["Authorization"] =
-          "Bearer " + data.accessToken;
-        originalRequest.headers["Authorization"] = "Bearer " + data.accessToken;
+        // Use the centralized method from authStore to ensure the storage event fires for other tabs
+        useAuthStore.getState().setAccessToken(newAccessToken);
+        useAuthStore.getState().fetchUser(); // Update user info with new token
 
-        processQueue(null, data.accessToken);
+        // Retry all queued requests with the new token
+        processQueue(null, newAccessToken);
+
+        // Retry the original request
+        originalRequest.headers["Authorization"] = `Bearer ${newAccessToken}`;
         return api(originalRequest);
       } catch (refreshError) {
+        // If refresh fails, logout all tabs and reject all queued requests
         processQueue(refreshError, null);
         useAuthStore.getState().logout();
         return Promise.reject(refreshError);
       } finally {
-        isRefreshing = false;
+        // Always remove the lock
+        localStorage.removeItem("isRefreshing");
       }
+      // --- ROBUST LOCKING MECHANISM END ---
     }
 
-    // For all other errors, including the 401 from the login page, reject immediately.
-    // This sends the original error back to the login form.
     return Promise.reject(error);
-    // --- REWRITTEN INTERCEPTOR LOGIC END ---
   }
 );
 
