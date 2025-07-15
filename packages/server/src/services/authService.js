@@ -97,7 +97,8 @@ const login = async (email, password, reqContext) => {
     { expiresIn: "7d" }
   );
 
-  await db.query("DELETE FROM refresh_tokens WHERE user_id = $1", [user.id]);
+  // THIS LINE HAS BEEN REMOVED TO ALLOW MULTIPLE LOGINS
+  // await db.query("DELETE FROM refresh_tokens WHERE user_id = $1", [user.id]);
 
   const sevenDaysFromNow = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
   await db.query(
@@ -116,6 +117,7 @@ const refreshAccessToken = async (token) => {
     const decoded = jwt.verify(token, config.jwt.refreshSecret);
     const userId = decoded.id;
 
+    // This query now correctly implements token rotation for a single session
     const tokenResult = await client.query(
       "DELETE FROM refresh_tokens WHERE token = $1 AND user_id = $2 AND expires_at > NOW() RETURNING token",
       [token, userId]
@@ -205,6 +207,7 @@ const logout = async (accessToken, refreshToken, reqContext) => {
   }
 
   if (refreshToken) {
+    // This correctly deletes only the one session being logged out
     await db.query("DELETE FROM refresh_tokens WHERE token = $1", [
       refreshToken,
     ]);
