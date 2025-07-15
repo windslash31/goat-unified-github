@@ -1,4 +1,3 @@
-// packages/server/src/services/userService.js
 const crypto = require("crypto");
 const db = require("../config/db");
 const { logActivity } = require("./logService");
@@ -16,11 +15,26 @@ const getUsers = async () => {
   return result.rows;
 };
 
-const createUser = async (userData, actorId, reqContext) => {
+const createUser = async (userData, actor, reqContext) => {
   const { email, fullName, roleId } = userData;
   const client = await db.pool.connect();
   try {
     await client.query("BEGIN");
+
+    if (roleId) {
+      const roleQuery = "SELECT name FROM roles WHERE id = $1";
+      const roleResult = await client.query(roleQuery, [roleId]);
+
+      if (roleResult.rows.length > 0) {
+        const roleName = roleResult.rows[0].name;
+
+        if (roleName === "admin" && actor.role !== "admin") {
+          throw new Error(
+            "You do not have permission to create an admin user."
+          );
+        }
+      }
+    }
 
     const existingUser = await client.query(
       "SELECT id FROM users WHERE email = $1",
@@ -47,7 +61,7 @@ const createUser = async (userData, actorId, reqContext) => {
     const newUser = result.rows[0];
 
     await logActivity(
-      actorId,
+      actor.id,
       "USER_CREATE",
       {
         targetUserEmail: newUser.email,
