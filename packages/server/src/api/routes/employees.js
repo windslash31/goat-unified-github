@@ -1,4 +1,3 @@
-// packages/server/src/api/routes/employees.js
 const express = require("express");
 const router = express.Router();
 const multer = require("multer");
@@ -11,7 +10,6 @@ const {
   authorizeAdminOrSelfForLogs,
 } = require("../middleware/authMiddleware");
 
-// Configure multer for CSV file uploads
 const upload = multer({
   storage: multer.memoryStorage(),
   fileFilter: (req, file, cb) => {
@@ -23,7 +21,6 @@ const upload = multer({
   },
 });
 
-// --- FIXED: N8N routes moved to the top to ensure they are matched first ---
 router.post(
   "/onboard",
   authenticateApiKey,
@@ -43,7 +40,6 @@ router.post(
   employeeController.createApplicationAccess
 );
 
-// General Employee Routes for the UI
 router.get(
   "/",
   authenticateToken,
@@ -57,16 +53,14 @@ router.get(
   employeeController.exportEmployees
 );
 
-// --- NEW: Route for bulk employee import ---
 router.post(
   "/bulk-import",
   authenticateToken,
   authorize("employee:create"),
-  upload.single("file"), // 'file' should match the name attribute in the form
+  upload.single("file"),
   employeeController.bulkImportEmployees
 );
 
-// --- NEW: Route for downloading the import template ---
 router.get(
   "/template/csv",
   authenticateToken,
@@ -87,7 +81,6 @@ router.put(
   employeeController.updateEmployee
 );
 
-// --- NEW: Route for fetching license details ---
 router.get(
   "/:id/licenses",
   authenticateToken,
@@ -95,7 +88,6 @@ router.get(
   employeeController.getLicenseDetails
 );
 
-// Platform and Log related routes
 router.get(
   "/:id/platform-statuses",
   authenticateToken,
@@ -133,7 +125,6 @@ router.post(
   employeeController.deactivateOnPlatforms
 );
 
-// Log a view action
 router.post(
   "/logs/view",
   authenticateToken,
@@ -149,7 +140,6 @@ router.get(
   employeeController.getEmployeeOptions
 );
 
-// Route for bulk actions
 router.post(
   "/bulk-deactivate",
   authenticateToken,

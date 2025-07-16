@@ -1,6 +1,5 @@
-// packages/server/src/config/db.js
 const { Pool } = require("pg");
-const config = require("./config"); // Import the new config
+const config = require("./config");
 
 const pool = new Pool({
   user: config.db.user,
@@ -10,7 +9,6 @@ const pool = new Pool({
   port: config.db.port,
 });
 
-// A helper function to make single queries
 const query = (text, params) => pool.query(text, params);
 
 module.exports = {

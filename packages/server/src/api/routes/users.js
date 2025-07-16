@@ -1,4 +1,3 @@
-// packages/server/src/api/routes/users.js
 const express = require("express");
 const router = express.Router();
 const userController = require("../controllers/userController");
@@ -8,10 +7,9 @@ const {
 } = require("../middleware/authMiddleware");
 const rateLimit = require("express-rate-limit");
 
-// --- NEW: Limiter for sensitive user actions ---
 const userActionLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
-  max: 15, // Limit each IP to 15 requests per hour for these sensitive actions
+  max: 15, // Limit each IP to 15 requests per hour
   message: "Too many requests for this action, please try again later.",
   standardHeaders: true,
   legacyHeaders: false,
@@ -23,7 +21,6 @@ router.post(
   userController.changePassword
 );
 
-// The page itself requires the new "view" permission
 router.get(
   "/",
   authenticateToken,
@@ -31,7 +28,6 @@ router.get(
   userController.listUsers
 );
 
-// Each action route is protected by its own specific permission
 router.post(
   "/",
   authenticateToken,
@@ -39,7 +35,6 @@ router.post(
   userController.createUser
 );
 
-// Apply the new limiter to the password reset route
 router.post(
   "/:id/reset-password",
   authenticateToken,
@@ -60,14 +55,13 @@ router.delete(
   userController.deleteUser
 );
 
-// api keys management
 router.get(
   "/:id/api-keys",
   authenticateToken,
   authorize("user:manage_api_keys"),
   userController.listApiKeys
 );
-// Apply the new limiter to the API key generation route
+
 router.post(
   "/:id/api-keys",
   authenticateToken,
@@ -75,6 +69,7 @@ router.post(
   authorize("user:manage_api_keys"),
   userController.generateApiKey
 );
+
 router.delete(
   "/api-keys/:keyId",
   authenticateToken,

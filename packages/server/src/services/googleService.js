@@ -3,9 +3,6 @@ const { OAuth2 } = google.auth;
 
 let oauth2Client;
 
-/**
- * Creates and returns a single, reusable authenticated OAuth2 client.
- */
 async function getAuthClient() {
   if (oauth2Client) {
     return oauth2Client;
@@ -32,7 +29,6 @@ async function getAuthClient() {
       refresh_token: process.env.GOOGLE_REFRESH_TOKEN,
     });
 
-    // Cache the client for future use
     oauth2Client = client;
     return oauth2Client;
   } catch (error) {
@@ -46,9 +42,6 @@ async function getAuthClient() {
   }
 }
 
-/**
- * Returns an authenticated Google Admin SDK (Directory) client.
- */
 async function getDirectoryClient() {
   const auth = await getAuthClient();
   return google.admin({
@@ -57,9 +50,6 @@ async function getDirectoryClient() {
   });
 }
 
-/**
- * Returns an authenticated Google Licensing API client.
- */
 const getLicensingClient = async () => {
   const auth = await getAuthClient();
   return google.licensing({ version: "v1", auth });
@@ -128,10 +118,10 @@ const suspendUser = async (email) => {
 
 const getLoginEvents = async (email) => {
   try {
-    const auth = await getAuthClient(); // Get the authenticated client
+    const auth = await getAuthClient();
     const reports = google.reports({
       version: "reports_v1",
-      auth: auth, // Use the auth object directly
+      auth: auth,
     });
 
     const thirtyDaysAgo = new Date(
@@ -150,19 +140,14 @@ const getLoginEvents = async (email) => {
       `Failed to get Google Workspace login events for ${email}:`,
       error.message
     );
-    return []; // Return empty array on error
+    return [];
   }
 };
 
-/**
- * NEW: Fetches the license assignments for a specific user.
- * This checks for a standard Google Workspace license.
- */
 const getUserLicense = async (email) => {
   try {
     const licensing = await getLicensingClient();
-    // This looks for a standard Google Workspace license assignment.
-    // The productId for Google Workspace is 'Google-Apps'.
+
     const response = await licensing.licenseAssignments.listForProduct({
       productId: "Google-Apps",
       customerId: process.env.GOOGLE_CUSTOMER_ID,
@@ -171,18 +156,15 @@ const getUserLicense = async (email) => {
 
     const licenses = response.data.items || [];
 
-    // We map the response to a simpler format for the frontend.
     return licenses.map((lic) => ({
       skuName: lic.skuName,
-      planName: "Google Workspace", // You can customize this if you use different plans
+      planName: "Google Workspace",
     }));
   } catch (error) {
     if (error.code === 404) {
-      // 404 means the user or the license assignment doesn't exist, which is not an error in this context.
       return [];
     }
     console.error("Error fetching Google User License:", error.message);
-    // For other errors, we throw to indicate a real problem.
     throw error;
   }
 };
@@ -191,5 +173,5 @@ module.exports = {
   getUserStatus,
   suspendUser,
   getLoginEvents,
-  getUserLicense, // Export the new function
+  getUserLicense,
 };

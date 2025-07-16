@@ -1,7 +1,6 @@
 const fetch = require("node-fetch");
 
 const getUserStatus = async (email) => {
-  // Use the exact environment variable names you have defined
   if (
     !process.env.ATLASSIAN_API_TOKEN ||
     !process.env.ATLASSIAN_API_USER ||
@@ -16,7 +15,6 @@ const getUserStatus = async (email) => {
     };
   }
 
-  // Construct the URL using your ATLASSIAN_DOMAIN variable
   const url = `https://${
     process.env.ATLASSIAN_DOMAIN
   }/rest/api/3/user/search?query=${encodeURIComponent(email)}`;

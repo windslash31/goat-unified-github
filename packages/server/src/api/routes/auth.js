@@ -7,17 +7,15 @@ const {
   authorize,
 } = require("../middleware/authMiddleware");
 
-// Limiter for login attempts, now keyed by email address
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 10, // Limit each email to 10 login attempts per windowMs
+  max: 10, // Limit each email to 10 login attempts
   message:
     "Too many login attempts for this account, please try again after 15 minutes",
   standardHeaders: true,
   legacyHeaders: false,
   skipSuccessfulRequests: true,
   keyGenerator: (req) => {
-    // Use the email address from the request body as the key
     return req.body.email;
   },
 });

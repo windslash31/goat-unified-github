@@ -28,7 +28,6 @@ const logActivity = async (
   reqContext = {},
   client = db
 ) => {
-  // This function remains unchanged
   try {
     let actorEmail = null;
     let actorFullName = null;

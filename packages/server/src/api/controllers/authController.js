@@ -1,9 +1,7 @@
 const authService = require("../../services/authService");
 const employeeService = require("../../services/employeeService");
-const config = require("../../config/config"); // Import config
+const config = require("../../config/config");
 
-// --- HELPER FUNCTION FOR CONSISTENT COOKIE OPTIONS ---
-// This is the single source of truth for all cookie settings.
 const getCookieOptions = () => {
   const isProduction = config.nodeEnv === "production";
   return {
@@ -54,7 +52,6 @@ const logout = async (req, res, next) => {
 
     await authService.logout(accessToken, refreshToken, reqContext);
 
-    // Use the helper function for consistency when clearing
     const clearOptions = { ...getCookieOptions(), maxAge: 0 };
     res.clearCookie("refreshToken", clearOptions);
 
@@ -68,7 +65,6 @@ const refreshToken = async (req, res, next) => {
   const { refreshToken: token } = req.cookies;
 
   if (!token) {
-    // This part is correct. No token, no access.
     return res.status(401).json({ message: "Refresh token is required." });
   }
 

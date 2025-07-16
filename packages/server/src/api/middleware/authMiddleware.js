@@ -24,8 +24,8 @@ const authenticateToken = async (req, res, next) => {
     }
 
     const user = jwt.verify(token, config.jwt.secret);
-    req.user = user; // Attach user payload to the request
-    next(); // Proceed to the next middleware
+    req.user = user;
+    next();
   } catch (err) {
     if (err instanceof jwt.JsonWebTokenError) {
       return res.status(401).json({ message: "Token is not valid." });

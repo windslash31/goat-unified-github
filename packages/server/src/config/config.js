@@ -1,12 +1,10 @@
-// packages/server/src/config/config.js
-
 if (process.env.NODE_ENV !== "production") {
   require("./loadEnv");
 }
 
 module.exports = {
   port: process.env.PORT || 4000,
-  clientUrl: process.env.CLIENT_URL, // Keep this line
+  clientUrl: process.env.CLIENT_URL,
   db: {
     user: process.env.DB_USER,
     host: process.env.DB_HOST,
@@ -18,11 +16,9 @@ module.exports = {
     secret: process.env.JWT_SECRET,
     refreshSecret: process.env.JWT_REFRESH_SECRET,
   },
-  // --- ADD THIS SECTION ---
   cookie: {
     secret: process.env.COOKIE_SECRET,
   },
-  // --- END ADDITION ---
   google: {
     clientId: process.env.GOOGLE_CLIENT_ID,
     clientSecret: process.env.GOOGLE_CLIENT_SECRET,

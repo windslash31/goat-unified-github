@@ -6,11 +6,8 @@ const {
   authorize,
 } = require("../middleware/authMiddleware");
 
-// Anyone who is logged in can get the list of applications for filtering
 router.get("/", authenticateToken, applicationController.listAllApplications);
 
-// --- CRUD Routes for Applications ---
-// Now protected with the correct permission
 router.post(
   "/",
   authenticateToken,

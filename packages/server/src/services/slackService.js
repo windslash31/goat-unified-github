@@ -1,8 +1,5 @@
 const { WebClient } = require("@slack/web-api");
 
-// -- MODIFICATION START: LAZY INITIALIZATION --
-// We will initialize the client inside the functions that use it
-// to ensure environment variables are loaded.
 let web;
 const getWebClient = () => {
   if (!web) {
@@ -15,7 +12,6 @@ const getWebClient = () => {
   }
   return web;
 };
-// -- MODIFICATION END --
 
 const getUserStatus = async (email) => {
   if (!email) {
@@ -28,7 +24,7 @@ const getUserStatus = async (email) => {
   }
 
   try {
-    const client = getWebClient(); // Use the getter function
+    const client = getWebClient();
     const result = await client.users.lookupByEmail({ email });
     if (result.ok && result.user) {
       return {
@@ -65,10 +61,9 @@ const getUserStatus = async (email) => {
 
 const deactivateUser = async (email) => {
   try {
-    const client = getWebClient(); // Use the getter function
+    const client = getWebClient();
     const result = await client.users.lookupByEmail({ email });
     if (result.ok && result.user) {
-      // Placeholder for admin.users.setInactive
       return {
         success: true,
         message: `Deactivation for ${email} would be performed here.`,
@@ -94,13 +89,10 @@ const deactivateUser = async (email) => {
 };
 
 const getAuditLogs = async (email) => {
-  // This is a placeholder implementation.
   try {
-    const client = getWebClient(); // Use the getter function
+    const client = getWebClient();
     const userResult = await client.users.lookupByEmail({ email });
     if (userResult.ok && userResult.user) {
-      // const logResult = await web.admin.audit.v1.logs({ action: 'user_login', actors: result.user.id });
-      // For this example, we return mock data based on your UI.
       console.warn(
         "Slack audit log fetching is mocked. Requires Enterprise Grid for real data."
       );

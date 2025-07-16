@@ -12,13 +12,13 @@ const getDashboardStats = async () => {
         LIMIT 1;
     `;
   try {
-    console.log("Attempting to query dashboard stats..."); // Add this
+    console.log("Attempting to query dashboard stats...");
     const result = await db.query(statsQuery);
-    console.log("Dashboard stats query successful."); // Add this
+    console.log("Dashboard stats query successful.");
     return result.rows[0];
   } catch (error) {
-    console.error("Error during getDashboardStats DB query:", error); // Add this
-    throw error; // Re-throw to propagate to controller
+    console.error("Error during getDashboardStats DB query:", error);
+    throw error;
   }
 };
 
@@ -58,8 +58,6 @@ const getRecentTickets = async () => {
 };
 
 const getLicenseStats = async () => {
-  // This is a placeholder. In a real scenario, you'd query a table
-  // or an external API for license counts.
   return [
     { name: "Google Workspace", used: 150, total: 200 },
     { name: "Atlassian", used: 120, total: 150 },

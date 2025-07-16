@@ -6,7 +6,6 @@ const { Parser } = require("json2csv");
 
 const listActivityLogs = async (req, res, next) => {
   try {
-    // Pass query params as filters
     const logs = await getActivityLogs(req.query);
     res.json(logs);
   } catch (error) {
@@ -25,7 +24,7 @@ const getLogFilterOptions = async (req, res, next) => {
 
 const exportActivityLogs = async (req, res, next) => {
   try {
-    const logs = await getActivityLogs(1000); // Export up to 1000 logs
+    const logs = await getActivityLogs(1000);
 
     const fields = [
       "timestamp",

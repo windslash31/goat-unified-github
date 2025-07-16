@@ -207,7 +207,6 @@ const logout = async (accessToken, refreshToken, reqContext) => {
   }
 
   if (refreshToken) {
-    // This correctly deletes only the one session being logged out
     await db.query("DELETE FROM refresh_tokens WHERE token = $1", [
       refreshToken,
     ]);
