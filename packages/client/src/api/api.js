@@ -51,7 +51,6 @@ api.interceptors.response.use(
       // We start the refresh process.
       refreshPromise = new Promise(async (resolve, reject) => {
         try {
-          console.log("Attempting to refresh token...");
           const { data } = await api.post("/api/auth/refresh");
           const newAccessToken = data.accessToken;
 
@@ -59,10 +58,8 @@ api.interceptors.response.use(
           // This will update localStorage and trigger the 'storage' event for other tabs.
           useAuthStore.getState().setAccessToken(newAccessToken);
 
-          console.log("Token refreshed successfully.");
           resolve(newAccessToken);
         } catch (refreshError) {
-          console.error("Failed to refresh token, logging out.", refreshError);
           // If refresh fails, log out from all tabs.
           useAuthStore.getState().logout();
           reject(refreshError);
