@@ -36,8 +36,5 @@ module.exports = {
     apiUser: process.env.ATLASSIAN_API_USER,
     domain: process.env.ATLASSIAN_DOMAIN,
   },
-  gemini: {
-    apiKey: process.env.GEMINI_API_KEY,
-  },
   nodeEnv: process.env.NODE_ENV || "development",
 };

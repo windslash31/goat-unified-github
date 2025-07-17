@@ -12,7 +12,6 @@ const logRoutes = require("./api/routes/logs");
 const jiraRoutes = require("./api/routes/jira");
 const userRoutes = require("./api/routes/users");
 const { schedulePlatformSync } = require("./cron/platformSync");
-const aiRoutes = require("./api/routes/ai");
 
 const app = express();
 app.set("trust proxy", 1);
@@ -37,24 +36,20 @@ app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Group related routes
-const routes = {
-  auth: authRoutes,
-  employees: employeeRoutes,
-  roles: roleRoutes,
-  applications: applicationRoutes,
-  dashboard: dashboardRoutes,
-  logs: logRoutes,
-  jira: jiraRoutes,
-  users: userRoutes,
-  ai: aiRoutes,
-};
+//routes
+app.use("/api/auth", authRoutes);
+app.use("/api/employees", employeeRoutes);
+app.use("/api/roles", roleRoutes);
+app.use("/api/applications", applicationRoutes);
+app.use("/api/dashboard", dashboardRoutes);
+app.use("/api/logs", logRoutes);
+app.use("/api/jira", jiraRoutes);
+app.use("/api/users", userRoutes);
+app.use("/api/employees", employeeRoutes);
+app.use("/api/roles", roleRoutes);
+app.use("/api/ai", aiRoutes);
 
-// Register routes
-Object.entries(routes).forEach(([path, router]) => {
-  app.use(`/api/${path}`, router);
-});
-
+// Global error handler
 app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(500).send("Something broke!");
