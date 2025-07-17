@@ -17,32 +17,31 @@ const app = express();
 app.set("trust proxy", 1);
 
 const whitelist = ["http://localhost:3000"];
+
 if (config.clientUrl) {
   whitelist.push(...config.clientUrl.split(",").map((url) => url.trim()));
 }
 
 const corsOptions = {
-  // The origin function is more robust for checking against a whitelist.
   origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin || whitelist.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
       callback(new Error("Not allowed by CORS"));
     }
   },
-  credentials: true, // This is important for sending cookies.
+  credentials: true,
 };
 
 // Middlewares
 app.use(helmet());
-app.use(cookieParser(config.cookie.secret));
 app.use(cors(corsOptions));
+app.options("*", cors(corsOptions));
+app.use(cookieParser(config.cookie.secret));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.options("*", cors(corsOptions));
 
-//routes
+// --- Routes ---
 app.use("/api/auth", authRoutes);
 app.use("/api/employees", employeeRoutes);
 app.use("/api/roles", roleRoutes);
@@ -51,7 +50,6 @@ app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/logs", logRoutes);
 app.use("/api/jira", jiraRoutes);
 app.use("/api/users", userRoutes);
-app.use("/api/roles", roleRoutes);
 
 // Global error handler
 app.use((err, req, res, next) => {
@@ -59,13 +57,13 @@ app.use((err, req, res, next) => {
   res.status(500).send("Something broke!");
 });
 
-const PORT = config.port;
+const PORT = config.port || 8080;
 app.listen(PORT, () => {
-  console.log(`Backend server running at http://localhost:${PORT}`);
+  console.log(`Backend server running on port ${PORT}`);
 
-  //if (config.nodeEnv === "production") {
-  schedulePlatformSync();
-  //}
+  if (config.nodeEnv !== "development") {
+    schedulePlatformSync();
+  }
 });
 
 module.exports = app;
