@@ -1,12 +1,11 @@
-// This file now maps fields from the *simplified* data object sent by your backend.
-
-// Helper to safely get a value. Since the object is flat, this is simpler.
+// Helper to safely get a value from a nested object
 const get = (obj, path, defaultValue = null) => {
-  return obj[path] !== undefined ? obj[path] : defaultValue;
+  const value = path.split(".").reduce((a, b) => (a ? a[b] : undefined), obj);
+  return value !== undefined ? value : defaultValue;
 };
 
-// --- Mapper for Employee Offboarding ---
-const mapEmployeeOffboardingFields = (employeeDetails) => ({
+// Mapper for Employee Offboarding
+const mapEmployeeOffboardingFields = (employeeDetails, assetDetails) => ({
   title: "Employee Offboarding Details",
   sections: [
     {
@@ -21,7 +20,7 @@ const mapEmployeeOffboardingFields = (employeeDetails) => ({
             .filter(Boolean)
             .join(" "),
         },
-        { label: "Email", value: get(employeeDetails, "email") },
+        { label: "Email", value: get(employeeDetails, "employeeEmail") },
         { label: "Position", value: get(employeeDetails, "position") },
         { label: "Manager Email", value: get(employeeDetails, "managerEmail") },
       ],
@@ -41,11 +40,21 @@ const mapEmployeeOffboardingFields = (employeeDetails) => ({
         },
       ],
     },
+    {
+      title: "Asset Details",
+      fields: [
+        {
+          label: "Assigned Laptop",
+          ...get(assetDetails, "assignedLaptop"),
+          type: "asset",
+        },
+      ],
+    },
   ],
 });
 
-// --- Mapper for Employee Onboarding ---
-const mapEmployeeOnboardingFields = (employeeDetails) => ({
+// Mapper for Employee Onboarding - updated to be more generic
+const mapEmployeeOnboardingFields = (employeeDetails, assetDetails) => ({
   title: "Employee Onboarding Details",
   sections: [
     {
@@ -60,9 +69,46 @@ const mapEmployeeOnboardingFields = (employeeDetails) => ({
             .filter(Boolean)
             .join(" "),
         },
-        { label: "Email", value: get(employeeDetails, "email") },
-        { label: "Position", value: get(employeeDetails, "position") },
+        {
+          label: "Employee Email",
+          value: get(employeeDetails, "employeeEmail"),
+        },
         { label: "Manager Email", value: get(employeeDetails, "managerEmail") },
+        {
+          label: "Join Date",
+          value: get(employeeDetails, "joinDate"),
+          type: "date",
+        },
+      ],
+    },
+    {
+      title: "Job Details",
+      fields: [
+        { label: "Position", value: get(employeeDetails, "position") },
+        { label: "Legal Entity", value: get(employeeDetails, "legalEntity") },
+        {
+          label: "Employment Type",
+          value: get(employeeDetails, "employmentType"),
+        },
+        {
+          label: "Employee Sub-Type",
+          value: get(employeeDetails, "employeeSubType"),
+        },
+        {
+          label: "Office Location",
+          value: get(employeeDetails, "officeLocation"),
+        },
+      ],
+    },
+    {
+      title: "Asset Assignment",
+      fields: [
+        { label: "Laptop Type", value: get(employeeDetails, "laptopType") },
+        {
+          label: "Assigned Laptop",
+          ...get(assetDetails, "assignedLaptop"),
+          type: "asset",
+        },
       ],
     },
   ],
@@ -70,12 +116,13 @@ const mapEmployeeOnboardingFields = (employeeDetails) => ({
 
 // --- Main Export: The Strategy Map ---
 export const JIRA_ISSUE_TYPE_MAPPERS = {
-  // These keys should match the 'issueType' string from your backend's response
+  // These keys now correctly match all your issue types
   "Employee Offboarding": (data) =>
-    mapEmployeeOffboardingFields(data.employee_details),
+    mapEmployeeOffboardingFields(data.employee_details, data.asset_details),
   "DB Offboarding": (data) =>
-    mapEmployeeOffboardingFields(data.employee_details),
-  "Employee Onboarding": (data) =>
-    mapEmployeeOnboardingFields(data.employee_details),
-  "DB Onboarding": (data) => mapEmployeeOnboardingFields(data.employee_details),
+    mapEmployeeOffboardingFields(data.employee_details, data.asset_details),
+  "Employee onboarding": (data) =>
+    mapEmployeeOnboardingFields(data.employee_details, data.asset_details),
+  "DB Onboarding": (data) =>
+    mapEmployeeOnboardingFields(data.employee_details, data.asset_details), // Re-uses the main onboarding mapper
 };
