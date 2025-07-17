@@ -65,16 +65,14 @@ const getEmployeeById = async (employeeId) => {
             FROM employee_application_access eaa
             JOIN internal_applications ia ON eaa.application_id = ia.id
             WHERE eaa.employee_id = e.id) as applications,
-            -- START: ADDED PLATFORM STATUS AGGREGATION
             (SELECT json_agg(json_build_object(
                 'platform_name', pas.platform_name,
                 'status', pas.status,
                 'details', pas.details,
                 'last_synced_at', pas.last_synced_at
-            ))
+            ) ORDER BY pas.platform_name) -- <<< THIS IS THE FIX
             FROM platform_access_status pas
             WHERE pas.employee_id = e.id) as platform_statuses
-            -- END: ADDED PLATFORM STATUS AGGREGATION
         FROM employees e
         LEFT JOIN legal_entities le ON e.legal_entity_id = le.id
         LEFT JOIN office_locations ol ON e.office_location_id = ol.id
@@ -89,7 +87,6 @@ const getEmployeeById = async (employeeId) => {
   const employee = result.rows[0];
   employee.status = getEmployeeStatus(employee);
   employee.applications = employee.applications || [];
-  // Add platform_statuses to the final object, defaulting to an empty array
   employee.platform_statuses = employee.platform_statuses || [];
   return employee;
 };
@@ -396,6 +393,7 @@ const syncPlatformStatus = async (employeeId) => {
       const platformStatus = await platform.service.getUserStatus(email);
       status = platformStatus.status;
 
+      details = platformStatus.details;
       const rawDetails = platformStatus.details;
       if (rawDetails) {
         switch (platform.name) {

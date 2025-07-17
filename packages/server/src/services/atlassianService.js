@@ -11,7 +11,7 @@ const getUserStatus = async (email) => {
       platform: "Atlassian",
       email,
       status: "Error",
-      message: "Server configuration error.",
+      details: { message: "Server configuration error." },
     };
   }
 
@@ -47,18 +47,18 @@ const getUserStatus = async (email) => {
     const user = users[0];
 
     // --- THIS IS THE CHANGE ---
-    // Create the details object with the specific fields you wanted.
+    // Added emailAddress and displayName to the details object.
     const details = {
       accountId: user.accountId,
       accountType: user.accountType,
       displayName: user.displayName,
+      emailAddress: user.emailAddress,
     };
 
     return {
       platform: "Atlassian",
-      email: user.emailAddress,
       status: user.active ? "Active" : "Suspended",
-      details: details, // Return the new details object
+      details: details,
     };
     // --- END OF CHANGE ---
   } catch (error) {
@@ -136,5 +136,5 @@ const deactivateUser = async (email) => {
 module.exports = {
   getUserStatus,
   deactivateUser,
-  getTicketDetails, // Export the new function
+  getTicketDetails,
 };

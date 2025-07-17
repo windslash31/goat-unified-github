@@ -107,12 +107,16 @@ const PlatformDetailView = ({ platformName, details }) => {
       );
       break;
     case "Atlassian":
+      // --- THIS IS THE CHANGE ---
       content = (
         <>
+          <DetailRow label="Display Name" value={details.displayName} />
+          <DetailRow label="Email" value={details.emailAddress} />
           <DetailRow label="Account ID" value={details.accountId} />
           <DetailRow label="Account Type" value={details.accountType} />
         </>
       );
+      // --- END OF CHANGE ---
       break;
     case "JumpCloud":
       content = (
