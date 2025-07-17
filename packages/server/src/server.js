@@ -16,13 +16,26 @@ const { schedulePlatformSync } = require("./cron/platformSync");
 const app = express();
 app.set("trust proxy", 1);
 
-const whitelist = ["http://localhost:3000", config.clientUrl];
+const whitelist = ["http://localhost:3000"];
+if (config.clientUrl) {
+  whitelist.push(...config.clientUrl.split(",").map((url) => url.trim()));
+}
+
+// --- START: UPDATED CORS CONFIGURATION WITH LOGGING ---
 
 const corsOptions = {
   origin: function (origin, callback) {
-    if (whitelist.indexOf(origin) !== -1 || !origin) {
+    // Log the incoming request's origin and the server's whitelist
+    console.log("--- CORS DEBUG ---");
+    console.log("Request Origin:", origin);
+    console.log("Whitelist:", whitelist);
+    console.log("--- END CORS DEBUG ---");
+
+    if (!origin || whitelist.indexOf(origin) !== -1) {
+      // If origin is in the whitelist, allow it
       callback(null, true);
     } else {
+      // Otherwise, reject it
       callback(new Error("Not allowed by CORS"));
     }
   },
