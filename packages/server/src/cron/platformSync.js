@@ -56,9 +56,9 @@ const syncAllUserStatuses = async () => {
  * Initializes and schedules the cron job.
  */
 const schedulePlatformSync = () => {
-  cron.schedule("* * * * *", syncAllUserStatuses, {
+  //cron.schedule("* * * * *", syncAllUserStatuses, {
     // Schedule to run at 2 AM every day in Jakarta's timezone
-    //cron.schedule("0 2 * * *", syncAllUserStatuses, {
+    cron.schedule("0 2 * * *", syncAllUserStatuses, {
     scheduled: true,
     timezone: "Asia/Jakarta",
   });
