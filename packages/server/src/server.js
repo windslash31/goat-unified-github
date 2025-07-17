@@ -16,18 +16,23 @@ const { schedulePlatformSync } = require("./cron/platformSync");
 const app = express();
 app.set("trust proxy", 1);
 
-//const whitelist = ["http://localhost:3000", config.clientUrl];
 const whitelist = ["https://goat-project-465601.web.app/", config.clientUrl];
+const whitelist = ["http://localhost:3000"];
+if (config.clientUrl) {
+  whitelist.push(...config.clientUrl.split(",").map((url) => url.trim()));
+}
 
 const corsOptions = {
+  // The origin function is more robust for checking against a whitelist.
   origin: function (origin, callback) {
-    if (whitelist.indexOf(origin) !== -1 || !origin) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin || whitelist.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
       callback(new Error("Not allowed by CORS"));
     }
   },
-  credentials: true,
+  credentials: true, // This is important for sending cookies.
 };
 
 // Middlewares
@@ -36,6 +41,7 @@ app.use(cookieParser(config.cookie.secret));
 app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.options("*", cors(corsOptions));
 
 //routes
 app.use("/api/auth", authRoutes);
