@@ -56,6 +56,38 @@ const SectionHeader = ({ children }) => (
   </h4>
 );
 
+// --- START: NEW ASSET DETAILS COMPONENT ---
+const AssetDetails = ({ asset }) => {
+  // If there's an error message in the asset details, display it.
+  if (asset.error) {
+    return (
+      <div>
+        <SectionHeader>Asset Details</SectionHeader>
+        <div className="text-red-500 text-sm py-2">{asset.error}</div>
+      </div>
+    );
+  }
+
+  // Filter out null or undefined values before rendering
+  const detailsToShow = Object.entries(asset).filter(
+    ([key, value]) => value !== null && typeof value !== "undefined"
+  );
+
+  if (detailsToShow.length === 0) {
+    return null; // Don't render the section if there are no asset details
+  }
+
+  return (
+    <div>
+      <SectionHeader>Asset Details</SectionHeader>
+      {detailsToShow.map(([key, value]) => (
+        <DetailRow key={key} label={key.replace(/_/g, " ")} value={value} />
+      ))}
+    </div>
+  );
+};
+// --- END: NEW ASSET DETAILS COMPONENT ---
+
 export const JiraTicketModal = ({ ticketId, onClose }) => {
   const token = localStorage.getItem("accessToken");
 
@@ -75,7 +107,6 @@ export const JiraTicketModal = ({ ticketId, onClose }) => {
 
   const processedDetails = useMemo(() => {
     if (!ticket) return null;
-    // Use the mapper strategy on the simplified ticket object
     const mapper = JIRA_ISSUE_TYPE_MAPPERS[ticket.issueType];
     return mapper
       ? mapper(ticket)
@@ -130,6 +161,13 @@ export const JiraTicketModal = ({ ticketId, onClose }) => {
                 ))}
               </div>
             ))}
+
+            {/* --- START: RENDER ASSET DETAILS --- */}
+            {ticket.asset_details &&
+              Object.keys(ticket.asset_details).length > 0 && (
+                <AssetDetails asset={ticket.asset_details} />
+              )}
+            {/* --- END: RENDER ASSET DETAILS --- */}
           </dl>
         </div>
       );
