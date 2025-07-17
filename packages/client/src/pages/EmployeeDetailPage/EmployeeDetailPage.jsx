@@ -1,3 +1,5 @@
+// packages/client/src/pages/EmployeeDetailPage.js
+
 import React, { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -174,12 +176,18 @@ export const EmployeeDetailPage = ({ permissions, onLogout }) => {
     }
   };
 
-  const handleAssetClick = (asset) => {
-    if (asset) {
-      setSelectedAsset(asset);
+  // --- START: CORRECTED handleAssetClick FUNCTION ---
+  const handleAssetClick = (assetDetails) => {
+    // This function now robustly handles the incoming data
+    if (assetDetails && typeof assetDetails === 'object') {
+      setSelectedAsset(assetDetails);
       setIsAssetModalOpen(true);
+    } else {
+      // This case should not be hit based on your logs, but it's good practice
+      console.error("handleAssetClick was called with invalid data:", assetDetails);
     }
   };
+  // --- END: CORRECTED handleAssetClick FUNCTION ---
 
   const handleEdit = () => {
     openModal("editEmployee", employee);
@@ -210,7 +218,7 @@ export const EmployeeDetailPage = ({ permissions, onLogout }) => {
           navigate={navigate}
           permissions={permissions}
           onTicketClick={handleTicketClick}
-          onAssetClick={handleAssetClick}
+          onAssetClick={handleAssetClick} // Passing the corrected handler
         />
       )}
       {activeTab === "devices" && <DevicesTab employeeId={employeeId} />}
