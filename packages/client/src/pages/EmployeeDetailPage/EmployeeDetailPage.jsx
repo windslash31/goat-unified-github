@@ -16,6 +16,7 @@ import { EmployeeDetailHeader } from "./EmployeeDetailHeader";
 import { EmployeeDetailsTab } from "./EmployeeDetailsTab";
 import { EmployeeApplicationsTab } from "./EmployeeApplicationsTab";
 import { JiraTicketModal } from "../../components/ui/JiraTicketModal";
+import { AssetDetailModal } from "../../components/ui/AssetDetailModal"; // --- 1. IMPORT THE NEW MODAL ---
 import { LicensesTab } from "./LicensesTab";
 import { UnifiedTimelinePage } from "./UnifiedTimelinePage";
 import { PlatformLogPage } from "./PlatformLogPage";
@@ -50,6 +51,9 @@ export const EmployeeDetailPage = ({ permissions, onLogout }) => {
 
   const [isJiraModalOpen, setIsJiraModalOpen] = useState(false);
   const [selectedTicketId, setSelectedTicketId] = useState(null);
+
+  const [isAssetModalOpen, setIsAssetModalOpen] = useState(false);
+  const [selectedAsset, setSelectedAsset] = useState(null);
 
   const {
     data: employee,
@@ -170,6 +174,13 @@ export const EmployeeDetailPage = ({ permissions, onLogout }) => {
     }
   };
 
+  const handleAssetClick = (asset) => {
+    if (asset) {
+      setSelectedAsset(asset);
+      setIsAssetModalOpen(true);
+    }
+  };
+
   const handleEdit = () => {
     openModal("editEmployee", employee);
   };
@@ -199,6 +210,7 @@ export const EmployeeDetailPage = ({ permissions, onLogout }) => {
           navigate={navigate}
           permissions={permissions}
           onTicketClick={handleTicketClick}
+          onAssetClick={handleAssetClick}
         />
       )}
       {activeTab === "devices" && <DevicesTab employeeId={employeeId} />}
@@ -308,6 +320,13 @@ export const EmployeeDetailPage = ({ permissions, onLogout }) => {
         <JiraTicketModal
           ticketId={selectedTicketId}
           onClose={() => setIsJiraModalOpen(false)}
+        />
+      )}
+
+      {isAssetModalOpen && (
+        <AssetDetailModal
+          asset={selectedAsset}
+          onClose={() => setIsAssetModalOpen(false)}
         />
       )}
     </>
