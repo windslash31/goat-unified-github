@@ -7,7 +7,6 @@ import { Button } from "./Button";
 import { motion, AnimatePresence } from "framer-motion";
 import { JIRA_ISSUE_TYPE_MAPPERS } from "../../config/jiraFieldMapping";
 
-// The fetch function remains the same.
 const fetchTicketDetails = async (ticketId, token) => {
   if (!ticketId || !token) return null;
   const response = await fetch(
@@ -56,6 +55,34 @@ const SectionHeader = ({ children }) => (
   </h4>
 );
 
+const AssetDetails = ({ asset }) => {
+  if (asset.error) {
+    return (
+      <div>
+        <SectionHeader>Asset Details</SectionHeader>
+        <div className="text-red-500 text-sm py-2">{asset.error}</div>
+      </div>
+    );
+  }
+
+  const detailsToShow = Object.entries(asset).filter(
+    ([key, value]) => value !== null && typeof value !== "undefined"
+  );
+
+  if (detailsToShow.length === 0) {
+    return null;
+  }
+
+  return (
+    <div>
+      <SectionHeader>Asset Details</SectionHeader>
+      {detailsToShow.map(([key, value]) => (
+        <DetailRow key={key} label={key.replace(/_/g, " ")} value={value} />
+      ))}
+    </div>
+  );
+};
+
 export const JiraTicketModal = ({ ticketId, onClose }) => {
   const token = localStorage.getItem("accessToken");
 
@@ -75,7 +102,6 @@ export const JiraTicketModal = ({ ticketId, onClose }) => {
 
   const processedDetails = useMemo(() => {
     if (!ticket) return null;
-    // Use the mapper strategy on the simplified ticket object
     const mapper = JIRA_ISSUE_TYPE_MAPPERS[ticket.issueType];
     return mapper
       ? mapper(ticket)
@@ -130,6 +156,11 @@ export const JiraTicketModal = ({ ticketId, onClose }) => {
                 ))}
               </div>
             ))}
+
+            {ticket.asset_details &&
+              Object.keys(ticket.asset_details).length > 0 && (
+                <AssetDetails asset={ticket.asset_details} />
+              )}
           </dl>
         </div>
       );

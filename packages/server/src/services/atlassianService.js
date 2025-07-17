@@ -71,7 +71,13 @@ const getUserStatus = async (email) => {
   }
 };
 
-// --- THIS IS THE MODIFIED FUNCTION ---
+const findAttributeValue = (attributes, name) => {
+  const attribute = attributes.find(
+    (attr) => attr.objectTypeAttribute.name === name
+  );
+  return attribute?.objectAttributeValues[0]?.displayValue || null;
+};
+
 const getTicketDetails = async (ticketId) => {
   if (
     !process.env.ATLASSIAN_DOMAIN ||
@@ -109,7 +115,6 @@ const getTicketDetails = async (ticketId) => {
     const data = await response.json();
     const fields = data.fields;
 
-    // This object now extracts fields from all onboarding and offboarding tickets.
     const details = {
       summary: fields.summary,
       reporter: fields.reporter?.displayName || "N/A",
@@ -133,22 +138,58 @@ const getTicketDetails = async (ticketId) => {
         laptopType: fields.customfield_11531?.value,
         officeLocation: fields.customfield_10729?.value,
         employeeSubType: fields.customfield_11557?.value,
-        employeeStatus: fields.customfield_11551?.value, // e.g., Non Expat
-
-        // Offboarding specific fields
+        employeeStatus: fields.customfield_11551?.value,
         resignationDate: fields.customfield_10727,
         accessCutoffDate: fields.customfield_10982,
       },
-      asset_details: {
-        // Checks for asset fields from all ticket types
-        assignedLaptop:
-          fields.customfield_11745?.[0] ||
-          fields.customfield_11746?.[0] ||
-          fields.customfield_11747?.[0],
-        officeLocation: fields.customfield_10870?.[0],
-        laptopProfessional: fields.customfield_10711?.[0],
-      },
+      asset_details: {},
     };
+
+    const assetReference =
+      fields.customfield_11745?.[0] ||
+      fields.customfield_11746?.[0] ||
+      fields.customfield_11747?.[0];
+
+    if (
+      assetReference &&
+      assetReference.workspaceId &&
+      assetReference.objectId
+    ) {
+      try {
+        const assetData = await getAssetDetails(
+          assetReference.workspaceId,
+          assetReference.objectId
+        );
+        if (assetData && assetData.attributes) {
+          const attributes = assetData.attributes;
+          details.asset_details = {
+            key: assetData.objectKey,
+            name: assetData.label,
+            type: assetData.objectType.name,
+            Tag: findAttributeValue(attributes, "Tag"),
+            "Serial Number": findAttributeValue(attributes, "Serial Number"),
+            Status: findAttributeValue(attributes, "Status"),
+            "Invoice Number": findAttributeValue(attributes, "Invoice Number"),
+            "Buying Years": findAttributeValue(attributes, "Buying Years"),
+            "Operating System": findAttributeValue(
+              attributes,
+              "Operating System"
+            ),
+            Created: findAttributeValue(attributes, "Created"),
+            Updated: findAttributeValue(attributes, "Updated"),
+            Owner: findAttributeValue(attributes, "Owner"),
+            "Model/Type": findAttributeValue(attributes, "Model/Type"),
+            Location: findAttributeValue(attributes, "Location"),
+          };
+        }
+      } catch (error) {
+        console.error(
+          `Could not fetch asset details for ticket ${ticketId}:`,
+          error
+        );
+        details.asset_details.error = "Could not fetch asset details.";
+      }
+    }
 
     return details;
   } catch (error) {
@@ -170,7 +211,7 @@ const getAssetDetails = async (workspaceId, objectId) => {
   };
   try {
     const response = await axios.get(url, { headers });
-    return response.data;
+    return Array.isArray(response.data) ? response.data[0] : response.data;
   } catch (error) {
     console.error(
       `Failed to fetch Jira asset ${objectId}:`,
