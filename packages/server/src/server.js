@@ -37,18 +37,23 @@ app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-//routes
-app.use("/api/auth", authRoutes);
-app.use("/api/employees", employeeRoutes);
-app.use("/api/roles", roleRoutes);
-app.use("/api/applications", applicationRoutes);
-app.use("/api/dashboard", dashboardRoutes);
-app.use("/api/logs", logRoutes);
-app.use("/api/jira", jiraRoutes);
-app.use("/api/users", userRoutes);
-app.use("/api/employees", employeeRoutes);
-app.use("/api/roles", roleRoutes);
-app.use("/api/ai", aiRoutes);
+// Group related routes
+const routes = {
+  auth: authRoutes,
+  employees: employeeRoutes,
+  roles: roleRoutes,
+  applications: applicationRoutes,
+  dashboard: dashboardRoutes,
+  logs: logRoutes,
+  jira: jiraRoutes,
+  users: userRoutes,
+  ai: aiRoutes,
+};
+
+// Register routes
+Object.entries(routes).forEach(([path, router]) => {
+  app.use(`/api/${path}`, router);
+});
 
 app.use((err, req, res, next) => {
   console.error(err.stack);

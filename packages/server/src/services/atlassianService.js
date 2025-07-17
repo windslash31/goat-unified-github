@@ -83,7 +83,8 @@ const getTicketDetails = async (ticketId) => {
     );
   }
 
-  const url = `https://${process.env.ATLASSIAN_DOMAIN}/rest/api/3/issue/${ticketId}`;
+  const url =
+    `https://` + process.env.ATLASSIAN_DOMAIN + `/rest/api/3/issue/${ticketId}`;
 
   const headers = {
     Authorization: `Basic ${Buffer.from(
@@ -106,16 +107,25 @@ const getTicketDetails = async (ticketId) => {
     }
 
     const data = await response.json();
+    const fields = data.fields;
 
     const details = {
-      summary: data.fields.summary,
-      reporter: data.fields.reporter ? data.fields.reporter.displayName : "N/A",
-      assignee: data.fields.assignee
-        ? data.fields.assignee.displayName
-        : "Unassigned",
-      created: data.fields.created,
-      status: data.fields.status.name,
-      issueType: data.fields.issuetype.name,
+      summary: fields.summary,
+      reporter: fields.reporter?.displayName || "N/A",
+      assignee: fields.assignee?.displayName || "Unassigned",
+      status: fields.status?.name || "N/A",
+      created: fields.created,
+      issueType: fields.issuetype?.name || "N/A",
+      employee_details: {
+        firstName: fields.customfield_10897,
+        lastName: fields.customfield_10961,
+        email: fields.customfield_10970,
+        position: fields.customfield_11552,
+        managerEmail: fields.customfield_10960,
+        resignationDate: fields.customfield_10727,
+        accessCutoffDate: fields.customfield_10982,
+      },
+      assigned_asset_id: fields.customfield_11745?.[0]?.objectId || "None",
     };
 
     return details;
