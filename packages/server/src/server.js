@@ -16,11 +16,15 @@ const { schedulePlatformSync } = require("./cron/platformSync");
 const app = express();
 app.set("trust proxy", 1);
 
-const whitelist = ["http://localhost:3000", config.clientUrl];
+const whitelist = ["http://localhost:3000"];
+if (config.clientUrl) {
+  whitelist.push(...config.clientUrl.split(",").map((url) => url.trim()));
+}
 
 const corsOptions = {
   origin: function (origin, callback) {
-    if (whitelist.indexOf(origin) !== -1 || !origin) {
+
+    if (!origin || whitelist.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
       callback(new Error("Not allowed by CORS"));
@@ -29,7 +33,6 @@ const corsOptions = {
   credentials: true,
 };
 
-// Middlewares
 app.use(helmet());
 app.use(cookieParser(config.cookie.secret));
 app.use(cors(corsOptions));
@@ -45,7 +48,6 @@ app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/logs", logRoutes);
 app.use("/api/jira", jiraRoutes);
 app.use("/api/users", userRoutes);
-app.use("/api/roles", roleRoutes);
 
 // Global error handler
 app.use((err, req, res, next) => {
@@ -57,9 +59,9 @@ const PORT = config.port;
 app.listen(PORT, () => {
   console.log(`Backend server running at http://localhost:${PORT}`);
 
-  //if (config.nodeEnv === "production") {
-  schedulePlatformSync();
-  //}
+  if (config.nodeEnv === "production") {
+    schedulePlatformSync();
+  }
 });
 
 module.exports = app;
