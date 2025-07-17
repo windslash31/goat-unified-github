@@ -1,7 +1,8 @@
-import React, { memo } from "react";
-import { Ticket } from "lucide-react";
+import React, { memo, useState } from "react";
+import { Ticket, ChevronRight } from "lucide-react";
 import { PLATFORM_CONFIG } from "../../config/platforms";
 import { formatDistanceToNow } from "date-fns";
+import { motion, AnimatePresence } from "framer-motion";
 
 const PlatformStatusBadge = ({ status }) => {
   const styles = {
@@ -25,20 +26,124 @@ const PlatformStatusBadge = ({ status }) => {
 };
 
 const PlatformRowSkeleton = () => (
-  <div className="flex items-center justify-between p-4 rounded-lg bg-gray-50 dark:bg-gray-900/50 animate-pulse">
-    <div className="flex items-center gap-4">
-      <div className="w-8 h-8 rounded-md bg-gray-300 dark:bg-gray-700"></div>
-      <div>
-        <div className="h-4 bg-gray-300 dark:bg-gray-700 rounded w-24"></div>
-        <div className="h-3 bg-gray-300 dark:bg-gray-700 rounded w-32 mt-1"></div>
+  <div className="p-4 rounded-lg bg-gray-50 dark:bg-gray-900/50 animate-pulse">
+    <div className="flex items-center justify-between">
+      <div className="flex items-center gap-4">
+        <div className="w-8 h-8 rounded-md bg-gray-300 dark:bg-gray-700"></div>
+        <div>
+          <div className="h-4 bg-gray-300 dark:bg-gray-700 rounded w-24"></div>
+          <div className="h-3 bg-gray-300 dark:bg-gray-700 rounded w-32 mt-1"></div>
+        </div>
       </div>
+      <div className="h-6 bg-gray-300 dark:bg-gray-700 rounded-full w-20"></div>
     </div>
-    <div className="h-6 bg-gray-300 dark:bg-gray-700 rounded-full w-20"></div>
   </div>
 );
 
+// --- START: NEW COMPONENT TO RENDER DETAILS NICELY ---
+const DetailRow = ({ label, value }) => {
+  if (value === null || typeof value === "undefined" || value === "")
+    return null;
+  return (
+    <div className="grid grid-cols-3 gap-4 text-xs">
+      <span className="col-span-1 text-gray-500 dark:text-gray-400">
+        {label}
+      </span>
+      <span className="col-span-2 font-medium text-gray-800 dark:text-gray-200 break-words">
+        {String(value)}
+      </span>
+    </div>
+  );
+};
+
+const PlatformDetailView = ({ platformName, details }) => {
+  // Render nothing if details are empty
+  if (!details || Object.keys(details).length === 0) {
+    return (
+      <div className="text-center text-xs text-gray-500 pt-3">
+        No additional details available.
+      </div>
+    );
+  }
+
+  let content;
+  switch (platformName) {
+    case "Google":
+      content = (
+        <>
+          <DetailRow label="Is Admin" value={details.isAdmin ? "Yes" : "No"} />
+          <DetailRow
+            label="Is Delegated Admin"
+            value={details.isDelegatedAdmin ? "Yes" : "No"}
+          />
+          <DetailRow label="Org Unit Path" value={details.orgUnitPath} />
+          <DetailRow
+            label="Last Login"
+            value={
+              details.lastLoginTime
+                ? new Date(details.lastLoginTime).toLocaleString()
+                : "N/A"
+            }
+          />
+          <DetailRow label="Aliases" value={details.aliases?.join(", ")} />
+        </>
+      );
+      break;
+    case "Slack":
+      content = (
+        <>
+          <DetailRow label="User ID" value={details.id} />
+          <DetailRow label="Is Admin" value={details.is_admin ? "Yes" : "No"} />
+          <DetailRow label="Is Owner" value={details.is_owner ? "Yes" : "No"} />
+          <DetailRow
+            label="Is Guest"
+            value={
+              details.is_restricted || details.is_ultra_restricted
+                ? "Yes"
+                : "No"
+            }
+          />
+        </>
+      );
+      break;
+    case "Atlassian":
+      content = (
+        <>
+          <DetailRow label="Account ID" value={details.accountId} />
+          <DetailRow label="Account Type" value={details.accountType} />
+        </>
+      );
+      break;
+    case "JumpCloud":
+      content = (
+        <>
+          <DetailRow label="Username" value={details.username} />
+          <DetailRow label="User ID" value={details.id} />
+          <DetailRow label="Job Title" value={details.jobTitle} />
+          <DetailRow label="Department" value={details.department} />
+        </>
+      );
+      break;
+    default:
+      content = (
+        <pre className="text-xs">{JSON.stringify(details, null, 2)}</pre>
+      );
+  }
+
+  return <div className="space-y-2">{content}</div>;
+};
+// --- END: NEW COMPONENT TO RENDER DETAILS NICELY ---
+
 export const EmployeeApplicationsTab = memo(
   ({ applications, platformStatuses, isLoading, onTicketClick }) => {
+    const [expandedPlatform, setExpandedPlatform] = useState(null);
+
+    const togglePlatformExpansion = (platformName) => {
+      setExpandedPlatform(
+        expandedPlatform === platformName ? null : platformName
+      );
+    };
+
     return (
       <div className="space-y-8">
         <div className="p-6 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
@@ -49,7 +154,7 @@ export const EmployeeApplicationsTab = memo(
             Live status of the employee's account on integrated external
             platforms.
           </p>
-          <div className="space-y-4">
+          <div className="space-y-2">
             {isLoading ? (
               <>
                 <PlatformRowSkeleton />
@@ -57,9 +162,8 @@ export const EmployeeApplicationsTab = memo(
                 <PlatformRowSkeleton />
               </>
             ) : (
-              // --- START: MODIFIED PLATFORM STATUS RENDERING ---
               platformStatuses.map((platform) => {
-                // Use platform_name from the backend, and get the logo from the config
+                const isExpanded = expandedPlatform === platform.platform_name;
                 const platformConfig =
                   PLATFORM_CONFIG[platform.platform_name] ||
                   PLATFORM_CONFIG.Default;
@@ -68,32 +172,77 @@ export const EmployeeApplicationsTab = memo(
                       addSuffix: true,
                     })
                   : "never";
+                const hasDetails =
+                  platform.details &&
+                  Object.keys(platform.details).length > 0 &&
+                  !platform.details.error;
 
                 return (
                   <div
                     key={platform.platform_name}
-                    className="flex items-center justify-between p-4 rounded-lg bg-gray-50 dark:bg-gray-900/50"
+                    className="p-4 rounded-lg bg-gray-50 dark:bg-gray-900/50"
                   >
-                    <div className="flex items-center gap-4 min-w-0">
-                      <img
-                        src={platformConfig.logo}
-                        alt={`${platform.platform_name} Logo`}
-                        className="w-8 h-8"
-                      />
-                      <div className="min-w-0">
-                        <p className="font-semibold text-gray-800 dark:text-gray-200 truncate">
-                          {platform.platform_name}
-                        </p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                          Last synced: {lastSyncTime}
-                        </p>
+                    <button
+                      onClick={() =>
+                        hasDetails &&
+                        togglePlatformExpansion(platform.platform_name)
+                      }
+                      className="w-full text-left"
+                      disabled={!hasDetails}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-4 min-w-0">
+                          <img
+                            src={platformConfig.logo}
+                            alt={`${platform.platform_name} Logo`}
+                            className="w-8 h-8"
+                          />
+                          <div className="min-w-0">
+                            <p className="font-semibold text-gray-800 dark:text-gray-200 truncate">
+                              {platform.platform_name}
+                            </p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                              Last synced: {lastSyncTime}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-4">
+                          <PlatformStatusBadge status={platform.status} />
+                          {hasDetails && (
+                            <ChevronRight
+                              className={`w-5 h-5 text-gray-400 transition-transform ${
+                                isExpanded ? "rotate-90" : ""
+                              }`}
+                            />
+                          )}
+                        </div>
                       </div>
-                    </div>
-                    <PlatformStatusBadge status={platform.status} />
+                    </button>
+                    <AnimatePresence>
+                      {isExpanded && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0, marginTop: 0 }}
+                          animate={{
+                            height: "auto",
+                            opacity: 1,
+                            marginTop: "12px",
+                          }}
+                          exit={{ height: 0, opacity: 0, marginTop: 0 }}
+                          transition={{ duration: 0.2 }}
+                          className="overflow-hidden pl-12"
+                        >
+                          <div className="pt-3 border-t border-gray-200 dark:border-gray-700">
+                            <PlatformDetailView
+                              platformName={platform.platform_name}
+                              details={platform.details}
+                            />
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                   </div>
                 );
               })
-              // --- END: MODIFIED PLATFORM STATUS RENDERING ---
             )}
           </div>
         </div>
