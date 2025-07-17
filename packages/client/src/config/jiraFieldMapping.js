@@ -45,7 +45,7 @@ const mapEmployeeOffboardingFields = (employeeDetails, assetDetails) => ({
       fields: [
         {
           label: "Assigned Laptop",
-          ...get(assetDetails, "assignedLaptop"),
+          ...(get(assetDetails, "assignedLaptop") ?? {}),
           type: "asset",
         },
       ],

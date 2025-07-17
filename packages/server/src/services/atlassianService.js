@@ -2,7 +2,6 @@ const fetch = require("node-fetch");
 const axios = require("axios");
 const config = require("../config/config");
 
-// This function remains unchanged
 const getUserStatus = async (email) => {
   if (
     !process.env.ATLASSIAN_API_TOKEN ||
@@ -114,22 +113,19 @@ const getTicketDetails = async (ticketId) => {
     const details = {
       summary: fields.summary,
       reporter: fields.reporter?.displayName || "N/A",
-      assignee: fields.assignee?.displayName || "N/A",
+      assignee: fields.assignee?.displayName || "Unassigned",
       status: fields.status?.name || "N/A",
       created: fields.created,
       issueType: fields.issuetype?.name || "N/A",
       employee_details: {
-        // Shared fields across multiple ticket types
         firstName: fields.customfield_10897,
         lastName: fields.customfield_10961,
         managerEmail: fields.customfield_10960,
 
-        // Onboarding specific fields (handles both ticket types)
         employeeEmail: fields.customfield_10970 || fields.customfield_10984,
         joinDate: fields.customfield_10985,
         position: fields.customfield_11552,
 
-        // Fields with a '.value' property
         legalEntity:
           fields.customfield_10892?.value || fields.customfield_11529?.value,
         employmentType:
