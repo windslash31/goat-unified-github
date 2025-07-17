@@ -45,7 +45,6 @@ app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/logs", logRoutes);
 app.use("/api/jira", jiraRoutes);
 app.use("/api/users", userRoutes);
-app.use("/api/roles", roleRoutes);
 
 // Global error handler
 app.use((err, req, res, next) => {
@@ -57,9 +56,9 @@ const PORT = config.port;
 app.listen(PORT, () => {
   console.log(`Backend server running at http://localhost:${PORT}`);
 
-  //if (config.nodeEnv === "production") {
-  schedulePlatformSync();
-  //}
+  if (config.nodeEnv === "production") {
+    schedulePlatformSync();
+  }
 });
 
 module.exports = app;
