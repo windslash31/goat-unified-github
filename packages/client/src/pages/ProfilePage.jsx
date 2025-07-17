@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import {
   UserSquare,
   LayoutGrid,
@@ -8,7 +8,6 @@ import {
   KeyRound,
   Laptop,
   MoreVertical,
-  RefreshCw,
 } from "lucide-react";
 import { EmployeeDetailHeader } from "./EmployeeDetailPage/EmployeeDetailHeader";
 import { EmployeeDetailsTab } from "./EmployeeDetailPage/EmployeeDetailsTab";
@@ -53,8 +52,6 @@ export const ProfilePage = ({ employee, permissions, onLogout, user }) => {
   const moreMenuRef = useRef(null);
   const isDesktop = useMediaQuery("(min-width: 768px)");
 
-  const queryClient = useQueryClient();
-
   const { data: currentUserEmployeeRecord, isLoading: isLoadingMe } = useQuery({
     queryKey: ["me"],
     queryFn: fetchMe,
@@ -63,20 +60,6 @@ export const ProfilePage = ({ employee, permissions, onLogout, user }) => {
   });
 
   const currentEmployee = employee || currentUserEmployeeRecord;
-
-  const { mutate: syncPlatformStatus, isPending: isSyncing } = useMutation({
-    mutationFn: () =>
-      api.post(`/api/employees/${currentEmployee.id}/sync-status`),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["me"] });
-      console.log(
-        "Profile platform statuses synced successfully. Refetching data."
-      );
-    },
-    onError: (error) => {
-      console.error("Failed to sync profile platform statuses:", error);
-    },
-  });
 
   const {
     data: timelineData,
@@ -199,6 +182,7 @@ export const ProfilePage = ({ employee, permissions, onLogout, user }) => {
       )}
       {activeTab === "platforms" && (
         <EmployeeApplicationsTab
+          employeeId={currentEmployee.id}
           applications={currentEmployee.applications || []}
           platformStatuses={currentEmployee.platform_statuses || []}
           isLoading={isLoadingMe}
@@ -303,22 +287,6 @@ export const ProfilePage = ({ employee, permissions, onLogout, user }) => {
               )}
             </div>
           </div>
-
-          {activeTab === "platforms" && (
-            <div className="flex justify-end mt-4">
-              <button
-                onClick={() => syncPlatformStatus()}
-                disabled={isSyncing}
-                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-kredivo-primary hover:bg-kredivo-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-kredivo-primary disabled:opacity-50"
-              >
-                <RefreshCw
-                  className={`w-4 h-4 mr-2 ${isSyncing ? "animate-spin" : ""}`}
-                />
-                {isSyncing ? "Syncing..." : "Sync"}
-              </button>
-            </div>
-          )}
-
           {TabContent}
         </div>
       </div>

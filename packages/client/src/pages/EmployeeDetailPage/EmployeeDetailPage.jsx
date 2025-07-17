@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-// --- CHANGE: Import useMutation and useQueryClient ---
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import {
   UserSquare,
   LayoutGrid,
@@ -11,7 +10,6 @@ import {
   BookLock,
   Laptop,
   MoreVertical,
-  RefreshCw, // Import a refresh icon
 } from "lucide-react";
 import { useBreadcrumb } from "../../context/BreadcrumbContext";
 import { EmployeeDetailHeader } from "./EmployeeDetailHeader";
@@ -33,9 +31,6 @@ const fetchEmployeeById = async (employeeId) => {
   return data;
 };
 
-// This separate fetch is no longer needed, as statuses are included in the main employee object.
-// const fetchPlatformStatuses = async (employeeId) => { ... };
-
 const fetchTimelineData = async (employeeId) => {
   const { data } = await api.get(
     `/api/employees/${employeeId}/unified-timeline`
@@ -56,9 +51,6 @@ export const EmployeeDetailPage = ({ permissions, onLogout }) => {
   const [isJiraModalOpen, setIsJiraModalOpen] = useState(false);
   const [selectedTicketId, setSelectedTicketId] = useState(null);
 
-  // --- CHANGE: Add useQueryClient ---
-  const queryClient = useQueryClient();
-
   const {
     data: employee,
     isLoading: isEmployeeLoading,
@@ -72,25 +64,6 @@ export const EmployeeDetailPage = ({ permissions, onLogout }) => {
     },
   });
 
-  // --- START: ADDED MUTATION FOR SYNCING ---
-  const { mutate: syncPlatformStatus, isPending: isSyncing } = useMutation({
-    mutationFn: () => api.post(`/api/employees/${employeeId}/sync-status`),
-    onSuccess: () => {
-      // When the sync is successful, invalidate the 'employee' query.
-      // This tells React Query to refetch the data, which will include the new sync times.
-      queryClient.invalidateQueries({ queryKey: ["employee", employeeId] });
-      console.log("Platform statuses synced successfully. Refetching data.");
-    },
-    onError: (error) => {
-      console.error("Failed to sync platform statuses:", error);
-      // You can add a user-facing error message here (e.g., a toast notification)
-    },
-  });
-  // --- END: ADDED MUTATION FOR SYNCING ---
-
-  // The separate query for platform statuses is no longer needed.
-  // const { data: platformStatuses = [], isLoading: isLoadingPlatforms } = useQuery(...)
-
   const {
     data: timelineData,
     isLoading: isTimelineLoading,
@@ -101,7 +74,6 @@ export const EmployeeDetailPage = ({ permissions, onLogout }) => {
     enabled: !!employeeId && activeTab === "timeline",
   });
 
-  // --- TABS CONFIGURATION ---
   const allTabs = [
     {
       id: "details",
@@ -153,7 +125,6 @@ export const EmployeeDetailPage = ({ permissions, onLogout }) => {
     (tab) => tab.id === activeTab
   );
 
-  // --- SIDE EFFECTS ---
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (moreMenuRef.current && !moreMenuRef.current.contains(event.target)) {
@@ -187,7 +158,6 @@ export const EmployeeDetailPage = ({ permissions, onLogout }) => {
     };
   }, [employee, employeeId, setDynamicCrumbs]);
 
-  // --- HANDLER FUNCTIONS ---
   const handleTabClick = (tabId) => {
     setActiveTab(tabId);
     setIsMoreMenuOpen(false);
@@ -208,7 +178,6 @@ export const EmployeeDetailPage = ({ permissions, onLogout }) => {
     openModal("deactivateEmployee", employee);
   };
 
-  // --- RENDER LOGIC ---
   const TabButton = ({ id, label, shortLabel, icon }) => (
     <button
       onClick={() => handleTabClick(id)}
@@ -233,9 +202,9 @@ export const EmployeeDetailPage = ({ permissions, onLogout }) => {
         />
       )}
       {activeTab === "devices" && <DevicesTab employeeId={employeeId} />}
-      {/* --- CHANGE: Pass platform_statuses from the employee object --- */}
       {activeTab === "platforms" && (
         <EmployeeApplicationsTab
+          employeeId={employeeId}
           applications={employee.applications || []}
           platformStatuses={employee.platform_statuses || []}
           isLoading={isEmployeeLoading}
@@ -333,22 +302,6 @@ export const EmployeeDetailPage = ({ permissions, onLogout }) => {
             )}
           </div>
         </div>
-
-        {activeTab === "platforms" && (
-          <div className="flex justify-end mt-4">
-            <button
-              onClick={() => syncPlatformStatus()}
-              disabled={isSyncing}
-              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-kredivo-primary hover:bg-kredivo-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-kredivo-primary disabled:opacity-50"
-            >
-              <RefreshCw
-                className={`w-4 h-4 mr-2 ${isSyncing ? "animate-spin" : ""}`}
-              />
-              {isSyncing ? "Syncing..." : "Sync"}
-            </button>
-          </div>
-        )}
-
         {TabContent}
       </div>
       {isJiraModalOpen && (

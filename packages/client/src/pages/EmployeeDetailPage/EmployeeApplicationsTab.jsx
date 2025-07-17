@@ -1,5 +1,7 @@
 import React, { memo, useState } from "react";
-import { Ticket, ChevronRight } from "lucide-react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import api from "../../api/api";
+import { Ticket, ChevronRight, RefreshCw } from "lucide-react";
 import { PLATFORM_CONFIG } from "../../config/platforms";
 import { formatDistanceToNow } from "date-fns";
 import { motion, AnimatePresence } from "framer-motion";
@@ -40,7 +42,6 @@ const PlatformRowSkeleton = () => (
   </div>
 );
 
-// --- START: NEW COMPONENT TO RENDER DETAILS NICELY ---
 const DetailRow = ({ label, value }) => {
   if (value === null || typeof value === "undefined" || value === "")
     return null;
@@ -57,7 +58,6 @@ const DetailRow = ({ label, value }) => {
 };
 
 const PlatformDetailView = ({ platformName, details }) => {
-  // Render nothing if details are empty
   if (!details || Object.keys(details).length === 0) {
     return (
       <div className="text-center text-xs text-gray-500 pt-3">
@@ -132,11 +132,30 @@ const PlatformDetailView = ({ platformName, details }) => {
 
   return <div className="space-y-2">{content}</div>;
 };
-// --- END: NEW COMPONENT TO RENDER DETAILS NICELY ---
 
 export const EmployeeApplicationsTab = memo(
-  ({ applications, platformStatuses, isLoading, onTicketClick }) => {
+  ({
+    employeeId,
+    applications,
+    platformStatuses,
+    isLoading,
+    onTicketClick,
+  }) => {
     const [expandedPlatform, setExpandedPlatform] = useState(null);
+    const queryClient = useQueryClient();
+
+    const { mutate: syncPlatformStatus, isPending: isSyncing } = useMutation({
+      mutationFn: () => api.post(`/api/employees/${employeeId}/sync-status`),
+      onSuccess: () => {
+        queryClient.invalidateQueries({
+          queryKey: ["employee", String(employeeId)],
+        });
+        queryClient.invalidateQueries({ queryKey: ["me"] });
+      },
+      onError: (error) => {
+        console.error("Failed to sync platform statuses:", error);
+      },
+    });
 
     const togglePlatformExpansion = (platformName) => {
       setExpandedPlatform(
@@ -147,9 +166,21 @@ export const EmployeeApplicationsTab = memo(
     return (
       <div className="space-y-8">
         <div className="p-6 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-            Platform Access Status
-          </h3>
+          <div className="flex justify-between items-center mb-2">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+              Platform Access Status
+            </h3>
+            <button
+              onClick={() => syncPlatformStatus()}
+              disabled={isSyncing}
+              className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md shadow-sm text-white bg-kredivo-primary hover:bg-kredivo-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-kredivo-primary disabled:opacity-50"
+            >
+              <RefreshCw
+                className={`w-4 h-4 mr-2 ${isSyncing ? "animate-spin" : ""}`}
+              />
+              {isSyncing ? "Syncing..." : "Sync"}
+            </button>
+          </div>
           <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
             Live status of the employee's account on integrated external
             platforms.
