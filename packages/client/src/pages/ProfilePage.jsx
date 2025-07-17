@@ -11,8 +11,8 @@ import {
 } from "lucide-react";
 import { EmployeeDetailHeader } from "./EmployeeDetailPage/EmployeeDetailHeader";
 import { EmployeeDetailsTab } from "./EmployeeDetailPage/EmployeeDetailsTab";
-import { EmployeeApplicationsTab } from "./EmployeeDetailPage/EmployeeApplicationsTab";
 import { JiraTicketModal } from "../components/ui/JiraTicketModal";
+import { AssetDetailModal } from "../components/ui/AssetDetailModal";
 import { WelcomePage } from "../components/ui/WelcomePage";
 import { AccessDeniedPage } from "../components/ui/AccessDeniedPage";
 import { UnifiedTimelinePage } from "./EmployeeDetailPage/UnifiedTimelinePage";
@@ -51,6 +51,9 @@ export const ProfilePage = ({ employee, permissions, onLogout, user }) => {
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
   const moreMenuRef = useRef(null);
   const isDesktop = useMediaQuery("(min-width: 768px)");
+
+  const [isAssetModalOpen, setIsAssetModalOpen] = useState(false);
+  const [selectedAsset, setSelectedAsset] = useState(null);
 
   const { data: currentUserEmployeeRecord, isLoading: isLoadingMe } = useQuery({
     queryKey: ["me"],
@@ -138,6 +141,15 @@ export const ProfilePage = ({ employee, permissions, onLogout, user }) => {
     }
   };
 
+  const handleAssetClick = (assetDetails) => {
+    if (assetDetails && typeof assetDetails === 'object') {
+      setSelectedAsset(assetDetails);
+      setIsAssetModalOpen(true);
+    } else {
+      console.error("handleAssetClick was called with invalid data:", assetDetails);
+    }
+  };
+
   const handleEdit = () => {
     openModal("editEmployee", currentEmployee);
   };
@@ -175,6 +187,7 @@ export const ProfilePage = ({ employee, permissions, onLogout, user }) => {
           employee={currentEmployee}
           permissions={permissions}
           onTicketClick={handleTicketClick}
+          onAssetClick={handleAssetClick} 
         />
       )}
       {activeTab === "devices" && (
@@ -294,6 +307,12 @@ export const ProfilePage = ({ employee, permissions, onLogout, user }) => {
         <JiraTicketModal
           ticketId={selectedTicketId}
           onClose={() => setIsJiraModalOpen(false)}
+        />
+      )}
+      {isAssetModalOpen && (
+        <AssetDetailModal
+          asset={selectedAsset}
+          onClose={() => setIsAssetModalOpen(false)}
         />
       )}
       {isChangePasswordModalOpen && (
