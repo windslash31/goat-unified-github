@@ -60,14 +60,25 @@ const getUserStatus = async (email) => {
     const directory = await getDirectoryClient();
     const response = await directory.users.get({
       userKey: email,
-      fields: "suspended,primaryEmail",
+      fields:
+        "suspended,primaryEmail,isAdmin,isDelegatedAdmin,aliases,orgUnitPath,lastLoginTime",
     });
 
     const userData = response.data;
+
+    const details = {
+      isAdmin: userData.isAdmin,
+      isDelegatedAdmin: userData.isDelegatedAdmin,
+      aliases: userData.aliases || [],
+      orgUnitPath: userData.orgUnitPath,
+      lastLoginTime: userData.lastLoginTime,
+    };
+
     return {
       platform: "Google Workspace",
       email: userData.primaryEmail,
       status: userData.suspended ? "Suspended" : "Active",
+      details: details,
       message: userData.suspended
         ? "Account is suspended."
         : "Account is active.",

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+// --- CHANGE: Import useMutation and useQueryClient ---
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   UserSquare,
   LayoutGrid,
@@ -10,6 +11,7 @@ import {
   BookLock,
   Laptop,
   MoreVertical,
+  RefreshCw, // Import a refresh icon
 } from "lucide-react";
 import { useBreadcrumb } from "../../context/BreadcrumbContext";
 import { EmployeeDetailHeader } from "./EmployeeDetailHeader";
@@ -24,32 +26,28 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
 import api from "../../api/api";
 import { EmployeeDetailSkeleton } from "../../components/ui/EmployeeDetailSkeleton";
-import { useModalStore } from "../../stores/modalStore"; 
+import { useModalStore } from "../../stores/modalStore";
 
 const fetchEmployeeById = async (employeeId) => {
   const { data } = await api.get(`/api/employees/${employeeId}`);
   return data;
 };
 
-const fetchPlatformStatuses = async (employeeId) => {
-  const { data } = await api.get(`/api/employees/${employeeId}/platform-statuses`);
+// This separate fetch is no longer needed, as statuses are included in the main employee object.
+// const fetchPlatformStatuses = async (employeeId) => { ... };
+
+const fetchTimelineData = async (employeeId) => {
+  const { data } = await api.get(
+    `/api/employees/${employeeId}/unified-timeline`
+  );
   return data;
 };
 
-const fetchTimelineData = async (employeeId) => {
-    const { data } = await api.get(`/api/employees/${employeeId}/unified-timeline`);
-    return data;
-};
-
-
-export const EmployeeDetailPage = ({
-  permissions,
-  onLogout,
-}) => {
+export const EmployeeDetailPage = ({ permissions, onLogout }) => {
   const { employeeId } = useParams();
   const navigate = useNavigate();
   const { setDynamicCrumbs } = useBreadcrumb();
-  const { openModal } = useModalStore(); // Use the modal store
+  const { openModal } = useModalStore();
   const [activeTab, setActiveTab] = useState("details");
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
   const moreMenuRef = useRef(null);
@@ -58,52 +56,102 @@ export const EmployeeDetailPage = ({
   const [isJiraModalOpen, setIsJiraModalOpen] = useState(false);
   const [selectedTicketId, setSelectedTicketId] = useState(null);
 
-  const { 
-    data: employee, 
-    isLoading: isEmployeeLoading, 
-    error: pageError 
+  // --- CHANGE: Add useQueryClient ---
+  const queryClient = useQueryClient();
+
+  const {
+    data: employee,
+    isLoading: isEmployeeLoading,
+    error: pageError,
   } = useQuery({
-    queryKey: ['employee', employeeId],
+    queryKey: ["employee", employeeId],
     queryFn: () => fetchEmployeeById(employeeId),
     enabled: !!employeeId,
     onError: (err) => {
-        console.error("Failed to fetch employee:", err);
-    }
+      console.error("Failed to fetch employee:", err);
+    },
   });
 
-  const { 
-    data: platformStatuses = [], 
-    isLoading: isLoadingPlatforms 
-  } = useQuery({
-    queryKey: ['platformStatuses', employeeId],
-    queryFn: () => fetchPlatformStatuses(employeeId),
-    enabled: !!employeeId,
+  // --- START: ADDED MUTATION FOR SYNCING ---
+  const { mutate: syncPlatformStatus, isPending: isSyncing } = useMutation({
+    mutationFn: () => api.post(`/api/employees/${employeeId}/sync-status`),
+    onSuccess: () => {
+      // When the sync is successful, invalidate the 'employee' query.
+      // This tells React Query to refetch the data, which will include the new sync times.
+      queryClient.invalidateQueries({ queryKey: ["employee", employeeId] });
+      console.log("Platform statuses synced successfully. Refetching data.");
+    },
+    onError: (error) => {
+      console.error("Failed to sync platform statuses:", error);
+      // You can add a user-facing error message here (e.g., a toast notification)
+    },
   });
+  // --- END: ADDED MUTATION FOR SYNCING ---
+
+  // The separate query for platform statuses is no longer needed.
+  // const { data: platformStatuses = [], isLoading: isLoadingPlatforms } = useQuery(...)
 
   const {
-      data: timelineData,
-      isLoading: isTimelineLoading,
-      error: timelineError,
+    data: timelineData,
+    isLoading: isTimelineLoading,
+    error: timelineError,
   } = useQuery({
-      queryKey: ['timeline', employeeId],
-      queryFn: () => fetchTimelineData(employeeId),
-      enabled: !!employeeId && activeTab === 'timeline', // Only fetch when tab is active
+    queryKey: ["timeline", employeeId],
+    queryFn: () => fetchTimelineData(employeeId),
+    enabled: !!employeeId && activeTab === "timeline",
   });
 
   // --- TABS CONFIGURATION ---
   const allTabs = [
-    { id: "details", label: "Details", icon: <UserSquare size={16} />, permission: true, },
-    { id: "devices", label: "Devices", icon: <Laptop size={16} />, permission: true, },
-    { id: "platforms", label: "Apps & Platforms", shortLabel: "Access", icon: <LayoutGrid size={16} />, permission: true, },
-    { id: "licenses", label: "Licenses", icon: <BookLock size={16} />, permission: true, },
-    { id: "platform-logs", label: "Platform Logs", shortLabel: "Logs", icon: <HardDrive size={16} />, permission: permissions.includes("log:read:platform"), },
-    { id: "timeline", label: "Unified Timeline", shortLabel: "Timeline", icon: <Bot size={16} />, permission: permissions.includes("log:read:platform"), },
+    {
+      id: "details",
+      label: "Details",
+      icon: <UserSquare size={16} />,
+      permission: true,
+    },
+    {
+      id: "devices",
+      label: "Devices",
+      icon: <Laptop size={16} />,
+      permission: true,
+    },
+    {
+      id: "platforms",
+      label: "Apps & Platforms",
+      shortLabel: "Access",
+      icon: <LayoutGrid size={16} />,
+      permission: true,
+    },
+    {
+      id: "licenses",
+      label: "Licenses",
+      icon: <BookLock size={16} />,
+      permission: true,
+    },
+    {
+      id: "platform-logs",
+      label: "Platform Logs",
+      shortLabel: "Logs",
+      icon: <HardDrive size={16} />,
+      permission: permissions.includes("log:read:platform"),
+    },
+    {
+      id: "timeline",
+      label: "Unified Timeline",
+      shortLabel: "Timeline",
+      icon: <Bot size={16} />,
+      permission: permissions.includes("log:read:platform"),
+    },
   ].filter((tab) => tab.permission);
 
   const VISIBLE_TABS_COUNT = 3;
-  const visibleTabs = isDesktop ? allTabs : allTabs.slice(0, VISIBLE_TABS_COUNT);
+  const visibleTabs = isDesktop
+    ? allTabs
+    : allTabs.slice(0, VISIBLE_TABS_COUNT);
   const overflowTabs = isDesktop ? [] : allTabs.slice(VISIBLE_TABS_COUNT);
-  const isActiveTabInMoreMenu = overflowTabs.some((tab) => tab.id === activeTab);
+  const isActiveTabInMoreMenu = overflowTabs.some(
+    (tab) => tab.id === activeTab
+  );
 
   // --- SIDE EFFECTS ---
   useEffect(() => {
@@ -118,7 +166,11 @@ export const EmployeeDetailPage = ({
 
   useEffect(() => {
     if (employee) {
-      const fullName = [employee.first_name, employee.middle_name, employee.last_name]
+      const fullName = [
+        employee.first_name,
+        employee.middle_name,
+        employee.last_name,
+      ]
         .filter(Boolean)
         .join(" ");
       setDynamicCrumbs([
@@ -126,15 +178,14 @@ export const EmployeeDetailPage = ({
         { name: fullName, path: `/employees/${employeeId}` },
       ]);
 
-      api.post('/api/employees/logs/view', { targetEmployeeId: employeeId })
-         .catch(err => console.error("Failed to log profile view:", err));
-
+      api
+        .post("/api/employees/logs/view", { targetEmployeeId: employeeId })
+        .catch((err) => console.error("Failed to log profile view:", err));
     }
     return () => {
       setDynamicCrumbs([]);
     };
   }, [employee, employeeId, setDynamicCrumbs]);
-
 
   // --- HANDLER FUNCTIONS ---
   const handleTabClick = (tabId) => {
@@ -150,11 +201,11 @@ export const EmployeeDetailPage = ({
   };
 
   const handleEdit = () => {
-    openModal('editEmployee', employee);
+    openModal("editEmployee", employee);
   };
 
   const handleDeactivate = () => {
-    openModal('deactivateEmployee', employee);
+    openModal("deactivateEmployee", employee);
   };
 
   // --- RENDER LOGIC ---
@@ -173,12 +224,35 @@ export const EmployeeDetailPage = ({
 
   const TabContent = (
     <div className="mt-6">
-      {activeTab === "details" && <EmployeeDetailsTab employee={employee} navigate={navigate} permissions={permissions} onTicketClick={handleTicketClick} />}
+      {activeTab === "details" && (
+        <EmployeeDetailsTab
+          employee={employee}
+          navigate={navigate}
+          permissions={permissions}
+          onTicketClick={handleTicketClick}
+        />
+      )}
       {activeTab === "devices" && <DevicesTab employeeId={employeeId} />}
-      {activeTab === "platforms" && <EmployeeApplicationsTab applications={employee.applications || []} platformStatuses={platformStatuses} isLoading={isLoadingPlatforms} onTicketClick={handleTicketClick}/>}
+      {/* --- CHANGE: Pass platform_statuses from the employee object --- */}
+      {activeTab === "platforms" && (
+        <EmployeeApplicationsTab
+          applications={employee.applications || []}
+          platformStatuses={employee.platform_statuses || []}
+          isLoading={isEmployeeLoading}
+          onTicketClick={handleTicketClick}
+        />
+      )}
       {activeTab === "licenses" && <LicensesTab employeeId={employeeId} />}
-      {activeTab === "platform-logs" && <PlatformLogPage employeeId={employeeId} onLogout={onLogout} />}
-      {activeTab === "timeline" && <UnifiedTimelinePage events={timelineData} loading={isTimelineLoading} error={timelineError} />}
+      {activeTab === "platform-logs" && (
+        <PlatformLogPage employeeId={employeeId} onLogout={onLogout} />
+      )}
+      {activeTab === "timeline" && (
+        <UnifiedTimelinePage
+          events={timelineData}
+          loading={isTimelineLoading}
+          error={timelineError}
+        />
+      )}
     </div>
   );
 
@@ -192,8 +266,8 @@ export const EmployeeDetailPage = ({
         <p>{pageError.message || "An unexpected error occurred."}</p>
       </div>
     );
-  
-  if (!employee) return null; 
+
+  if (!employee) return null;
 
   return (
     <>
@@ -259,6 +333,22 @@ export const EmployeeDetailPage = ({
             )}
           </div>
         </div>
+
+        {activeTab === "platforms" && (
+          <div className="flex justify-end mt-4">
+            <button
+              onClick={() => syncPlatformStatus()}
+              disabled={isSyncing}
+              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-kredivo-primary hover:bg-kredivo-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-kredivo-primary disabled:opacity-50"
+            >
+              <RefreshCw
+                className={`w-4 h-4 mr-2 ${isSyncing ? "animate-spin" : ""}`}
+              />
+              {isSyncing ? "Syncing..." : "Sync"}
+            </button>
+          </div>
+        )}
+
         {TabContent}
       </div>
       {isJiraModalOpen && (

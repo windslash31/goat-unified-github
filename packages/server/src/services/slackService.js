@@ -26,16 +26,30 @@ const getUserStatus = async (email) => {
   try {
     const client = getWebClient();
     const result = await client.users.lookupByEmail({ email });
+
     if (result.ok && result.user) {
+      const user = result.user;
+
+      // --- THIS IS THE CHANGE ---
+      // Create the details object with the specific fields you wanted.
+      const details = {
+        id: user.id,
+        is_admin: user.is_admin,
+        is_owner: user.is_owner,
+        is_restricted: user.is_restricted,
+        is_ultra_restricted: user.is_ultra_restricted,
+      };
+
       return {
         platform: "Slack",
-        email: result.user.profile.email || email,
-        status: result.user.deleted ? "Suspended" : "Active",
-        message: result.user.deleted
-          ? "Account is deactivated."
-          : "Account is active.",
+        email: user.profile.email || email,
+        status: user.deleted ? "Suspended" : "Active",
+        details: details, // Return the new details object
       };
+      // --- END OF CHANGE ---
     }
+
+    // This line is kept for safety but should ideally not be reached if result.ok is true
     throw new Error("User found but data is incomplete.");
   } catch (error) {
     if (
@@ -46,7 +60,7 @@ const getUserStatus = async (email) => {
         platform: "Slack",
         email,
         status: "Not Found",
-        message: "User does not exist in Slack.",
+        details: { message: "User does not exist in Slack." },
       };
     }
     console.error("Slack API Error:", error.message);
@@ -54,7 +68,7 @@ const getUserStatus = async (email) => {
       platform: "Slack",
       email,
       status: "Error",
-      message: "Failed to fetch status from Slack.",
+      details: { message: "Failed to fetch status from Slack." },
     };
   }
 };
@@ -64,6 +78,8 @@ const deactivateUser = async (email) => {
     const client = getWebClient();
     const result = await client.users.lookupByEmail({ email });
     if (result.ok && result.user) {
+      // In a real implementation, you would call admin.users.setInactive here
+      // await client.admin.users.setInactive({ user_id: result.user.id });
       return {
         success: true,
         message: `Deactivation for ${email} would be performed here.`,
@@ -96,6 +112,7 @@ const getAuditLogs = async (email) => {
       console.warn(
         "Slack audit log fetching is mocked. Requires Enterprise Grid for real data."
       );
+      // This is mocked data. Real implementation requires Enterprise Grid.
       return [
         {
           id: "slack1",
