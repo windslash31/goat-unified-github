@@ -47,7 +47,6 @@ app.use("/api/jira", jiraRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/employees", employeeRoutes);
 app.use("/api/roles", roleRoutes);
-app.use("/api/ai", aiRoutes);
 
 // Global error handler
 app.use((err, req, res, next) => {
