@@ -45,7 +45,6 @@ app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/logs", logRoutes);
 app.use("/api/jira", jiraRoutes);
 app.use("/api/users", userRoutes);
-app.use("/api/employees", employeeRoutes);
 app.use("/api/roles", roleRoutes);
 
 // Global error handler
