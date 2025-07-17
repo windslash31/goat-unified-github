@@ -1,7 +1,7 @@
 import React, { memo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "../../api/api";
-import { Ticket, ChevronRight, RefreshCw } from "lucide-react";
+import { Ticket, ChevronDown, RefreshCw } from "lucide-react";
 import { PLATFORM_CONFIG } from "../../config/platforms";
 import { formatDistanceToNow } from "date-fns";
 import { motion, AnimatePresence } from "framer-motion";
@@ -18,7 +18,7 @@ const PlatformStatusBadge = ({ status }) => {
   };
   return (
     <span
-      className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full whitespace-nowrap ${
+      className={`px-2.5 py-0.5 text-xs font-semibold rounded-full whitespace-nowrap ${
         styles[status] || styles["Error"]
       }`}
     >
@@ -28,13 +28,12 @@ const PlatformStatusBadge = ({ status }) => {
 };
 
 const PlatformRowSkeleton = () => (
-  <div className="p-4 rounded-lg bg-gray-50 dark:bg-gray-900/50 animate-pulse">
+  <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 animate-pulse">
     <div className="flex items-center justify-between">
       <div className="flex items-center gap-4">
         <div className="w-8 h-8 rounded-md bg-gray-300 dark:bg-gray-700"></div>
         <div>
           <div className="h-4 bg-gray-300 dark:bg-gray-700 rounded w-24"></div>
-          <div className="h-3 bg-gray-300 dark:bg-gray-700 rounded w-32 mt-1"></div>
         </div>
       </div>
       <div className="h-6 bg-gray-300 dark:bg-gray-700 rounded-full w-20"></div>
@@ -42,25 +41,31 @@ const PlatformRowSkeleton = () => (
   </div>
 );
 
-const DetailRow = ({ label, value }) => {
-  if (value === null || typeof value === "undefined" || value === "")
+const DetailItem = ({ label, children }) => {
+  if (children === null || typeof children === "undefined" || children === "")
     return null;
   return (
-    <div className="grid grid-cols-3 gap-4 text-xs">
-      <span className="col-span-1 text-gray-500 dark:text-gray-400">
+    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center py-2 px-1">
+      <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 flex-shrink-0">
         {label}
-      </span>
-      <span className="col-span-2 font-medium text-gray-800 dark:text-gray-200 break-words">
-        {String(value)}
-      </span>
+      </dt>
+      <dd className="text-sm text-gray-800 dark:text-gray-200 text-left sm:text-right mt-1 sm:mt-0 break-words">
+        {String(children)}
+      </dd>
     </div>
   );
 };
 
+const DetailSectionHeader = ({ children }) => (
+  <h5 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mt-4 mb-1 px-1 first:mt-0">
+    {children}
+  </h5>
+);
+
 const PlatformDetailView = ({ platformName, details }) => {
   if (!details || Object.keys(details).length === 0) {
     return (
-      <div className="text-center text-xs text-gray-500 pt-3">
+      <div className="text-center text-sm text-gray-500 py-4">
         No additional details available.
       </div>
     );
@@ -71,114 +76,88 @@ const PlatformDetailView = ({ platformName, details }) => {
     case "Google":
       content = (
         <>
-          <DetailRow label="Is Admin" value={details.isAdmin ? "Yes" : "No"} />
-          <DetailRow
-            label="Is Delegated Admin"
-            value={details.isDelegatedAdmin ? "Yes" : "No"}
-          />
-          <DetailRow
-            label="2-SV Enrolled"
-            value={details.isEnrolledIn2Sv ? "Yes" : "No"}
-          />
-          <DetailRow label="Org Unit Path" value={details.orgUnitPath} />
-          <DetailRow
-            label="Last Login"
-            value={
-              details.lastLoginTime
-                ? new Date(details.lastLoginTime).toLocaleString()
-                : "N/A"
-            }
-          />
-          <DetailRow label="Aliases" value={details.aliases?.join(", ")} />
+          <DetailSectionHeader>Account Info</DetailSectionHeader>
+          <DetailItem label="Is Admin">
+            {details.isAdmin ? "Yes" : "No"}
+          </DetailItem>
+          <DetailItem label="Is Delegated Admin">
+            {details.isDelegatedAdmin ? "Yes" : "No"}
+          </DetailItem>
+          <DetailItem label="Org Unit">{details.orgUnitPath}</DetailItem>
+          <DetailSectionHeader>Security</DetailSectionHeader>
+          <DetailItem label="2-Step Verification">
+            {details.isEnrolledIn2Sv ? "Enrolled" : "Not Enrolled"}
+          </DetailItem>
+          <DetailItem label="Last Login">
+            {details.lastLoginTime
+              ? new Date(details.lastLoginTime).toLocaleString()
+              : "N/A"}
+          </DetailItem>
         </>
       );
       break;
     case "Slack":
       content = (
         <>
-          <DetailRow label="User ID" value={details.id} />
-          <DetailRow label="Is Admin" value={details.is_admin ? "Yes" : "No"} />
-          <DetailRow label="Is Owner" value={details.is_owner ? "Yes" : "No"} />
-          <DetailRow label="Is Guest" value={details.is_guest ? "Yes" : "No"} />
+          <DetailSectionHeader>Account Info</DetailSectionHeader>
+          <DetailItem label="User ID">{details.id}</DetailItem>
+          <DetailSectionHeader>Permissions</DetailSectionHeader>
+          <DetailItem label="Is Admin">
+            {details.is_admin ? "Yes" : "No"}
+          </DetailItem>
+          <DetailItem label="Is Owner">
+            {details.is_owner ? "Yes" : "No"}
+          </DetailItem>
+          <DetailItem label="Is Guest">
+            {details.is_guest ? "Yes" : "No"}
+          </DetailItem>
         </>
       );
       break;
     case "Atlassian":
       content = (
         <>
-          <DetailRow label="Display Name" value={details.displayName} />
-          <DetailRow label="Email" value={details.emailAddress} />
-          <DetailRow label="Account ID" value={details.accountId} />
-          <DetailRow label="Account Type" value={details.accountType} />
+          <DetailSectionHeader>Account Info</DetailSectionHeader>
+          <DetailItem label="Display Name">{details.displayName}</DetailItem>
+          <DetailItem label="Email">{details.emailAddress}</DetailItem>
+          <DetailItem label="Account ID">{details.accountId}</DetailItem>
+          <DetailItem label="Account Type">{details.accountType}</DetailItem>
         </>
       );
       break;
     case "JumpCloud":
       content = (
-        <div className="space-y-4">
-          <div>
-            <h5 className="font-semibold text-xs text-gray-600 dark:text-gray-300 mb-2">
-              Core User Identity
-            </h5>
-            <div className="pl-2 border-l-2 border-gray-200 dark:border-gray-600 space-y-2">
-              <DetailRow
-                label="Display Name"
-                value={details.coreIdentity?.displayName}
-              />
-              <DetailRow
-                label="Username"
-                value={details.coreIdentity?.username}
-              />
-              <DetailRow label="Email" value={details.coreIdentity?.email} />
-              <DetailRow label="ID" value={details.coreIdentity?.id} />
-            </div>
-          </div>
-          <div>
-            <h5 className="font-semibold text-xs text-gray-600 dark:text-gray-300 mb-2">
-              Account Status & Security
-            </h5>
-            <div className="pl-2 border-l-2 border-gray-200 dark:border-gray-600 space-y-2">
-              <DetailRow label="State" value={details.accountStatus?.state} />
-              <DetailRow
-                label="Activated"
-                value={details.accountStatus?.activated ? "Yes" : "No"}
-              />
-              <DetailRow
-                label="Suspended"
-                value={details.accountStatus?.suspended ? "Yes" : "No"}
-              />
-              <DetailRow
-                label="Account Locked"
-                value={details.accountStatus?.accountLocked ? "Yes" : "No"}
-              />
-              <DetailRow
-                label="Password Expired"
-                value={details.accountStatus?.passwordExpired ? "Yes" : "No"}
-              />
-              <DetailRow
-                label="MFA Status"
-                value={details.accountStatus?.mfaStatus}
-              />
-            </div>
-          </div>
-          <div>
-            <h5 className="font-semibold text-xs text-gray-600 dark:text-gray-300 mb-2">
-              Permissions & Access
-            </h5>
-            <div className="pl-2 border-l-2 border-gray-200 dark:border-gray-600 space-y-2">
-              <DetailRow label="Admin" value={details.permissions?.isAdmin} />
-              <DetailRow
-                label="Sudo Access"
-                value={details.permissions?.hasSudo}
-              />
-              <DetailRow label="Tags" value={details.permissions?.tags} />
-              <DetailRow
-                label="Samba Service User"
-                value={details.permissions?.isSambaServiceUser}
-              />
-            </div>
-          </div>
-        </div>
+        <>
+          <DetailSectionHeader>Core Identity</DetailSectionHeader>
+          <DetailItem label="Display Name">
+            {details.coreIdentity?.displayName}
+          </DetailItem>
+          <DetailItem label="Username">
+            {details.coreIdentity?.username}
+          </DetailItem>
+          <DetailItem label="ID">{details.coreIdentity?.id}</DetailItem>
+
+          <DetailSectionHeader>Account Status</DetailSectionHeader>
+          <DetailItem label="State">{details.accountStatus?.state}</DetailItem>
+          <DetailItem label="Activated">
+            {details.accountStatus?.activated ? "Yes" : "No"}
+          </DetailItem>
+          <DetailItem label="Account Locked">
+            {details.accountStatus?.accountLocked ? "Yes" : "No"}
+          </DetailItem>
+          <DetailItem label="MFA Status">
+            {details.accountStatus?.mfaStatus}
+          </DetailItem>
+
+          <DetailSectionHeader>Permissions</DetailSectionHeader>
+          <DetailItem label="Is Admin">
+            {details.permissions?.isAdmin}
+          </DetailItem>
+          <DetailItem label="Sudo Access">
+            {details.permissions?.hasSudo}
+          </DetailItem>
+          <DetailItem label="Tags">{details.permissions?.tags}</DetailItem>
+        </>
       );
       break;
     default:
@@ -187,8 +166,82 @@ const PlatformDetailView = ({ platformName, details }) => {
       );
   }
 
-  return <div className="space-y-2">{content}</div>;
+  return (
+    <dl className="divide-y divide-gray-200 dark:divide-gray-700">{content}</dl>
+  );
 };
+
+const PlatformStatusCard = memo(({ platform, isExpanded, onToggle }) => {
+  const platformConfig =
+    PLATFORM_CONFIG[platform.platform_name] || PLATFORM_CONFIG.Default;
+  const lastSyncTime = platform.last_synced_at
+    ? formatDistanceToNow(new Date(platform.last_synced_at), {
+        addSuffix: true,
+      })
+    : "never";
+  const hasDetails =
+    platform.details &&
+    Object.keys(platform.details).length > 0 &&
+    !platform.details.error;
+
+  return (
+    <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+      <button
+        onClick={onToggle}
+        className="w-full text-left"
+        disabled={!hasDetails}
+      >
+        <div className="flex items-start gap-4">
+          <img
+            src={platformConfig.logo}
+            alt={`${platform.platform_name} Logo`}
+            className="w-8 h-8 mt-1 flex-shrink-0"
+          />
+          <div className="flex-grow min-w-0">
+            <div className="flex justify-between items-start">
+              <p className="font-semibold text-gray-800 dark:text-gray-200 truncate">
+                {platform.platform_name}
+              </p>
+              <div className="flex-shrink-0 flex items-center gap-2 pl-2">
+                <PlatformStatusBadge status={platform.status} />
+                {hasDetails && (
+                  <ChevronDown
+                    className={`w-5 h-5 text-gray-400 transition-transform ${
+                      isExpanded ? "rotate-180" : ""
+                    }`}
+                  />
+                )}
+              </div>
+            </div>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+              Last synced: {lastSyncTime}
+            </p>
+          </div>
+        </div>
+      </button>
+      <AnimatePresence>
+        {isExpanded && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="overflow-hidden"
+          >
+            <div className="pt-4 mt-4 border-t border-gray-200 dark:border-gray-700">
+              <div className="p-3 bg-gray-100 dark:bg-gray-900/70 rounded-lg shadow-inner">
+                <PlatformDetailView
+                  platformName={platform.platform_name}
+                  details={platform.details}
+                />
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+});
 
 export const EmployeeApplicationsTab = memo(
   ({
@@ -222,7 +275,7 @@ export const EmployeeApplicationsTab = memo(
 
     return (
       <div className="space-y-8">
-        <div className="p-6 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+        <div>
           <div className="flex justify-between items-center mb-2">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
               Platform Access Status
@@ -238,104 +291,36 @@ export const EmployeeApplicationsTab = memo(
               {isSyncing ? "Syncing..." : "Sync"}
             </button>
           </div>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
             Live status of the employee's account on integrated external
             platforms.
           </p>
-          <div className="space-y-2">
+          {/* --- START: CHANGED TO A SINGLE-COLUMN LAYOUT --- */}
+          <div className="space-y-4">
             {isLoading ? (
               <>
                 <PlatformRowSkeleton />
                 <PlatformRowSkeleton />
                 <PlatformRowSkeleton />
+                <PlatformRowSkeleton />
               </>
             ) : (
-              platformStatuses.map((platform) => {
-                const isExpanded = expandedPlatform === platform.platform_name;
-                const platformConfig =
-                  PLATFORM_CONFIG[platform.platform_name] ||
-                  PLATFORM_CONFIG.Default;
-                const lastSyncTime = platform.last_synced_at
-                  ? formatDistanceToNow(new Date(platform.last_synced_at), {
-                      addSuffix: true,
-                    })
-                  : "never";
-                const hasDetails =
-                  platform.details &&
-                  Object.keys(platform.details).length > 0 &&
-                  !platform.details.error;
-
-                return (
-                  <div
-                    key={platform.platform_name}
-                    className="p-4 rounded-lg bg-gray-50 dark:bg-gray-900/50"
-                  >
-                    <button
-                      onClick={() =>
-                        hasDetails &&
-                        togglePlatformExpansion(platform.platform_name)
-                      }
-                      className="w-full text-left"
-                      disabled={!hasDetails}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-4 min-w-0">
-                          <img
-                            src={platformConfig.logo}
-                            alt={`${platform.platform_name} Logo`}
-                            className="w-8 h-8"
-                          />
-                          <div className="min-w-0">
-                            <p className="font-semibold text-gray-800 dark:text-gray-200 truncate">
-                              {platform.platform_name}
-                            </p>
-                            <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                              Last synced: {lastSyncTime}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-4">
-                          <PlatformStatusBadge status={platform.status} />
-                          {hasDetails && (
-                            <ChevronRight
-                              className={`w-5 h-5 text-gray-400 transition-transform ${
-                                isExpanded ? "rotate-90" : ""
-                              }`}
-                            />
-                          )}
-                        </div>
-                      </div>
-                    </button>
-                    <AnimatePresence>
-                      {isExpanded && (
-                        <motion.div
-                          initial={{ height: 0, opacity: 0, marginTop: 0 }}
-                          animate={{
-                            height: "auto",
-                            opacity: 1,
-                            marginTop: "12px",
-                          }}
-                          exit={{ height: 0, opacity: 0, marginTop: 0 }}
-                          transition={{ duration: 0.2 }}
-                          className="overflow-hidden pl-12"
-                        >
-                          <div className="pt-3 border-t border-gray-200 dark:border-gray-700">
-                            <PlatformDetailView
-                              platformName={platform.platform_name}
-                              details={platform.details}
-                            />
-                          </div>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </div>
-                );
-              })
+              platformStatuses.map((platform) => (
+                <PlatformStatusCard
+                  key={platform.platform_name}
+                  platform={platform}
+                  isExpanded={expandedPlatform === platform.platform_name}
+                  onToggle={() =>
+                    togglePlatformExpansion(platform.platform_name)
+                  }
+                />
+              ))
             )}
           </div>
+          {/* --- END: CHANGED TO A SINGLE-COLUMN LAYOUT --- */}
         </div>
 
-        <div className="p-6 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+        <div>
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
             Internal Application Access
           </h3>
@@ -348,7 +333,7 @@ export const EmployeeApplicationsTab = memo(
               {applications.map((app) => (
                 <div
                   key={app.name}
-                  className="p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-200 dark:border-gray-700/50"
+                  className="p-4 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700"
                 >
                   <div className="font-semibold text-gray-800 dark:text-gray-200">
                     {app.name}
