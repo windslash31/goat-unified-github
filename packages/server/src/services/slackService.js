@@ -30,8 +30,6 @@ const getUserStatus = async (email) => {
     if (result.ok && result.user) {
       const user = result.user;
 
-      // --- THIS IS THE CHANGE ---
-      // Create the details object with the specific fields you wanted.
       const details = {
         id: user.id,
         is_admin: user.is_admin,

@@ -76,6 +76,10 @@ const PlatformDetailView = ({ platformName, details }) => {
             label="Is Delegated Admin"
             value={details.isDelegatedAdmin ? "Yes" : "No"}
           />
+          <DetailRow
+            label="2-SV Enrolled"
+            value={details.isEnrolledIn2Sv ? "Yes" : "No"}
+          />
           <DetailRow label="Org Unit Path" value={details.orgUnitPath} />
           <DetailRow
             label="Last Login"
@@ -95,19 +99,11 @@ const PlatformDetailView = ({ platformName, details }) => {
           <DetailRow label="User ID" value={details.id} />
           <DetailRow label="Is Admin" value={details.is_admin ? "Yes" : "No"} />
           <DetailRow label="Is Owner" value={details.is_owner ? "Yes" : "No"} />
-          <DetailRow
-            label="Is Guest"
-            value={
-              details.is_restricted || details.is_ultra_restricted
-                ? "Yes"
-                : "No"
-            }
-          />
+          <DetailRow label="Is Guest" value={details.is_guest ? "Yes" : "No"} />
         </>
       );
       break;
     case "Atlassian":
-      // --- THIS IS THE CHANGE ---
       content = (
         <>
           <DetailRow label="Display Name" value={details.displayName} />
@@ -116,16 +112,73 @@ const PlatformDetailView = ({ platformName, details }) => {
           <DetailRow label="Account Type" value={details.accountType} />
         </>
       );
-      // --- END OF CHANGE ---
       break;
     case "JumpCloud":
       content = (
-        <>
-          <DetailRow label="Username" value={details.username} />
-          <DetailRow label="User ID" value={details.id} />
-          <DetailRow label="Job Title" value={details.jobTitle} />
-          <DetailRow label="Department" value={details.department} />
-        </>
+        <div className="space-y-4">
+          <div>
+            <h5 className="font-semibold text-xs text-gray-600 dark:text-gray-300 mb-2">
+              Core User Identity
+            </h5>
+            <div className="pl-2 border-l-2 border-gray-200 dark:border-gray-600 space-y-2">
+              <DetailRow
+                label="Display Name"
+                value={details.coreIdentity?.displayName}
+              />
+              <DetailRow
+                label="Username"
+                value={details.coreIdentity?.username}
+              />
+              <DetailRow label="Email" value={details.coreIdentity?.email} />
+              <DetailRow label="ID" value={details.coreIdentity?.id} />
+            </div>
+          </div>
+          <div>
+            <h5 className="font-semibold text-xs text-gray-600 dark:text-gray-300 mb-2">
+              Account Status & Security
+            </h5>
+            <div className="pl-2 border-l-2 border-gray-200 dark:border-gray-600 space-y-2">
+              <DetailRow label="State" value={details.accountStatus?.state} />
+              <DetailRow
+                label="Activated"
+                value={details.accountStatus?.activated ? "Yes" : "No"}
+              />
+              <DetailRow
+                label="Suspended"
+                value={details.accountStatus?.suspended ? "Yes" : "No"}
+              />
+              <DetailRow
+                label="Account Locked"
+                value={details.accountStatus?.accountLocked ? "Yes" : "No"}
+              />
+              <DetailRow
+                label="Password Expired"
+                value={details.accountStatus?.passwordExpired ? "Yes" : "No"}
+              />
+              <DetailRow
+                label="MFA Status"
+                value={details.accountStatus?.mfaStatus}
+              />
+            </div>
+          </div>
+          <div>
+            <h5 className="font-semibold text-xs text-gray-600 dark:text-gray-300 mb-2">
+              Permissions & Access
+            </h5>
+            <div className="pl-2 border-l-2 border-gray-200 dark:border-gray-600 space-y-2">
+              <DetailRow label="Admin" value={details.permissions?.isAdmin} />
+              <DetailRow
+                label="Sudo Access"
+                value={details.permissions?.hasSudo}
+              />
+              <DetailRow label="Tags" value={details.permissions?.tags} />
+              <DetailRow
+                label="Samba Service User"
+                value={details.permissions?.isSambaServiceUser}
+              />
+            </div>
+          </div>
+        </div>
       );
       break;
     default:

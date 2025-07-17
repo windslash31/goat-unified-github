@@ -58,22 +58,33 @@ const getUserStatus = async (email) => {
       };
     }
 
-    // --- THIS IS THE CHANGE ---
-    // Create a structured object for the details field.
     const details = {
-      id: user.id,
-      username: user.username,
-      jobTitle: user.jobTitle,
-      department: user.department,
+      coreIdentity: {
+        displayName: user.displayname,
+        username: user.username,
+        email: user.email,
+        id: user._id,
+      },
+      accountStatus: {
+        state: user.state,
+        activated: user.activated,
+        suspended: user.suspended,
+        accountLocked: user.account_locked,
+        passwordExpired: user.password_expired,
+        mfaStatus: user.mfaEnrollment?.overallStatus,
+      },
+      permissions: {
+        isAdmin: user.admin ? "Yes" : "No",
+        hasSudo: user.sudo ? "Yes" : "No",
+      },
     };
 
     return {
       platform: "JumpCloud",
-      email: user.email, // Return the user's primary email
+      email: user.email,
       status: user.suspended ? "Suspended" : "Active",
-      details: details, // Return the new details object
+      details: details,
     };
-    // --- END OF CHANGE ---
   } catch (error) {
     return {
       platform: "JumpCloud",

@@ -61,7 +61,7 @@ const getUserStatus = async (email) => {
     const response = await directory.users.get({
       userKey: email,
       fields:
-        "suspended,primaryEmail,isAdmin,isDelegatedAdmin,aliases,orgUnitPath,lastLoginTime",
+        "suspended,primaryEmail,isAdmin,isDelegatedAdmin,aliases,orgUnitPath,lastLoginTime,isEnrolledIn2Sv",
     });
 
     const userData = response.data;
@@ -72,32 +72,27 @@ const getUserStatus = async (email) => {
       aliases: userData.aliases || [],
       orgUnitPath: userData.orgUnitPath,
       lastLoginTime: userData.lastLoginTime,
+      isEnrolledIn2Sv: userData.isEnrolledIn2Sv,
     };
 
     return {
-      platform: "Google Workspace",
-      email: userData.primaryEmail,
+      platform: "Google",
       status: userData.suspended ? "Suspended" : "Active",
       details: details,
-      message: userData.suspended
-        ? "Account is suspended."
-        : "Account is active.",
     };
   } catch (error) {
     if (error.code === 404) {
       return {
-        platform: "Google Workspace",
-        email: email,
+        platform: "Google",
         status: "Not Found",
-        message: "User does not exist in Google Workspace.",
+        details: { message: "User does not exist." },
       };
     }
     console.error("Google Workspace Error:", error.message);
     return {
-      platform: "Google Workspace",
-      email: email,
+      platform: "Google",
       status: "Error",
-      message: "Failed to fetch status from Google Workspace.",
+      details: { message: "Failed to fetch status." },
     };
   }
 };
