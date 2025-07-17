@@ -1,6 +1,4 @@
-// packages/client/src/pages/EmployeeDetailPage.js
-
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react"; // Import useCallback
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -169,33 +167,29 @@ export const EmployeeDetailPage = ({ permissions, onLogout }) => {
     setIsMoreMenuOpen(false);
   };
 
-  const handleTicketClick = (ticketId) => {
+  // --- START: STABILIZED HANDLER FUNCTIONS ---
+  const handleTicketClick = useCallback((ticketId) => {
     if (ticketId) {
       setSelectedTicketId(ticketId);
       setIsJiraModalOpen(true);
     }
-  };
+  }, []); // Empty dependency array means this function is created only once
 
-  // --- START: CORRECTED handleAssetClick FUNCTION ---
-  const handleAssetClick = (assetDetails) => {
-    // This function now robustly handles the incoming data
-    if (assetDetails && typeof assetDetails === 'object') {
-      setSelectedAsset(assetDetails);
+  const handleAssetClick = useCallback((asset) => {
+    if (asset) {
+      setSelectedAsset(asset);
       setIsAssetModalOpen(true);
-    } else {
-      // This case should not be hit based on your logs, but it's good practice
-      console.error("handleAssetClick was called with invalid data:", assetDetails);
     }
-  };
-  // --- END: CORRECTED handleAssetClick FUNCTION ---
+  }, []); // Empty dependency array means this function is created only once
 
-  const handleEdit = () => {
+  const handleEdit = useCallback(() => {
     openModal("editEmployee", employee);
-  };
+  }, [employee, openModal]);
 
-  const handleDeactivate = () => {
+  const handleDeactivate = useCallback(() => {
     openModal("deactivateEmployee", employee);
-  };
+  }, [employee, openModal]);
+  // --- END: STABILIZED HANDLER FUNCTIONS ---
 
   const TabButton = ({ id, label, shortLabel, icon }) => (
     <button
@@ -218,7 +212,7 @@ export const EmployeeDetailPage = ({ permissions, onLogout }) => {
           navigate={navigate}
           permissions={permissions}
           onTicketClick={handleTicketClick}
-          onAssetClick={handleAssetClick} // Passing the corrected handler
+          onAssetClick={handleAssetClick}
         />
       )}
       {activeTab === "devices" && <DevicesTab employeeId={employeeId} />}
