@@ -1,6 +1,8 @@
 const fetch = require("node-fetch");
+const axios = require("axios");
+const config = require("../config/config");
 
-// This function is kept as is from your provided file.
+// This function remains unchanged
 const getUserStatus = async (email) => {
   if (
     !process.env.ATLASSIAN_API_TOKEN ||
@@ -70,6 +72,7 @@ const getUserStatus = async (email) => {
   }
 };
 
+// --- THIS IS THE MODIFIED FUNCTION ---
 const getTicketDetails = async (ticketId) => {
   if (
     !process.env.ATLASSIAN_DOMAIN ||
@@ -94,16 +97,20 @@ const getTicketDetails = async (ticketId) => {
   try {
     const response = await fetch(url, { method: "GET", headers });
 
-    if (response.status === 404) throw new Error("Jira ticket not found.");
+    if (response.status === 404) {
+      throw new Error("Jira ticket not found.");
+    }
     if (!response.ok) {
       const errorBody = await response.text();
-      throw new Error(`Jira API error: ${response.status} - ${errorBody}`);
+      throw new Error(
+        `Jira API responded with status ${response.status}: ${errorBody}`
+      );
     }
 
     const data = await response.json();
     const fields = data.fields;
 
-    // This object now extracts fields from both "Employee Onboarding" and "DB Onboarding" tickets
+    // This object now extracts fields from all onboarding and offboarding tickets.
     const details = {
       summary: fields.summary,
       reporter: fields.reporter?.displayName || "N/A",
@@ -112,32 +119,38 @@ const getTicketDetails = async (ticketId) => {
       created: fields.created,
       issueType: fields.issuetype?.name || "N/A",
       employee_details: {
-        // Shared fields
+        // Shared fields across multiple ticket types
         firstName: fields.customfield_10897,
         lastName: fields.customfield_10961,
         managerEmail: fields.customfield_10960,
 
-        // Fields that can come from different places depending on the ticket
-        employeeEmail: fields.customfield_10970 || fields.customfield_10984, // Use whichever is available
-        joinDate: fields.customfield_10985, // Used by both onboarding types in your examples
+        // Onboarding specific fields (handles both ticket types)
+        employeeEmail: fields.customfield_10970 || fields.customfield_10984,
+        joinDate: fields.customfield_10985,
         position: fields.customfield_11552,
 
-        // Fields that have a '.value' property
-        legalEntity: fields.customfield_11529?.value,
-        employmentType: fields.customfield_11530?.value,
+        // Fields with a '.value' property
+        legalEntity:
+          fields.customfield_10892?.value || fields.customfield_11529?.value,
+        employmentType:
+          fields.customfield_10724?.value || fields.customfield_11530?.value,
         laptopType: fields.customfield_11531?.value,
         officeLocation: fields.customfield_10729?.value,
-        employeeSubType: fields.customfield_11557?.value, // e.g., Professional
+        employeeSubType: fields.customfield_11557?.value,
         employeeStatus: fields.customfield_11551?.value, // e.g., Non Expat
 
-        // Offboarding specific (will be null on onboarding tickets)
+        // Offboarding specific fields
         resignationDate: fields.customfield_10727,
         accessCutoffDate: fields.customfield_10982,
       },
       asset_details: {
-        // The assigned laptop can be in different fields, so we check both
+        // Checks for asset fields from all ticket types
         assignedLaptop:
-          fields.customfield_11745?.[0] || fields.customfield_11747?.[0],
+          fields.customfield_11745?.[0] ||
+          fields.customfield_11746?.[0] ||
+          fields.customfield_11747?.[0],
+        officeLocation: fields.customfield_10870?.[0],
+        laptopProfessional: fields.customfield_10711?.[0],
       },
     };
 
@@ -148,7 +161,6 @@ const getTicketDetails = async (ticketId) => {
   }
 };
 
-// This function is new, to resolve asset IDs
 const getAssetDetails = async (workspaceId, objectId) => {
   if (!workspaceId || !objectId) {
     throw new Error("Workspace ID and Object ID are required.");
@@ -172,7 +184,6 @@ const getAssetDetails = async (workspaceId, objectId) => {
   }
 };
 
-// This function is kept as is.
 const deactivateUser = async (email) => {
   return {
     success: true,

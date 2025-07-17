@@ -53,7 +53,7 @@ const mapEmployeeOffboardingFields = (employeeDetails, assetDetails) => ({
   ],
 });
 
-// Mapper for Employee Onboarding - updated to be more generic
+// Mapper for Employee Onboarding
 const mapEmployeeOnboardingFields = (employeeDetails, assetDetails) => ({
   title: "Employee Onboarding Details",
   sections: [
@@ -114,15 +114,42 @@ const mapEmployeeOnboardingFields = (employeeDetails, assetDetails) => ({
   ],
 });
 
+// Mapper for DB-level tasks
+const mapDbTaskFields = (employeeDetails) => ({
+  title: `Database Task`,
+  sections: [
+    {
+      title: "Target User",
+      fields: [
+        {
+          label: "Employee Email",
+          value: get(employeeDetails, "employeeEmail"),
+        },
+      ],
+    },
+    {
+      title: "Task Details",
+      fields: [
+        {
+          label: "Effective Date",
+          value:
+            get(employeeDetails, "joinDate") ||
+            get(employeeDetails, "resignationDate"),
+          type: "date",
+        },
+      ],
+    },
+  ],
+});
+
 // --- Main Export: The Strategy Map ---
 export const JIRA_ISSUE_TYPE_MAPPERS = {
   // These keys now correctly match all your issue types
   "Employee Offboarding": (data) =>
     mapEmployeeOffboardingFields(data.employee_details, data.asset_details),
-  "DB Offboarding": (data) =>
-    mapEmployeeOffboardingFields(data.employee_details, data.asset_details),
+  "DB Offboarding": (data) => mapDbTaskFields(data.employee_details),
   "Employee onboarding": (data) =>
     mapEmployeeOnboardingFields(data.employee_details, data.asset_details),
   "DB Onboarding": (data) =>
-    mapEmployeeOnboardingFields(data.employee_details, data.asset_details), // Re-uses the main onboarding mapper
+    mapEmployeeOnboardingFields(data.employee_details, data.asset_details),
 };
