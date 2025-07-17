@@ -16,7 +16,6 @@ const { schedulePlatformSync } = require("./cron/platformSync");
 const app = express();
 app.set("trust proxy", 1);
 
-const whitelist = ["https://goat-project-465601.web.app/", config.clientUrl];
 const whitelist = ["http://localhost:3000"];
 if (config.clientUrl) {
   whitelist.push(...config.clientUrl.split(",").map((url) => url.trim()));
