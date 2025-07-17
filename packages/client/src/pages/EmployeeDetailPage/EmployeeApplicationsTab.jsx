@@ -1,7 +1,19 @@
 import React, { memo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "../../api/api";
-import { Ticket, ChevronDown, RefreshCw } from "lucide-react";
+import {
+  Ticket,
+  ChevronDown,
+  RefreshCw,
+  CheckCircle,
+  XCircle,
+  Info,
+  Hash,
+  Cpu,
+  HardDrive,
+  Monitor,
+  Shield,
+} from "lucide-react";
 import { PLATFORM_CONFIG } from "../../config/platforms";
 import { formatDistanceToNow } from "date-fns";
 import { motion, AnimatePresence } from "framer-motion";
@@ -41,27 +53,34 @@ const PlatformRowSkeleton = () => (
   </div>
 );
 
-const DetailItem = ({ label, children }) => {
-  if (children === null || typeof children === "undefined" || children === "")
+// --- MODIFIED: Uses a grid layout for better readability on desktop ---
+const DetailItem = ({ label, value, isMono = false }) => {
+  if (value === null || typeof value === "undefined" || value === "")
     return null;
   return (
-    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center py-2 px-1">
-      <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 flex-shrink-0">
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-1 sm:gap-4 py-2.5 px-1 border-b border-gray-200 dark:border-gray-700 last:border-b-0">
+      <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 sm:col-span-1">
         {label}
       </dt>
-      <dd className="text-sm text-gray-800 dark:text-gray-200 text-left sm:text-right mt-1 sm:mt-0 break-words">
-        {String(children)}
+      <dd
+        className={`text-sm text-gray-800 dark:text-gray-200 sm:col-span-2 break-words ${
+          isMono ? "font-mono text-xs" : ""
+        }`}
+      >
+        {value}
       </dd>
     </div>
   );
 };
 
+// --- MODIFIED: Improved styling for better visual separation ---
 const DetailSectionHeader = ({ children }) => (
-  <h5 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mt-4 mb-1 px-1 first:mt-0">
+  <h4 className="text-md font-semibold text-gray-600 dark:text-gray-300 pt-4 pb-1 border-b-2 border-kredivo-primary/50">
     {children}
-  </h5>
+  </h4>
 );
 
+// --- MODIFIED: Renders improved detail view with better formatting ---
 const PlatformDetailView = ({ platformName, details }) => {
   if (!details || Object.keys(details).length === 0) {
     return (
@@ -71,28 +90,43 @@ const PlatformDetailView = ({ platformName, details }) => {
     );
   }
 
+  // Helper to format boolean values for display
+  const formatBoolean = (value) =>
+    value ? (
+      <span className="flex items-center gap-1 text-green-600 dark:text-green-400 font-medium">
+        <CheckCircle size={14} /> Yes
+      </span>
+    ) : (
+      <span className="flex items-center gap-1 text-red-600 dark:text-red-400 font-medium">
+        <XCircle size={14} /> No
+      </span>
+    );
+
   let content;
   switch (platformName) {
     case "Google":
       content = (
         <>
           <DetailSectionHeader>Account Info</DetailSectionHeader>
-          <DetailItem label="Is Admin">
-            {details.isAdmin ? "Yes" : "No"}
-          </DetailItem>
-          <DetailItem label="Is Delegated Admin">
-            {details.isDelegatedAdmin ? "Yes" : "No"}
-          </DetailItem>
-          <DetailItem label="Org Unit">{details.orgUnitPath}</DetailItem>
+          <DetailItem label="Is Admin" value={formatBoolean(details.isAdmin)} />
+          <DetailItem
+            label="Is Delegated Admin"
+            value={formatBoolean(details.isDelegatedAdmin)}
+          />
+          <DetailItem label="Org Unit" value={details.orgUnitPath} />
           <DetailSectionHeader>Security</DetailSectionHeader>
-          <DetailItem label="2-Step Verification">
-            {details.isEnrolledIn2Sv ? "Enrolled" : "Not Enrolled"}
-          </DetailItem>
-          <DetailItem label="Last Login">
-            {details.lastLoginTime
-              ? new Date(details.lastLoginTime).toLocaleString()
-              : "N/A"}
-          </DetailItem>
+          <DetailItem
+            label="2-Step Verification"
+            value={details.isEnrolledIn2Sv ? "Enrolled" : "Not Enrolled"}
+          />
+          <DetailItem
+            label="Last Login"
+            value={
+              details.lastLoginTime
+                ? new Date(details.lastLoginTime).toLocaleString()
+                : "N/A"
+            }
+          />
         </>
       );
       break;
@@ -100,17 +134,20 @@ const PlatformDetailView = ({ platformName, details }) => {
       content = (
         <>
           <DetailSectionHeader>Account Info</DetailSectionHeader>
-          <DetailItem label="User ID">{details.id}</DetailItem>
+          <DetailItem label="User ID" value={details.id} />
           <DetailSectionHeader>Permissions</DetailSectionHeader>
-          <DetailItem label="Is Admin">
-            {details.is_admin ? "Yes" : "No"}
-          </DetailItem>
-          <DetailItem label="Is Owner">
-            {details.is_owner ? "Yes" : "No"}
-          </DetailItem>
-          <DetailItem label="Is Guest">
-            {details.is_guest ? "Yes" : "No"}
-          </DetailItem>
+          <DetailItem
+            label="Is Admin"
+            value={formatBoolean(details.is_admin)}
+          />
+          <DetailItem
+            label="Is Owner"
+            value={formatBoolean(details.is_owner)}
+          />
+          <DetailItem
+            label="Is Guest"
+            value={formatBoolean(details.is_guest)}
+          />
         </>
       );
       break;
@@ -118,45 +155,57 @@ const PlatformDetailView = ({ platformName, details }) => {
       content = (
         <>
           <DetailSectionHeader>Account Info</DetailSectionHeader>
-          <DetailItem label="Display Name">{details.displayName}</DetailItem>
-          <DetailItem label="Email">{details.emailAddress}</DetailItem>
-          <DetailItem label="Account ID">{details.accountId}</DetailItem>
-          <DetailItem label="Account Type">{details.accountType}</DetailItem>
+          <DetailItem label="Display Name" value={details.displayName} />
+          <DetailItem label="Email" value={details.emailAddress} />
+          <DetailItem label="Account ID" value={details.accountId} />
+          <DetailItem label="Account Type" value={details.accountType} />
         </>
       );
       break;
     case "JumpCloud":
       content = (
         <>
-          <DetailSectionHeader>Core Identity</DetailSectionHeader>
-          <DetailItem label="Display Name">
-            {details.coreIdentity?.displayName}
-          </DetailItem>
-          <DetailItem label="Username">
-            {details.coreIdentity?.username}
-          </DetailItem>
-          <DetailItem label="ID">{details.coreIdentity?.id}</DetailItem>
+          <DetailSectionHeader>Core User Identity</DetailSectionHeader>
+          <DetailItem label="Username" value={details.coreIdentity?.username} />
+          <DetailItem label="Email" value={details.coreIdentity?.email} />
+          <DetailItem label="ID" value={details.coreIdentity?.id} isMono />
 
-          <DetailSectionHeader>Account Status</DetailSectionHeader>
-          <DetailItem label="State">{details.accountStatus?.state}</DetailItem>
-          <DetailItem label="Activated">
-            {details.accountStatus?.activated ? "Yes" : "No"}
-          </DetailItem>
-          <DetailItem label="Account Locked">
-            {details.accountStatus?.accountLocked ? "Yes" : "No"}
-          </DetailItem>
-          <DetailItem label="MFA Status">
-            {details.accountStatus?.mfaStatus}
-          </DetailItem>
+          <DetailSectionHeader>Account Status & Security</DetailSectionHeader>
+          <DetailItem label="State" value={details.accountStatus?.state} />
+          <DetailItem
+            label="Activated"
+            value={formatBoolean(details.accountStatus?.activated)}
+          />
+          <DetailItem
+            label="Suspended"
+            value={formatBoolean(details.accountStatus?.suspended)}
+          />
+          <DetailItem
+            label="Account Locked"
+            value={formatBoolean(details.accountStatus?.accountLocked)}
+          />
+          <DetailItem
+            label="Password Expired"
+            value={formatBoolean(details.accountStatus?.passwordExpired)}
+          />
+          <DetailItem
+            label="MFA Status"
+            value={details.accountStatus?.mfaStatus}
+          />
 
-          <DetailSectionHeader>Permissions</DetailSectionHeader>
-          <DetailItem label="Is Admin">
-            {details.permissions?.isAdmin}
-          </DetailItem>
-          <DetailItem label="Sudo Access">
-            {details.permissions?.hasSudo}
-          </DetailItem>
-          <DetailItem label="Tags">{details.permissions?.tags}</DetailItem>
+          <DetailSectionHeader>Permissions & Access</DetailSectionHeader>
+          <DetailItem
+            label="Admin"
+            value={formatBoolean(details.permissions?.isAdmin)}
+          />
+          <DetailItem
+            label="Sudo Access"
+            value={formatBoolean(details.permissions?.hasSudo)}
+          />
+          <DetailItem
+            label="Tags"
+            value={details.permissions?.tags?.join(", ")}
+          />
         </>
       );
       break;
@@ -166,9 +215,7 @@ const PlatformDetailView = ({ platformName, details }) => {
       );
   }
 
-  return (
-    <dl className="divide-y divide-gray-200 dark:divide-gray-700">{content}</dl>
-  );
+  return <dl className="space-y-1">{content}</dl>;
 };
 
 const PlatformStatusCard = memo(({ platform, isExpanded, onToggle }) => {
@@ -295,7 +342,6 @@ export const EmployeeApplicationsTab = memo(
             Live status of the employee's account on integrated external
             platforms.
           </p>
-          {/* --- START: CHANGED TO A SINGLE-COLUMN LAYOUT --- */}
           <div className="space-y-4">
             {isLoading ? (
               <>
@@ -317,7 +363,6 @@ export const EmployeeApplicationsTab = memo(
               ))
             )}
           </div>
-          {/* --- END: CHANGED TO A SINGLE-COLUMN LAYOUT --- */}
         </div>
 
         <div>
