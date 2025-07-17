@@ -232,9 +232,89 @@ const deactivateUser = async (email) => {
   };
 };
 
+const findAssetByName = async (assetName) => {
+  const workspaceId = config.atlassian.workspaceId;
+  if (!workspaceId) {
+    throw new Error("Atlassian Workspace ID is not configured on the server.");
+  }
+  if (!assetName) {
+    throw new Error("Asset name is required for searching.");
+  }
+
+  const url = `https://api.atlassian.com/jsm/assets/workspace/${workspaceId}/v1/object/aql`;
+  const headers = {
+    Authorization: `Basic ${Buffer.from(
+      `${config.atlassian.apiUser}:${config.atlassian.apiToken}`
+    ).toString("base64")}`,
+    "Content-Type": "application/json",
+    Accept: "application/json",
+  };
+
+  const body = {
+    qlQuery: `objectType = "Laptops" AND (key = "${assetName}" OR label = "${assetName}")`,
+    resultsPerPage: 1, // We only need the first result.
+  };
+
+  try {
+    const response = await axios.post(url, body, { headers });
+
+    const assetEntries = response.data?.values;
+    if (!assetEntries || assetEntries.length === 0) {
+      throw new Error(
+        `Asset with name or key "${assetName}" not found in Jira.`
+      );
+    }
+
+    const asset = assetEntries[0];
+    const attributeDefinitions = response.data.objectTypeAttributes || [];
+
+    const fullAttributes = asset.attributes.map((attr) => {
+      const definition = attributeDefinitions.find(
+        (def) => def.id === attr.objectTypeAttributeId
+      );
+      return {
+        ...attr,
+        objectTypeAttribute: definition || {},
+      };
+    });
+
+    return {
+      key: asset.objectKey,
+      name: asset.label,
+      type: asset.objectType.name,
+      Tag: findAttributeValue(fullAttributes, "Tag"),
+      "Serial Number": findAttributeValue(fullAttributes, "Serial Number"),
+      Status: findAttributeValue(fullAttributes, "Status"),
+      "Invoice Number": findAttributeValue(fullAttributes, "Invoice Number"),
+      "Buying Years": findAttributeValue(fullAttributes, "Buying Years"),
+      "Operating System": findAttributeValue(
+        fullAttributes,
+        "Operating System"
+      ),
+      Created: findAttributeValue(fullAttributes, "Created"),
+      Updated: findAttributeValue(fullAttributes, "Updated"),
+      "Model/Type": findAttributeValue(fullAttributes, "Model/Type"),
+      Location: findAttributeValue(fullAttributes, "Location"),
+      Owner: findAttributeValue(fullAttributes, "Owner"),
+    };
+  } catch (error) {
+    console.error(
+      `Failed to search for Jira asset "${assetName}":`,
+      error.response?.data?.errorMessages ||
+        error.response?.data ||
+        error.message
+    );
+    throw new Error(
+      error.response?.data?.message ||
+        `Could not find asset details for "${assetName}".`
+    );
+  }
+};
+
 module.exports = {
   getUserStatus,
   deactivateUser,
   getTicketDetails,
   getAssetDetails,
+  findAssetByName,
 };
