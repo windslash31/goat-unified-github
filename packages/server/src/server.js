@@ -16,15 +16,11 @@ const { schedulePlatformSync } = require("./cron/platformSync");
 const app = express();
 app.set("trust proxy", 1);
 
-const whitelist = ["http://localhost:3000"];
-
-if (config.clientUrl) {
-  whitelist.push(...config.clientUrl.split(",").map((url) => url.trim()));
-}
+const whitelist = ["http://localhost:3000", config.clientUrl];
 
 const corsOptions = {
   origin: function (origin, callback) {
-    if (!origin || whitelist.indexOf(origin) !== -1) {
+    if (whitelist.indexOf(origin) !== -1 || !origin) {
       callback(null, true);
     } else {
       callback(new Error("Not allowed by CORS"));
@@ -35,13 +31,12 @@ const corsOptions = {
 
 // Middlewares
 app.use(helmet());
-app.use(cors(corsOptions));
-app.options("*", cors(corsOptions));
 app.use(cookieParser(config.cookie.secret));
+app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// --- Routes ---
+//routes
 app.use("/api/auth", authRoutes);
 app.use("/api/employees", employeeRoutes);
 app.use("/api/roles", roleRoutes);
@@ -50,6 +45,7 @@ app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/logs", logRoutes);
 app.use("/api/jira", jiraRoutes);
 app.use("/api/users", userRoutes);
+app.use("/api/roles", roleRoutes);
 
 // Global error handler
 app.use((err, req, res, next) => {
@@ -57,13 +53,13 @@ app.use((err, req, res, next) => {
   res.status(500).send("Something broke!");
 });
 
-const PORT = config.port || 8080;
+const PORT = config.port;
 app.listen(PORT, () => {
-  console.log(`Backend server running on port ${PORT}`);
+  console.log(`Backend server running at http://localhost:${PORT}`);
 
-  if (config.nodeEnv !== "development") {
-    schedulePlatformSync();
-  }
+  //if (config.nodeEnv === "production") {
+  schedulePlatformSync();
+  //}
 });
 
 module.exports = app;
