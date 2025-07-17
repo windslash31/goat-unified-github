@@ -330,6 +330,27 @@ const getEmployeeDevices = async (req, res, next) => {
   }
 };
 
+// --- START: NEW CONTROLLER FUNCTION ---
+const syncPlatformStatus = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    // The service function now handles the core logic
+    const updatedStatuses = await employeeService.syncPlatformStatus(
+      parseInt(id, 10)
+    );
+    res.json({
+      message: "Platform statuses synced successfully.",
+      statuses: updatedStatuses,
+    });
+  } catch (error) {
+    if (error.message.includes("Employee not found")) {
+      return res.status(404).json({ message: error.message });
+    }
+    next(error);
+  }
+};
+// --- END: NEW CONTROLLER FUNCTION ---
+
 module.exports = {
   listEmployees,
   getEmployee,
@@ -351,4 +372,5 @@ module.exports = {
   bulkImportEmployees,
   getEmployeeImportTemplate,
   getEmployeeDevices,
+  syncPlatformStatus,
 };

@@ -81,6 +81,13 @@ router.put(
   employeeController.updateEmployee
 );
 
+router.post(
+  "/:id/sync-status",
+  authenticateToken,
+  authorize("employee:update"),
+  employeeController.syncPlatformStatus
+);
+
 router.get(
   "/:id/licenses",
   authenticateToken,
@@ -132,7 +139,6 @@ router.post(
   employeeController.logEmployeeView
 );
 
-// Routes for dropdown options
 router.get(
   "/options/:table",
   authenticateToken,

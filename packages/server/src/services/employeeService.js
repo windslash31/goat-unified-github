@@ -2,7 +2,6 @@ const db = require("../config/db");
 const { logActivity } = require("./logService");
 const Papa = require("papaparse");
 const { z } = require("zod");
-const { Transform } = require("stream");
 const { AsyncParser } = require("json2csv");
 const QueryStream = require("pg-query-stream");
 const jumpcloudService = require("./jumpcloudService");
@@ -65,7 +64,15 @@ const getEmployeeById = async (employeeId) => {
             )) 
             FROM employee_application_access eaa
             JOIN internal_applications ia ON eaa.application_id = ia.id
-            WHERE eaa.employee_id = e.id) as applications
+            WHERE eaa.employee_id = e.id) as applications,
+            (SELECT json_agg(json_build_object(
+                'platform_name', pas.platform_name,
+                'status', pas.status,
+                'details', pas.details,
+                'last_synced_at', pas.last_synced_at
+            ) ORDER BY pas.platform_name) -- <<< THIS IS THE FIX
+            FROM platform_access_status pas
+            WHERE pas.employee_id = e.id) as platform_statuses
         FROM employees e
         LEFT JOIN legal_entities le ON e.legal_entity_id = le.id
         LEFT JOIN office_locations ol ON e.office_location_id = ol.id
@@ -80,6 +87,7 @@ const getEmployeeById = async (employeeId) => {
   const employee = result.rows[0];
   employee.status = getEmployeeStatus(employee);
   employee.applications = employee.applications || [];
+  employee.platform_statuses = employee.platform_statuses || [];
   return employee;
 };
 
@@ -200,6 +208,7 @@ const getEmployees = async (filters) => {
     currentPage: parseInt(page, 10),
   };
 };
+
 const getEmployeesForExport = (filters) => {
   const {
     status,
@@ -292,7 +301,14 @@ const getEmployeesForExport = (filters) => {
                 FROM employee_application_access eaa
                 JOIN internal_applications ia ON eaa.application_id = ia.id
                 WHERE eaa.employee_id = e.id
-            ) as application_access
+            ) as application_access,
+            -- START: ADDED PLATFORM STATUS FOR EXPORT
+            (
+                SELECT STRING_AGG(pas.platform_name || ': ' || pas.status, '; ')
+                FROM platform_access_status pas
+                WHERE pas.employee_id = e.id
+            ) as platform_status_summary
+            -- END: ADDED PLATFORM STATUS FOR EXPORT
         FROM employees e
         LEFT JOIN employees manager ON e.manager_id = manager.id
         LEFT JOIN legal_entities le ON e.legal_entity_id = le.id
@@ -329,6 +345,7 @@ const streamEmployeesForExport = (filters) => {
     "access_cut_off_date_at_date",
     "created_at",
     "application_access",
+    "platform_status_summary", // Added to CSV export
   ];
 
   const asyncParser = new AsyncParser({ fields });
@@ -347,6 +364,103 @@ const streamEmployeesForExport = (filters) => {
   });
 
   return asyncParser.parse(queryStream);
+};
+
+const syncPlatformStatus = async (employeeId) => {
+  const employeeResult = await db.query(
+    "SELECT employee_email FROM employees WHERE id = $1",
+    [employeeId]
+  );
+  if (employeeResult.rows.length === 0) {
+    throw new Error("Employee not found.");
+  }
+  const email = employeeResult.rows[0].employee_email;
+
+  const platforms = [
+    { name: "Google", service: googleWorkspaceService },
+    { name: "JumpCloud", service: jumpcloudService },
+    { name: "Slack", service: slackService },
+    { name: "Atlassian", service: atlassianService },
+  ];
+
+  const statuses = [];
+
+  for (const platform of platforms) {
+    let status = "Not Found";
+    let details = {};
+
+    try {
+      const platformStatus = await platform.service.getUserStatus(email);
+      status = platformStatus.status;
+
+      details = platformStatus.details;
+      const rawDetails = platformStatus.details;
+      if (rawDetails) {
+        switch (platform.name) {
+          case "Google":
+            if (typeof rawDetails.isAdmin !== "undefined")
+              details.isAdmin = rawDetails.isAdmin;
+            if (typeof rawDetails.isDelegatedAdmin !== "undefined")
+              details.isDelegatedAdmin = rawDetails.isDelegatedAdmin;
+            if (rawDetails.aliases && rawDetails.aliases.length > 0)
+              details.aliases = rawDetails.aliases;
+            break;
+          case "JumpCloud":
+            if (rawDetails.username) details.username = rawDetails.username;
+            break;
+          case "Slack":
+            if (rawDetails.id) details.id = rawDetails.id;
+            if (typeof rawDetails.is_admin !== "undefined")
+              details.is_admin = rawDetails.is_admin;
+            if (typeof rawDetails.is_owner !== "undefined")
+              details.is_owner = rawDetails.is_owner;
+            break;
+          case "Atlassian":
+            if (Array.isArray(rawDetails) && rawDetails.length > 0) {
+              const atlassianUser = rawDetails[0];
+              if (atlassianUser.accountId)
+                details.accountId = atlassianUser.accountId;
+              if (atlassianUser.accountType)
+                details.accountType = atlassianUser.accountType;
+            }
+            break;
+        }
+      }
+    } catch (error) {
+      console.error(
+        `Failed to fetch status for ${email} from ${platform.name}:`,
+        error.message
+      );
+      status = "Error";
+      details = { error: error.message };
+    }
+
+    const last_synced_at = new Date();
+
+    const upsertQuery = `
+      INSERT INTO platform_access_status (employee_id, platform_name, status, details, last_synced_at)
+      VALUES ($1, $2, $3, $4, $5)
+      ON CONFLICT (employee_id, platform_name)
+      DO UPDATE SET
+        status = EXCLUDED.status,
+        details = EXCLUDED.details,
+        last_synced_at = EXCLUDED.last_synced_at
+      RETURNING *;
+    `;
+
+    const queryParams = [
+      employeeId,
+      platform.name,
+      status,
+      JSON.stringify(details),
+      last_synced_at,
+    ];
+
+    const result = await db.query(upsertQuery, queryParams);
+    statuses.push(result.rows[0]);
+  }
+
+  return statuses;
 };
 
 const updateEmployee = async (employeeId, updatedData, actorId, reqContext) => {
@@ -1215,4 +1329,5 @@ module.exports = {
   getLicenseDetails,
   bulkImportEmployees,
   getEmployeeDevices,
+  syncPlatformStatus, // Added new function to exports
 };

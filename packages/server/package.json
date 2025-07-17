@@ -26,6 +26,7 @@
     "jsonwebtoken": "^9.0.2",
     "multer": "^2.0.1",
     "node": "^20.19.3",
+    "node-cron": "^4.2.1",
     "node-fetch": "^2.7.0",
     "papaparse": "^5.5.3",
     "pg": "^8.16.2",

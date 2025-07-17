@@ -11,7 +11,7 @@ const getUserStatus = async (email) => {
       platform: "Atlassian",
       email,
       status: "Error",
-      message: "Server configuration error.",
+      details: { message: "Server configuration error." },
     };
   }
 
@@ -40,29 +40,38 @@ const getUserStatus = async (email) => {
         platform: "Atlassian",
         email: email,
         status: "Not Found",
-        message: "User does not exist in Atlassian.",
+        details: { message: "User does not exist in Atlassian." },
       };
     }
 
     const user = users[0];
+
+    // --- THIS IS THE CHANGE ---
+    // Added emailAddress and displayName to the details object.
+    const details = {
+      accountId: user.accountId,
+      accountType: user.accountType,
+      displayName: user.displayName,
+      emailAddress: user.emailAddress,
+    };
+
     return {
       platform: "Atlassian",
-      email: user.emailAddress,
       status: user.active ? "Active" : "Suspended",
-      message: user.active ? "Account is active." : "Account is deactivated.",
+      details: details,
     };
+    // --- END OF CHANGE ---
   } catch (error) {
     console.error("Atlassian Error:", error.message);
     return {
       platform: "Atlassian",
       email: email,
       status: "Error",
-      message: "Failed to fetch status from Atlassian.",
+      details: { message: "Failed to fetch status from Atlassian." },
     };
   }
 };
 
-// --- NEW FUNCTION ADDED HERE ---
 const getTicketDetails = async (ticketId) => {
   if (
     !process.env.ATLASSIAN_DOMAIN ||
@@ -127,5 +136,5 @@ const deactivateUser = async (email) => {
 module.exports = {
   getUserStatus,
   deactivateUser,
-  getTicketDetails, // Export the new function
+  getTicketDetails,
 };

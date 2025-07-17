@@ -49,22 +49,48 @@ const suspendUser = async (email) => {
 const getUserStatus = async (email) => {
   try {
     const user = await getUser(email);
-    if (!user)
-      return { platform: "JumpCloud", status: "Not Found", email: email };
+    if (!user) {
+      return {
+        platform: "JumpCloud",
+        status: "Not Found",
+        email: email,
+        details: { message: "User not found in JumpCloud." },
+      };
+    }
 
-    // --- MODIFICATION: Return the username instead of the email ---
+    const details = {
+      coreIdentity: {
+        displayName: user.displayname,
+        username: user.username,
+        email: user.email,
+        id: user._id,
+      },
+      accountStatus: {
+        state: user.state,
+        activated: user.activated,
+        suspended: user.suspended,
+        accountLocked: user.account_locked,
+        passwordExpired: user.password_expired,
+        mfaStatus: user.mfaEnrollment?.overallStatus,
+      },
+      permissions: {
+        isAdmin: user.admin ? "Yes" : "No",
+        hasSudo: user.sudo ? "Yes" : "No",
+      },
+    };
+
     return {
       platform: "JumpCloud",
-      email: user.username, // Changed from user.email to user.username
+      email: user.email,
       status: user.suspended ? "Suspended" : "Active",
-      details: `Username: ${user.username}`,
+      details: details,
     };
   } catch (error) {
     return {
       platform: "JumpCloud",
       status: "Error",
       email: email,
-      message: error.message,
+      details: { message: error.message },
     };
   }
 };

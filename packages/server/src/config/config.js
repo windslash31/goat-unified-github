@@ -1,6 +1,6 @@
-if (process.env.NODE_ENV !== "production") {
-  require("./loadEnv");
-}
+//if (process.env.NODE_ENV !== "production") {
+require("./loadEnv");
+//}
 
 module.exports = {
   port: process.env.PORT || 4000,

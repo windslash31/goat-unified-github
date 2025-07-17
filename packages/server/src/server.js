@@ -11,9 +11,10 @@ const dashboardRoutes = require("./api/routes/dashboard");
 const logRoutes = require("./api/routes/logs");
 const jiraRoutes = require("./api/routes/jira");
 const userRoutes = require("./api/routes/users");
+const { schedulePlatformSync } = require("./cron/platformSync");
 
 const app = express();
-app.set('trust proxy', 1);
+app.set("trust proxy", 1);
 
 const whitelist = ["http://localhost:3000", config.clientUrl];
 
@@ -54,6 +55,10 @@ app.use((err, req, res, next) => {
 const PORT = config.port;
 app.listen(PORT, () => {
   console.log(`Backend server running at http://localhost:${PORT}`);
+
+  //if (config.nodeEnv === "production") {
+  schedulePlatformSync();
+  //}
 });
 
 module.exports = app;

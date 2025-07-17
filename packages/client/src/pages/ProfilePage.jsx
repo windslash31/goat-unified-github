@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   UserSquare,
   LayoutGrid,
@@ -21,7 +22,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import { PlatformLogPage } from "./EmployeeDetailPage/PlatformLogPage";
 import { DevicesTab } from "./EmployeeDetailPage/DevicesTab";
 import { useMediaQuery } from "../hooks/useMediaQuery";
-import { useQuery } from "@tanstack/react-query";
 import { useAuthStore } from "../stores/authStore";
 import { useModalStore } from "../stores/modalStore";
 import api from "../api/api";
@@ -32,23 +32,19 @@ const fetchMe = async () => {
   return data;
 };
 
-export const ProfilePage = ({
-  employee,
-  permissions,
-  onLogout,
-  user,
-}) => {
+const fetchTimelineData = async (employeeId) => {
+  const { data } = await api.get(
+    `/api/employees/${employeeId}/unified-timeline`
+  );
+  return data;
+};
+
+export const ProfilePage = ({ employee, permissions, onLogout, user }) => {
   const { isAuthenticated } = useAuthStore();
-  const { openModal } = useModalStore(); // Use the modal store
+  const { openModal } = useModalStore();
   const [activeTab, setActiveTab] = useState("details");
-  const [platformStatuses, setPlatformStatuses] = useState([]);
-  const [isLoadingPlatforms, setIsLoadingPlatforms] = useState(true);
   const [isChangePasswordModalOpen, setIsChangePasswordModalOpen] =
     useState(false);
-
-  const [tabData, setTabData] = useState({
-    timeline: { data: null, loading: false, error: null, fetched: false },
-  });
 
   const [isJiraModalOpen, setIsJiraModalOpen] = useState(false);
   const [selectedTicketId, setSelectedTicketId] = useState(null);
@@ -61,6 +57,18 @@ export const ProfilePage = ({
     queryFn: fetchMe,
     enabled: isAuthenticated,
     staleTime: 1000 * 60 * 5,
+  });
+
+  const currentEmployee = employee || currentUserEmployeeRecord;
+
+  const {
+    data: timelineData,
+    isLoading: isTimelineLoading,
+    error: timelineError,
+  } = useQuery({
+    queryKey: ["timeline", currentEmployee?.id],
+    queryFn: () => fetchTimelineData(currentEmployee.id),
+    enabled: !!currentEmployee && activeTab === "timeline",
   });
 
   const allTabs = [
@@ -118,80 +126,6 @@ export const ProfilePage = ({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const fetchTimelineData = useCallback(
-    (force = false) => {
-      if (
-        !employee ||
-        !permissions.includes("log:read:platform") ||
-        (!force && (tabData.timeline.fetched || tabData.timeline.loading))
-      ) {
-        return;
-      }
-
-      const token = localStorage.getItem("accessToken");
-      let url = `${import.meta.env.VITE_API_BASE_URL}/api/employees/${employee.id}/unified-timeline`;
-
-      setTabData((prev) => ({
-        ...prev,
-        timeline: { ...prev.timeline, loading: true },
-      }));
-
-      fetch(url, { headers: { Authorization: `Bearer ${token}` } })
-        .then((res) =>
-          res.ok ? res.json() : res.json().then((err) => Promise.reject(err))
-        )
-        .then((data) => {
-          setTabData((prev) => ({
-            ...prev,
-            timeline: { data, loading: false, error: null, fetched: true },
-          }));
-        })
-        .catch((err) => {
-          setTabData((prev) => ({
-            ...prev,
-            timeline: {
-              data: [],
-              loading: false,
-              error: err.message,
-              fetched: true,
-            },
-          }));
-        });
-    },
-    [employee, permissions, tabData.timeline]
-  );
-
-  const fetchInitialData = useCallback(async () => {
-    if (!employee) return;
-    const token = localStorage.getItem("accessToken");
-    if (!token) {
-      onLogout();
-      return;
-    }
-
-    setIsLoadingPlatforms(true);
-    fetch(
-      `${import.meta.env.VITE_API_BASE_URL}/api/employees/${employee.id}/platform-statuses`,
-      { headers: { Authorization: `Bearer ${token}` } }
-    )
-      .then((res) => (res.ok ? res.json() : []))
-      .then((statusData) => setPlatformStatuses(statusData))
-      .catch((err) => console.error("Failed to fetch platform statuses:", err))
-      .finally(() => setIsLoadingPlatforms(false));
-  }, [employee, onLogout]);
-
-  useEffect(() => {
-    if (employee) {
-      fetchInitialData();
-    }
-  }, [employee, fetchInitialData]);
-
-  useEffect(() => {
-    if (employee && activeTab === "timeline") {
-      fetchTimelineData();
-    }
-  }, [employee, activeTab, fetchTimelineData]);
-
   const handleTabClick = (tabId) => {
     setActiveTab(tabId);
     setIsMoreMenuOpen(false);
@@ -205,11 +139,11 @@ export const ProfilePage = ({
   };
 
   const handleEdit = () => {
-    openModal('editEmployee', employee);
+    openModal("editEmployee", currentEmployee);
   };
 
   const handleDeactivate = () => {
-    openModal('deactivateEmployee', employee);
+    openModal("deactivateEmployee", currentEmployee);
   };
 
   if (isLoadingMe) return <EmployeeDetailSkeleton />;
@@ -217,7 +151,7 @@ export const ProfilePage = ({
   if (!permissions.includes("profile:read:own")) {
     return <AccessDeniedPage />;
   }
-  if (!employee) {
+  if (!currentEmployee) {
     return <WelcomePage user={user} />;
   }
 
@@ -238,28 +172,31 @@ export const ProfilePage = ({
     <div className="mt-6">
       {activeTab === "details" && (
         <EmployeeDetailsTab
-          employee={employee}
+          employee={currentEmployee}
           permissions={permissions}
           onTicketClick={handleTicketClick}
         />
       )}
-      {activeTab === "devices" && <DevicesTab employeeId={employee.id} />}
+      {activeTab === "devices" && (
+        <DevicesTab employeeId={currentEmployee.id} />
+      )}
       {activeTab === "platforms" && (
         <EmployeeApplicationsTab
-          applications={employee.applications || []}
-          platformStatuses={platformStatuses}
-          isLoading={isLoadingPlatforms}
+          employeeId={currentEmployee.id}
+          applications={currentEmployee.applications || []}
+          platformStatuses={currentEmployee.platform_statuses || []}
+          isLoading={isLoadingMe}
           onTicketClick={handleTicketClick}
         />
       )}
       {activeTab === "platform-logs" && (
-        <PlatformLogPage employeeId={employee.id} onLogout={onLogout} />
+        <PlatformLogPage employeeId={currentEmployee.id} onLogout={onLogout} />
       )}
       {activeTab === "timeline" && (
         <UnifiedTimelinePage
-          events={tabData.timeline.data}
-          loading={tabData.timeline.loading}
-          error={tabData.timeline.error}
+          events={timelineData}
+          loading={isTimelineLoading}
+          error={timelineError}
         />
       )}
     </div>
@@ -292,7 +229,7 @@ export const ProfilePage = ({
         </div>
         <div className="p-4 sm:p-6 space-y-6">
           <EmployeeDetailHeader
-            employee={employee}
+            employee={currentEmployee}
             onEdit={handleEdit}
             onDeactivate={handleDeactivate}
             permissions={permissions}
