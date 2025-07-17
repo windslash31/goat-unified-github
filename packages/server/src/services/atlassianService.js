@@ -71,13 +71,6 @@ const getUserStatus = async (email) => {
   }
 };
 
-const findAttributeValue = (attributes, name) => {
-  const attribute = attributes.find(
-    (attr) => attr.objectTypeAttribute.name === name
-  );
-  return attribute?.objectAttributeValues[0]?.displayValue || null;
-};
-
 // --- THIS IS THE MODIFIED FUNCTION ---
 const getTicketDetails = async (ticketId) => {
   if (
@@ -146,54 +139,16 @@ const getTicketDetails = async (ticketId) => {
         resignationDate: fields.customfield_10727,
         accessCutoffDate: fields.customfield_10982,
       },
-      asset_details: {},
+      asset_details: {
+        // Checks for asset fields from all ticket types
+        assignedLaptop:
+          fields.customfield_11745?.[0] ||
+          fields.customfield_11746?.[0] ||
+          fields.customfield_11747?.[0],
+        officeLocation: fields.customfield_10870?.[0],
+        laptopProfessional: fields.customfield_10711?.[0],
+      },
     };
-
-    const assetReference =
-      fields.customfield_11745?.[0] ||
-      fields.customfield_11746?.[0] ||
-      fields.customfield_11747?.[0];
-
-    if (
-      assetReference &&
-      assetReference.workspaceId &&
-      assetReference.objectId
-    ) {
-      try {
-        const assetData = await getAssetDetails(
-          assetReference.workspaceId,
-          assetReference.objectId
-        );
-        if (assetData && assetData.attributes) {
-          const attributes = assetData.attributes;
-          details.asset_details = {
-            key: assetData.objectKey,
-            name: assetData.label,
-            type: assetData.objectType.name,
-            Tag: findAttributeValue(attributes, "Tag"),
-            "Serial Number": findAttributeValue(attributes, "Serial Number"),
-            Status: findAttributeValue(attributes, "Status"),
-            "Invoice Number": findAttributeValue(attributes, "Invoice Number"),
-            "Buying Years": findAttributeValue(attributes, "Buying Years"),
-            "Operating System": findAttributeValue(
-              attributes,
-              "Operating System"
-            ),
-            Created: findAttributeValue(attributes, "Created"),
-            Updated: findAttributeValue(attributes, "Updated"),
-            Owner: findAttributeValue(attributes, "Owner"),
-            "Model/Type": findAttributeValue(attributes, "Model/Type"),
-            Location: findAttributeValue(attributes, "Location"),
-          };
-        }
-      } catch (error) {
-        console.error(
-          `Could not fetch asset details for ticket ${ticketId}:`,
-          error
-        );
-        details.asset_details.error = "Could not fetch asset details.";
-      }
-    }
 
     return details;
   } catch (error) {
@@ -215,7 +170,7 @@ const getAssetDetails = async (workspaceId, objectId) => {
   };
   try {
     const response = await axios.get(url, { headers });
-    return Array.isArray(response.data) ? response.data[0] : response.data;
+    return response.data;
   } catch (error) {
     console.error(
       `Failed to fetch Jira asset ${objectId}:`,
@@ -232,89 +187,9 @@ const deactivateUser = async (email) => {
   };
 };
 
-const findAssetByName = async (assetName) => {
-  const workspaceId = config.atlassian.workspaceId;
-  if (!workspaceId) {
-    throw new Error("Atlassian Workspace ID is not configured on the server.");
-  }
-  if (!assetName) {
-    throw new Error("Asset name is required for searching.");
-  }
-
-  const url = `https://api.atlassian.com/jsm/assets/workspace/${workspaceId}/v1/object/aql`;
-  const headers = {
-    Authorization: `Basic ${Buffer.from(
-      `${config.atlassian.apiUser}:${config.atlassian.apiToken}`
-    ).toString("base64")}`,
-    "Content-Type": "application/json",
-    Accept: "application/json",
-  };
-
-  const body = {
-    qlQuery: `objectType = "Laptops" AND (key = "${assetName}" OR label = "${assetName}")`,
-    resultsPerPage: 1, // We only need the first result.
-  };
-
-  try {
-    const response = await axios.post(url, body, { headers });
-
-    const assetEntries = response.data?.values;
-    if (!assetEntries || assetEntries.length === 0) {
-      throw new Error(
-        `Asset with name or key "${assetName}" not found in Jira.`
-      );
-    }
-
-    const asset = assetEntries[0];
-    const attributeDefinitions = response.data.objectTypeAttributes || [];
-
-    const fullAttributes = asset.attributes.map((attr) => {
-      const definition = attributeDefinitions.find(
-        (def) => def.id === attr.objectTypeAttributeId
-      );
-      return {
-        ...attr,
-        objectTypeAttribute: definition || {},
-      };
-    });
-
-    return {
-      key: asset.objectKey,
-      name: asset.label,
-      type: asset.objectType.name,
-      Tag: findAttributeValue(fullAttributes, "Tag"),
-      "Serial Number": findAttributeValue(fullAttributes, "Serial Number"),
-      Status: findAttributeValue(fullAttributes, "Status"),
-      "Invoice Number": findAttributeValue(fullAttributes, "Invoice Number"),
-      "Buying Years": findAttributeValue(fullAttributes, "Buying Years"),
-      "Operating System": findAttributeValue(
-        fullAttributes,
-        "Operating System"
-      ),
-      Created: findAttributeValue(fullAttributes, "Created"),
-      Updated: findAttributeValue(fullAttributes, "Updated"),
-      "Model/Type": findAttributeValue(fullAttributes, "Model/Type"),
-      Location: findAttributeValue(fullAttributes, "Location"),
-      Owner: findAttributeValue(fullAttributes, "Owner"),
-    };
-  } catch (error) {
-    console.error(
-      `Failed to search for Jira asset "${assetName}":`,
-      error.response?.data?.errorMessages ||
-        error.response?.data ||
-        error.message
-    );
-    throw new Error(
-      error.response?.data?.message ||
-        `Could not find asset details for "${assetName}".`
-    );
-  }
-};
-
 module.exports = {
   getUserStatus,
   deactivateUser,
   getTicketDetails,
   getAssetDetails,
-  findAssetByName,
 };

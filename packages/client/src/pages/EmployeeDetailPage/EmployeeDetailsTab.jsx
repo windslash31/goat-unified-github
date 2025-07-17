@@ -1,4 +1,4 @@
-import React, { memo, useState } from "react";
+import React, { memo } from "react";
 import { Link } from "react-router-dom";
 import {
   UserSquare,
@@ -10,68 +10,12 @@ import {
   Hash,
   Calendar,
   Ticket,
-  Laptop,
-  Loader,
 } from "lucide-react";
 import { DetailRow } from "../../components/ui/DetailRow";
 import { StatusBadge } from "../../components/ui/StatusBadge";
-import { Button } from "../../components/ui/Button";
-import api from "../../api/api";
-import toast from "react-hot-toast";
-
-const AssetButton = ({ employee, onAssetClick }) => {
-  const [isAssetLoading, setIsAssetLoading] = useState(false);
-
-  const handleAssetClick = async () => {
-    const assetName = employee.asset_name;
-    if (!assetName) {
-      toast.error("No asset name found for this employee.");
-      return;
-    }
-
-    setIsAssetLoading(true);
-    try {
-      const { data: assetDetails } = await api.get(
-        `/api/jira/asset/search?name=${encodeURIComponent(assetName)}`
-      );
-
-      if (assetDetails && Object.keys(assetDetails).length > 0) {
-        onAssetClick(assetDetails);
-      } else {
-        toast.error(`No details found for asset: ${assetName}`);
-      }
-    } catch (error) {
-      console.error("Failed to fetch asset details:", error);
-      toast.error(error.message || `Could not load details for ${assetName}.`);
-    } finally {
-      setIsAssetLoading(false);
-    }
-  };
-
-  if (!employee.asset_name) {
-    return "—";
-  }
-
-  return (
-    <Button
-      variant="outline"
-      size="sm"
-      onClick={handleAssetClick}
-      disabled={isAssetLoading}
-      className="flex items-center gap-2 text-left"
-    >
-      {isAssetLoading ? (
-        <Loader size={16} className="animate-spin" />
-      ) : (
-        <Laptop size={16} />
-      )}
-      {employee.asset_name}
-    </Button>
-  );
-};
 
 export const EmployeeDetailsTab = memo(
-  ({ employee, permissions, navigate, onTicketClick, onAssetClick }) => {
+  ({ employee, permissions, navigate, onTicketClick }) => {
     const formatDate = (dateString) => {
       if (!dateString) return "—";
       return new Date(dateString).toLocaleDateString("en-US", {
@@ -83,6 +27,7 @@ export const EmployeeDetailsTab = memo(
 
     const JiraTicketLink = ({ ticketId }) => {
       if (!ticketId) return "—";
+      // This is now a button that calls the handler passed down from the parent
       return (
         <button
           onClick={() => onTicketClick(ticketId)}
@@ -97,6 +42,7 @@ export const EmployeeDetailsTab = memo(
     const ManagerLink = ({ managerId, managerName, managerEmail }) => {
       if (!managerId) return "—";
 
+      // This logic allows navigating to the manager's profile if the user has permission
       if (permissions.includes("employee:read:all")) {
         return (
           <Link
@@ -177,9 +123,7 @@ export const EmployeeDetailsTab = memo(
             <DetailRow
               icon={<Hash className="w-4 h-4 mr-2.5 text-gray-400" />}
               label="Asset"
-              value={
-                <AssetButton employee={employee} onAssetClick={onAssetClick} />
-              }
+              value={employee.asset_name}
             />
           </div>
         </div>
