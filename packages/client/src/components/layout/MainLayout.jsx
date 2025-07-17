@@ -1,12 +1,14 @@
-// packages/client/src/components/layout/MainLayout.js
 import React, { useState } from "react";
 import { Outlet } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
 import { Sidebar } from "./Sidebar";
 import { Header } from "./Header";
+import { AskGoatButton } from "../ui/AskGoatButton";
+import { AskGoatModal } from "../ui/AskGoatModal";
 
 const MainLayoutComponent = ({ onLogout, permissions, breadcrumbs, user }) => {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const [isGoatModalOpen, setIsGoatModalOpen] = useState(false);
 
   return (
     <div className="h-screen w-screen flex bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-200">
@@ -45,6 +47,12 @@ const MainLayoutComponent = ({ onLogout, permissions, breadcrumbs, user }) => {
           </main>
         </div>
       </div>
+
+      <AskGoatButton onClick={() => setIsGoatModalOpen(true)} />
+      <AskGoatModal
+        isOpen={isGoatModalOpen}
+        onClose={() => setIsGoatModalOpen(false)}
+      />
     </div>
   );
 };

@@ -12,6 +12,7 @@ const logRoutes = require("./api/routes/logs");
 const jiraRoutes = require("./api/routes/jira");
 const userRoutes = require("./api/routes/users");
 const { schedulePlatformSync } = require("./cron/platformSync");
+const aiRoutes = require("./api/routes/ai");
 
 const app = express();
 app.set("trust proxy", 1);
@@ -45,8 +46,10 @@ app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/logs", logRoutes);
 app.use("/api/jira", jiraRoutes);
 app.use("/api/users", userRoutes);
+app.use("/api/employees", employeeRoutes);
+app.use("/api/roles", roleRoutes);
+app.use("/api/ai", aiRoutes);
 
-// Global error handler
 app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(500).send("Something broke!");
