@@ -31,18 +31,35 @@ const AssetButton = ({ employee, onAssetClick }) => {
 
     setIsAssetLoading(true);
     try {
-      const { data: assetDetails } = await api.get(
+      const response = await api.get(
         `/api/jira/asset/search?name=${encodeURIComponent(assetName)}`
       );
 
-      if (assetDetails && Object.keys(assetDetails).length > 0) {
-        onAssetClick(assetDetails);
+      // --- START: ADDED DEBUGGING ---
+      console.log("Full API response object:", response);
+      const assetDetails = response.data;
+      console.log("Extracted assetDetails data:", assetDetails);
+
+      if (assetDetails && typeof assetDetails === 'object' && Object.keys(assetDetails).length > 0) {
+        console.log("Data is a valid object. Calling onAssetClick...");
+        // Add a try-catch around the callback itself to isolate the error
+        try {
+          onAssetClick(assetDetails);
+        } catch (callbackError) {
+            console.error("Error occurred INSIDE the onAssetClick callback:", callbackError);
+            toast.error("An error occurred while displaying the asset details.");
+        }
       } else {
+        console.warn("Received empty or invalid asset details from API.");
         toast.error(`No details found for asset: ${assetName}`);
       }
+      // --- END: ADDED DEBUGGING ---
+
     } catch (error) {
+      // This will catch network errors or non-2xx responses
+      const errorMessage = error.response?.data?.message || error.message || `Could not load details for ${assetName}.`;
       console.error("Failed to fetch asset details:", error);
-      toast.error(error.message || `Could not load details for ${assetName}.`);
+      toast.error(errorMessage);
     } finally {
       setIsAssetLoading(false);
     }
