@@ -134,7 +134,7 @@ const mapDbTaskFields = (employeeDetails) => ({
           label: "Effective Date",
           value:
             get(employeeDetails, "joinDate") ||
-            get(employeeDetails, "resignationDate"),
+            get(employeeDetails, "accessCutoffDate"),
           type: "date",
         },
       ],
