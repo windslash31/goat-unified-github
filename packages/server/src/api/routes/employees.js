@@ -164,4 +164,10 @@ router.get(
   employeeController.getEmployeeDevices
 );
 
+router.post(
+  "/trigger-sync",
+  // We will secure this in the Cloud Run settings, so no specific middleware is needed here.
+  employeeController.triggerPlatformSync
+);
+
 module.exports = router;
