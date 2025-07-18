@@ -59,9 +59,13 @@ export const useEmployeeTable = () => {
     },
   });
 
+  const filtersString = JSON.stringify(filters);
+  const sortingString = JSON.stringify(sorting);
+
   useEffect(() => {
+    // This effect now only runs when the *content* of filters or sorting changes.
     setPagination((prev) => ({ ...prev, currentPage: 1 }));
-  }, [filters, sorting]);
+  }, [filtersString, sortingString]);
 
   return {
     employees: data?.employees || [],

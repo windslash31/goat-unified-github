@@ -52,9 +52,6 @@ const syncAllUserStatuses = async () => {
   }
 };
 
-/**
- * Initializes and schedules the cron job.
- */
 const schedulePlatformSync = () => {
   //cron.schedule("* * * * *", syncAllUserStatuses, {
   // Schedule to run at 2 AM every day in Jakarta's timezone
