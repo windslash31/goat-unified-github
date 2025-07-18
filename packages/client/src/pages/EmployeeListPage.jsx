@@ -34,7 +34,6 @@ import { DesktopTable } from "../components/employees/DesktopTable";
 import { MobileList } from "../components/employees/MobileList";
 import { useDebounce } from "../hooks/useDebounce";
 
-// --- MODIFICATION START: Created a new memoized component to isolate state ---
 const SearchAndFilterActions = memo(
   ({
     initialSearch,
@@ -191,7 +190,6 @@ const SearchAndFilterActions = memo(
     );
   }
 );
-// --- MODIFICATION END ---
 
 export const EmployeeListPage = () => {
   const {
@@ -239,7 +237,6 @@ export const EmployeeListPage = () => {
     setSelectedRows(new Set());
   }, [filters, pagination.currentPage, employees]);
 
-  // --- MODIFICATION START: Callback for the child component to update filters ---
   const handleSearchChange = useCallback(
     (searchTerm) => {
       setFilters((prevFilters) => ({
@@ -264,7 +261,6 @@ export const EmployeeListPage = () => {
     });
     setPagination((prev) => ({ ...prev, currentPage: 1 }));
   };
-  // --- MODIFICATION END ---
 
   const handleExport = async () => {
     const sanitizedFilters = Object.fromEntries(
@@ -346,7 +342,6 @@ export const EmployeeListPage = () => {
     );
   }
 
-  // --- MODIFICATION START: Define props for the new component ---
   const searchFilterProps = {
     initialSearch: filters.search,
     onSearchChange: handleSearchChange,
@@ -444,12 +439,10 @@ export const EmployeeListPage = () => {
                     Employees
                   </h1>
                   <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap">
-                    {/* --- MODIFICATION START: Use props to render the component --- */}
                     <SearchAndFilterActions
                       {...searchFilterProps}
                       isMobile={!isDesktop}
                     />
-                    {/* --- MODIFICATION END --- */}
                   </div>
                 </motion.div>
               ) : (
@@ -463,7 +456,6 @@ export const EmployeeListPage = () => {
       <FilterPills
         filters={filters}
         setFilters={setFilters}
-        // No longer need to pass setSearchInputValue to pills
         options={filterOptions}
         onClear={handleClearFilters}
       />
