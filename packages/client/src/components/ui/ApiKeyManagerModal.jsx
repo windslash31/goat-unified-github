@@ -194,7 +194,8 @@ export const ApiKeyManagerModal = ({ user, onClose }) => {
         onClose={() => setIsDeleteModalOpen(false)}
         onConfirm={handleDeleteKey}
         title="Revoke API Key"
-        message={`Are you sure you want to revoke the key "${keyToDelete?.description}"? This action is irreversible.`}
+        message={`This will permanently revoke the key. This action is irreversible.`}
+        confirmationText={keyToDelete?.description}
       />
 
       {newlyGeneratedKey && (

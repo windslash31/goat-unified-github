@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { AlertTriangle, X } from "lucide-react";
 import { Button } from "./Button";
 import { motion, AnimatePresence } from "framer-motion";
@@ -9,7 +9,21 @@ export const ConfirmationModal = ({
   onConfirm,
   title,
   message,
+  confirmationText,
 }) => {
+  const [inputValue, setInputValue] = useState("");
+
+  // Reset input when the modal opens or confirmationText changes
+  useEffect(() => {
+    if (isOpen) {
+      setInputValue("");
+    }
+  }, [isOpen]);
+
+  const isConfirmationRequired = !!confirmationText;
+  const isConfirmDisabled =
+    isConfirmationRequired && inputValue !== confirmationText;
+
   return (
     <AnimatePresence>
       {isOpen && (
@@ -51,6 +65,27 @@ export const ConfirmationModal = ({
                   </p>
                 </div>
               </div>
+              {isConfirmationRequired && (
+                <div className="mt-4 text-left">
+                  <label
+                    htmlFor="confirmationInput"
+                    className="text-sm font-medium text-gray-700 dark:text-gray-300"
+                  >
+                    Please type{" "}
+                    <strong className="text-gray-900 dark:text-white">
+                      {confirmationText}
+                    </strong>{" "}
+                    to confirm.
+                  </label>
+                  <input
+                    id="confirmationInput"
+                    type="text"
+                    value={inputValue}
+                    onChange={(e) => setInputValue(e.target.value)}
+                    className="mt-1 block w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-kredivo-primary"
+                  />
+                </div>
+              )}
             </div>
             <div className="bg-gray-50 dark:bg-gray-800/50 px-4 py-4 sm:px-6 flex flex-col-reverse sm:flex-row sm:justify-end gap-3">
               <Button
@@ -64,6 +99,7 @@ export const ConfirmationModal = ({
                 onClick={onConfirm}
                 variant="danger"
                 className="w-full justify-center sm:w-auto"
+                disabled={isConfirmDisabled}
               >
                 Confirm
               </Button>
