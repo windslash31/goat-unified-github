@@ -21,7 +21,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "./Button";
 
 const formatDate = (dateString) => {
-  if (!dateString) return "N/A";
+  if (!dateString) return null;
   try {
     return new Intl.DateTimeFormat("en-US", {
       year: "numeric",
