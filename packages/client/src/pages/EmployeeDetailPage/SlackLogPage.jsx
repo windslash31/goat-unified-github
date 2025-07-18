@@ -10,16 +10,15 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
-const DetailRow = ({ label, value, icon }) => {
+const DetailItem = ({ label, value }) => {
   if (value === null || typeof value === "undefined" || value === "")
     return null;
   return (
-    <div className="flex items-start py-2.5 border-b border-gray-200 dark:border-gray-700 last:border-b-0">
-      <dt className="w-1/3 text-gray-500 dark:text-gray-400 flex-shrink-0 flex items-center gap-2">
-        {icon}
-        <span className="font-medium">{label}</span>
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-1 sm:gap-4 py-2.5 px-1 border-b border-gray-200 dark:border-gray-700 last:border-b-0">
+      <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 sm:col-span-1">
+        {label}
       </dt>
-      <dd className="w-2/3 text-gray-800 dark:text-gray-200 text-right break-words">
+      <dd className="text-sm text-gray-800 dark:text-gray-200 sm:col-span-2 break-words">
         {String(value)}
       </dd>
     </div>
@@ -35,46 +34,18 @@ const SectionHeader = ({ children }) => (
 const SlackLogDetailView = ({ log }) => (
   <dl>
     <SectionHeader>Actor</SectionHeader>
-    <DetailRow icon={<User size={14} />} label="Type" value={log.actor?.type} />
-    <DetailRow
-      icon={<User size={14} />}
-      label="User ID"
-      value={log.actor?.user?.id}
-    />
-    <DetailRow
-      icon={<User size={14} />}
-      label="User Name"
-      value={log.actor?.user?.name}
-    />
+    <DetailItem label="Type" value={log.actor?.type} />
+    <DetailItem label="User ID" value={log.actor?.user?.id} />
+    <DetailItem label="User Name" value={log.actor?.user?.name} />
 
     <SectionHeader>Entity</SectionHeader>
-    <DetailRow
-      icon={<Globe size={14} />}
-      label="Type"
-      value={log.entity?.type}
-    />
-    <DetailRow
-      icon={<Globe size={14} />}
-      label="Channel ID"
-      value={log.entity?.channel?.id}
-    />
-    <DetailRow
-      icon={<Globe size={14} />}
-      label="Channel Name"
-      value={log.entity?.channel?.name}
-    />
-    <DetailRow
-      icon={<Globe size={14} />}
-      label="Privacy"
-      value={log.entity?.channel?.privacy}
-    />
+    <DetailItem label="Type" value={log.entity?.type} />
+    <DetailItem label="Channel ID" value={log.entity?.channel?.id} />
+    <DetailItem label="Channel Name" value={log.entity?.channel?.name} />
+    <DetailItem label="Privacy" value={log.entity?.channel?.privacy} />
 
     <SectionHeader>Context</SectionHeader>
-    <DetailRow
-      icon={<Globe size={14} />}
-      label="Session ID"
-      value={log.context?.session_id}
-    />
+    <DetailItem label="Session ID" value={log.context?.session_id} />
   </dl>
 );
 
@@ -127,7 +98,7 @@ const SlackLogEntry = memo(({ log, isExpanded, onToggle }) => {
             transition={{ duration: 0.2 }}
             className="overflow-hidden"
           >
-            <div className="pt-3">
+            <div className="pt-4 mt-4 border-t border-gray-200 dark:border-gray-700">
               <div className="p-3 bg-gray-100 dark:bg-gray-900/70 rounded-lg shadow-inner">
                 <SlackLogDetailView log={log} />
               </div>

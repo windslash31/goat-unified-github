@@ -2,16 +2,15 @@ import React, { useState, memo } from "react";
 import { Edit, User, Info, ChevronDown, Key } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
-const DetailRow = ({ label, value, icon }) => {
+const DetailItem = ({ label, value }) => {
   if (value === null || typeof value === "undefined" || value === "")
     return null;
   return (
-    <div className="flex items-start py-2.5 border-b border-gray-200 dark:border-gray-700 last:border-b-0">
-      <dt className="w-1/3 text-gray-500 dark:text-gray-400 flex-shrink-0 flex items-center gap-2">
-        {icon}
-        <span className="font-medium">{label}</span>
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-1 sm:gap-4 py-2.5 px-1 border-b border-gray-200 dark:border-gray-700 last:border-b-0">
+      <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 sm:col-span-1">
+        {label}
       </dt>
-      <dd className="w-2/3 text-gray-800 dark:text-gray-200 text-right break-words">
+      <dd className="text-sm text-gray-800 dark:text-gray-200 sm:col-span-2 break-words">
         {String(value)}
       </dd>
     </div>
@@ -27,29 +26,20 @@ const SectionHeader = ({ children }) => (
 const AtlassianLogDetailView = ({ log }) => (
   <dl>
     <SectionHeader>Event Details</SectionHeader>
-    <DetailRow icon={<Info size={14} />} label="Summary" value={log.summary} />
-    <DetailRow
-      icon={<Info size={14} />}
-      label="Category"
-      value={log.category}
-    />
+    <DetailItem label="Summary" value={log.summary} />
+    <DetailItem label="Category" value={log.category} />
 
     <SectionHeader>Author</SectionHeader>
-    <DetailRow icon={<User size={14} />} label="Name" value={log.author.name} />
-    <DetailRow icon={<User size={14} />} label="Type" value={log.author.type} />
-    <DetailRow
-      icon={<Key size={14} />}
-      label="Account ID"
-      value={log.author.accountId}
-    />
+    <DetailItem label="Name" value={log.author.name} />
+    <DetailItem label="Type" value={log.author.type} />
+    <DetailItem label="Account ID" value={log.author.accountId} />
 
     {log.changedValues && log.changedValues.length > 0 && (
       <>
         <SectionHeader>Changed Values</SectionHeader>
         {log.changedValues.map((change, index) => (
-          <DetailRow
+          <DetailItem
             key={index}
-            icon={<Edit size={14} />}
             label={change.name}
             value={`From "${change.oldValue}" to "${change.newValue}"`}
           />
@@ -107,7 +97,7 @@ const AtlassianLogEntry = memo(({ log, isExpanded, onToggle }) => {
             transition={{ duration: 0.2 }}
             className="overflow-hidden"
           >
-            <div className="pt-3">
+            <div className="pt-4 mt-4 border-t border-gray-200 dark:border-gray-700">
               <div className="p-3 bg-gray-100 dark:bg-gray-900/70 rounded-lg shadow-inner">
                 <AtlassianLogDetailView log={log} />
               </div>

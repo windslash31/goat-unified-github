@@ -2,17 +2,15 @@ import React, { useState, memo } from "react";
 import { Shield, Server, ChevronDown, User, Info } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
-// Reusable components from other log pages for consistency
-const DetailRow = ({ label, value, icon }) => {
+const DetailItem = ({ label, value }) => {
   if (value === null || typeof value === "undefined" || value === "")
     return null;
   return (
-    <div className="flex items-start py-2.5 border-b border-gray-200 dark:border-gray-700 last:border-b-0">
-      <dt className="w-1/3 text-gray-500 dark:text-gray-400 flex-shrink-0 flex items-center gap-2">
-        {icon}
-        <span className="font-medium">{label}</span>
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-1 sm:gap-4 py-2.5 px-1 border-b border-gray-200 dark:border-gray-700 last:border-b-0">
+      <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 sm:col-span-1">
+        {label}
       </dt>
-      <dd className="w-2/3 text-gray-800 dark:text-gray-200 text-right break-words">
+      <dd className="text-sm text-gray-800 dark:text-gray-200 sm:col-span-2 break-words">
         {String(value)}
       </dd>
     </div>
@@ -35,33 +33,16 @@ const GoogleLogDetailView = ({ log }) => {
   return (
     <dl>
       <SectionHeader>Event Details</SectionHeader>
-      <DetailRow
-        icon={<Info size={14} />}
-        label="Event Name"
-        value={event.name}
-      />
-      <DetailRow
-        icon={<Info size={14} />}
-        label="Login Type"
-        value={parameters.login_type}
-      />
-      <DetailRow
-        icon={<Info size={14} />}
+      <DetailItem label="Event Name" value={event.name} />
+      <DetailItem label="Login Type" value={parameters.login_type} />
+      <DetailItem
         label="Login Challenge Method"
         value={parameters.login_challenge_method}
       />
 
       <SectionHeader>Context</SectionHeader>
-      <DetailRow
-        icon={<Server size={14} />}
-        label="IP Address"
-        value={log.ipAddress}
-      />
-      <DetailRow
-        icon={<User size={14} />}
-        label="Actor Email"
-        value={log.actor.email}
-      />
+      <DetailItem label="IP Address" value={log.ipAddress} />
+      <DetailItem label="Actor Email" value={log.actor.email} />
     </dl>
   );
 };
@@ -120,7 +101,7 @@ const GoogleLogEntry = memo(({ log, isExpanded, onToggle }) => {
             transition={{ duration: 0.2 }}
             className="overflow-hidden"
           >
-            <div className="pt-3">
+            <div className="pt-4 mt-4 border-t border-gray-200 dark:border-gray-700">
               <div className="p-3 bg-gray-100 dark:bg-gray-900/70 rounded-lg shadow-inner">
                 <GoogleLogDetailView log={log} />
               </div>
