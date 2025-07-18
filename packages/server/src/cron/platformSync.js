@@ -57,8 +57,8 @@ const syncAllUserStatuses = async () => {
  */
 const schedulePlatformSync = () => {
   //cron.schedule("* * * * *", syncAllUserStatuses, {
-    // Schedule to run at 2 AM every day in Jakarta's timezone
-    cron.schedule("0 2 * * *", syncAllUserStatuses, {
+  // Schedule to run at 2 AM every day in Jakarta's timezone
+  cron.schedule("0 2 * * *", syncAllUserStatuses, {
     scheduled: true,
     timezone: "Asia/Jakarta",
   });
@@ -68,4 +68,4 @@ const schedulePlatformSync = () => {
   );
 };
 
-module.exports = { schedulePlatformSync };
+module.exports = { schedulePlatformSync, syncAllUserStatuses };

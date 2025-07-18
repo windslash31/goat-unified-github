@@ -351,19 +351,14 @@ const syncPlatformStatus = async (req, res, next) => {
 
 const triggerPlatformSync = async (req, res, next) => {
   console.log("CRON-TRIGGER: Received request to start platform sync.");
-  // Don't make the user wait for the job to finish.
-  // Acknowledge the request immediately.
   res
     .status(202)
     .json({ message: "Platform sync job triggered successfully." });
 
-  // Run the actual job in the background.
   try {
-    // We can reuse the function from your cron job file.
-    // Note: You'll need to import or expose syncAllUserStatuses.
-    // Let's assume you've exposed it from platformSync.js
-    const { syncPlatformStatus } = require("../../cron/platformSync");
-    await syncPlatformStatus();
+    // Correctly import the function from the cron file
+    const { syncAllUserStatuses } = require("../../cron/platformSync");
+    await syncAllUserStatuses(); // Call the correct function
   } catch (error) {
     console.error("CRON-TRIGGER: The triggered sync job failed.", error);
   }
