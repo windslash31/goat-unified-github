@@ -7,6 +7,7 @@ import {
   Download,
   Upload,
   Loader,
+  MoreVertical, // --- Added Icon
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { Button } from "../components/ui/Button";
@@ -46,6 +47,10 @@ export const EmployeeListPage = () => {
   const [selectedRows, setSelectedRows] = useState(new Set());
   const [isBulkActionMenuOpen, setIsBulkActionMenuOpen] = useState(false);
   const [isHeaderMinimized, setIsHeaderMinimized] = useState(false);
+  // --- MODIFICATION START: State and ref for new mobile menu ---
+  const [isMobileActionMenuOpen, setIsMobileActionMenuOpen] = useState(false);
+  const mobileMenuRef = useRef(null);
+  // --- MODIFICATION END ---
   const pageRef = useRef(null);
 
   const isDesktop = useMediaQuery("(min-width: 768px)");
@@ -77,6 +82,21 @@ export const EmployeeListPage = () => {
     mainContent.addEventListener("scroll", handleScroll);
     return () => mainContent.removeEventListener("scroll", handleScroll);
   }, []);
+
+  // --- MODIFICATION START: Effect to close mobile menu on outside click ---
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (
+        mobileMenuRef.current &&
+        !mobileMenuRef.current.contains(event.target)
+      ) {
+        setIsMobileActionMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+  // --- MODIFICATION END ---
 
   useEffect(() => {
     setSelectedRows(new Set());
@@ -167,13 +187,17 @@ export const EmployeeListPage = () => {
     });
   };
 
-  const SearchAndFilterActions = ({ isMinimized = false }) => (
+  // --- MODIFICATION START: Updated SearchAndFilterActions ---
+  const SearchAndFilterActions = ({
+    isMinimized = false,
+    isMobile = false,
+  }) => (
     <>
       <div className="relative flex-grow">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
         <input
           type="text"
-          placeholder="Search employees..."
+          placeholder="Search..."
           value={searchInputValue}
           onChange={(e) => setSearchInputValue(e.target.value)}
           className={`w-full pl-10 pr-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-kredivo-primary focus:outline-none ${
@@ -212,7 +236,7 @@ export const EmployeeListPage = () => {
             />
           )}
         </div>
-        {!isMinimized && (
+        {!isMinimized && !isMobile && (
           <>
             <Button onClick={handleExport} variant="secondary">
               <Download className="w-4 h-4 mr-2" />
@@ -227,9 +251,56 @@ export const EmployeeListPage = () => {
             </Button>
           </>
         )}
+        {isMobile && !isMinimized && (
+          <div className="relative" ref={mobileMenuRef}>
+            <button
+              onClick={() => setIsMobileActionMenuOpen((prev) => !prev)}
+              className="p-2 border rounded-md bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700"
+            >
+              <MoreVertical size={20} />
+            </button>
+            <AnimatePresence>
+              {isMobileActionMenuOpen && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95, y: -10 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.95, y: -10 }}
+                  transition={{ duration: 0.15 }}
+                  className="absolute top-full right-0 mt-2 w-48 bg-white dark:bg-gray-800 border dark:border-gray-700 rounded-lg shadow-xl z-20"
+                >
+                  <ul>
+                    <li>
+                      <button
+                        onClick={() => {
+                          handleExport();
+                          setIsMobileActionMenuOpen(false);
+                        }}
+                        className="w-full text-left flex items-center gap-3 px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700"
+                      >
+                        <Download className="w-4 h-4" /> Export
+                      </button>
+                    </li>
+                    <li>
+                      <button
+                        onClick={() => {
+                          setIsImportModalOpen(true);
+                          setIsMobileActionMenuOpen(false);
+                        }}
+                        className="w-full text-left flex items-center gap-3 px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700"
+                      >
+                        <Upload className="w-4 h-4" /> Import
+                      </button>
+                    </li>
+                  </ul>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        )}
       </div>
     </>
   );
+  // --- MODIFICATION END ---
 
   if (isLoading) {
     return (
@@ -257,13 +328,14 @@ export const EmployeeListPage = () => {
         <AnimatePresence>
           {isHeaderMinimized && (
             <motion.div
-              initial={{ y: -100, opacity: 0 }}
+              key="sticky-header"
+              initial={{ y: -70, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
-              exit={{ y: -100, opacity: 0 }}
-              transition={{ type: "spring", stiffness: 300, damping: 30 }}
+              exit={{ y: -70, opacity: 0 }}
+              transition={{ type: "spring", stiffness: 400, damping: 40 }}
               className="fixed top-16 left-0 right-0 p-4 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border-b border-gray-200 dark:border-gray-700 z-20 flex items-center gap-2"
             >
-              <SearchAndFilterActions isMinimized={true} />
+              <SearchAndFilterActions isMinimized={true} isMobile={true} />
             </motion.div>
           )}
         </AnimatePresence>
@@ -308,18 +380,31 @@ export const EmployeeListPage = () => {
           </div>
         ) : (
           <>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white self-start sm:self-center">
-              Employees
-            </h1>
-            <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap">
-              {isDesktop ? (
-                <SearchAndFilterActions />
-              ) : (
-                <div className="w-full flex items-center gap-2">
-                  <SearchAndFilterActions />
-                </div>
-              )}
-            </div>
+            <AnimatePresence>
+              {!isHeaderMinimized || isDesktop ? (
+                <motion.div
+                  key="full-header"
+                  initial={false}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  transition={{ duration: 0.2 }}
+                  className="w-full flex flex-col sm:flex-row justify-between items-center gap-4"
+                >
+                  <h1 className="text-2xl font-bold text-gray-900 dark:text-white self-start sm:self-center">
+                    Employees
+                  </h1>
+                  <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap">
+                    {isDesktop ? (
+                      <SearchAndFilterActions />
+                    ) : (
+                      <div className="w-full flex items-center gap-2">
+                        <SearchAndFilterActions isMobile={true} />
+                      </div>
+                    )}
+                  </div>
+                </motion.div>
+              ) : null}
+            </AnimatePresence>
           </>
         )}
       </div>
