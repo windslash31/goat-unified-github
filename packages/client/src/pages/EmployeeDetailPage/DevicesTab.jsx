@@ -1,10 +1,10 @@
-// packages/client/src/pages/EmployeeDetailPage/DevicesTab.js
 import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import api from "../../api/api";
 import { Smartphone, Laptop, Server, CheckCircle, XCircle } from "lucide-react";
-import { DeviceDetailModal } from "../../components/ui/DeviceDetailModal"; // Import the new modal
-import { DeviceCardSkeleton } from "../../components/ui/DeviceCardSkeleton"; // Import the skeleton
+import { DeviceDetailModal } from "../../components/ui/DeviceDetailModal";
+import { DeviceCardSkeleton } from "../../components/ui/DeviceCardSkeleton";
+import { formatDateTime } from "../../utils/formatters";
 
 const fetchEmployeeDevices = async (employeeId) => {
   const { data } = await api.get(`/api/employees/${employeeId}/devices`);
@@ -52,7 +52,7 @@ const DeviceCard = ({ device, onClick }) => {
       <div className="mt-4 pt-2 border-t border-gray-100 dark:border-gray-700 text-sm">
         <div className="flex justify-between">
           <span className="text-gray-500">Last Contact:</span>
-          <span>{new Date(device.lastContact).toLocaleString()}</span>
+          <span>{formatDateTime(device.lastContact)}</span>
         </div>
       </div>
     </div>
@@ -73,7 +73,6 @@ export const DevicesTab = ({ employeeId }) => {
   if (isLoading) {
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {/* Show 3 skeleton cards while loading */}
         <DeviceCardSkeleton />
         <DeviceCardSkeleton />
         <DeviceCardSkeleton />

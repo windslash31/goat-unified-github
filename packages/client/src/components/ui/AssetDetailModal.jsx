@@ -8,7 +8,6 @@ import {
   Tag,
   CheckCircle,
   FileText,
-  Calendar,
   Building,
   User,
   Package,
@@ -19,22 +18,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "./Button";
-
-const formatDate = (dateString) => {
-  if (!dateString) return "N/A";
-  try {
-    return new Intl.DateTimeFormat("en-US", {
-      year: "numeric",
-      month: "long",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: true,
-    }).format(new Date(dateString));
-  } catch (error) {
-    return dateString;
-  }
-};
+import { formatDateTime } from "../../utils/formatters";
 
 const DetailRow = ({ label, value, icon, isMono = false }) => {
   if (!value) return null;
@@ -160,12 +144,12 @@ export const AssetDetailModal = ({ asset, onClose }) => {
               <DetailRow
                 icon={<FilePlus size={14} />}
                 label="Created"
-                value={formatDate(asset.Created)}
+                value={formatDateTime(asset.Created)}
               />
               <DetailRow
                 icon={<Edit size={14} />}
                 label="Updated"
-                value={formatDate(asset.Updated)}
+                value={formatDateTime(asset.Updated)}
               />
             </div>
             <div className="px-6 py-3 bg-gray-50 dark:bg-gray-700/50 border-t border-gray-200 dark:border-gray-600 text-right">

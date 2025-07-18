@@ -12,7 +12,7 @@ import { Button } from "../components/ui/Button";
 import { useAuthStore } from "../stores/authStore";
 import api from "../api/api";
 import { motion } from "framer-motion";
-import { RoleManagementSkeleton } from '../components/ui/RoleManagementSkeleton';
+import { RoleManagementSkeleton } from "../components/ui/RoleManagementSkeleton";
 
 const permissionGroups = [
   {
@@ -329,7 +329,8 @@ export const RoleManagementPage = ({ onLogout }) => {
       setAllPermissions(permsRes.data);
     } catch (err) {
       console.error("Error:", err);
-      const errorMessage = err.response?.data?.message || "Could not load page data.";
+      const errorMessage =
+        err.response?.data?.message || "Could not load page data.";
       setError(errorMessage);
     } finally {
       setLoading(false);
@@ -410,7 +411,8 @@ export const RoleManagementPage = ({ onLogout }) => {
       setHasUnsavedChanges(false);
       fetchData();
     } catch (error) {
-      const errorMessage = error.response?.data?.message || "Could not save permissions.";
+      const errorMessage =
+        error.response?.data?.message || "Could not save permissions.";
       toast.error(errorMessage);
     } finally {
       setIsSaving(false);
@@ -428,7 +430,8 @@ export const RoleManagementPage = ({ onLogout }) => {
       setNewRoleName("");
       fetchData();
     } catch (error) {
-      const errorMessage = error.response?.data?.message || "Could not create role.";
+      const errorMessage =
+        error.response?.data?.message || "Could not create role.";
       toast.error(errorMessage);
     } finally {
       setIsCreatingRole(false);
@@ -452,7 +455,8 @@ export const RoleManagementPage = ({ onLogout }) => {
       }
       fetchData();
     } catch (error) {
-      const errorMessage = error.response?.data?.message || "Could not delete role.";
+      const errorMessage =
+        error.response?.data?.message || "Could not delete role.";
       toast.error(errorMessage);
     } finally {
       setIsDeleteModalOpen(false);
@@ -530,7 +534,8 @@ export const RoleManagementPage = ({ onLogout }) => {
         onClose={() => setIsDeleteModalOpen(false)}
         onConfirm={handleDeleteRole}
         title="Delete Role"
-        message={`Are you sure you want to delete the role "${roleToDelete?.name}"? This action cannot be undone.`}
+        message={`This action cannot be undone. This will permanently delete the role.`}
+        confirmationText={roleToDelete?.name}
       />
     </motion.div>
   );

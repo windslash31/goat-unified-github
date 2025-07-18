@@ -9,6 +9,7 @@ import {
   Globe,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { formatDateTime } from "../../utils/formatters";
 
 const DetailItem = ({ label, value }) => {
   if (value === null || typeof value === "undefined" || value === "")
@@ -79,7 +80,7 @@ const SlackLogEntry = memo(({ log, isExpanded, onToggle }) => {
               </div>
             </div>
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-              {new Date(log.date_create * 1000).toLocaleString()}
+              {formatDateTime(log.date_create * 1000)}
             </p>
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-2 truncate">
               {log.entity?.channel?.name

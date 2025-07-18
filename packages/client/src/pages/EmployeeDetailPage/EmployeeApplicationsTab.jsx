@@ -15,7 +15,7 @@ import {
   Shield,
 } from "lucide-react";
 import { PLATFORM_CONFIG } from "../../config/platforms";
-import { formatDistanceToNow } from "date-fns";
+import { formatTimeAgo } from "../../utils/formatters";
 import { motion, AnimatePresence } from "framer-motion";
 
 const PlatformStatusBadge = ({ status }) => {
@@ -53,7 +53,6 @@ const PlatformRowSkeleton = () => (
   </div>
 );
 
-// --- MODIFIED: Uses a grid layout for better readability on desktop ---
 const DetailItem = ({ label, value, isMono = false }) => {
   if (value === null || typeof value === "undefined" || value === "")
     return null;
@@ -73,14 +72,12 @@ const DetailItem = ({ label, value, isMono = false }) => {
   );
 };
 
-// --- MODIFIED: Improved styling for better visual separation ---
 const DetailSectionHeader = ({ children }) => (
   <h4 className="text-md font-semibold text-gray-600 dark:text-gray-300 pt-4 pb-1 border-b-2 border-kredivo-primary/50">
     {children}
   </h4>
 );
 
-// --- MODIFIED: Renders improved detail view with better formatting ---
 const PlatformDetailView = ({ platformName, details }) => {
   if (!details || Object.keys(details).length === 0) {
     return (
@@ -90,7 +87,6 @@ const PlatformDetailView = ({ platformName, details }) => {
     );
   }
 
-  // Helper to format boolean values for display
   const formatBoolean = (value) =>
     value ? (
       <span className="flex items-center gap-1 text-green-600 dark:text-green-400 font-medium">
@@ -221,11 +217,7 @@ const PlatformDetailView = ({ platformName, details }) => {
 const PlatformStatusCard = memo(({ platform, isExpanded, onToggle }) => {
   const platformConfig =
     PLATFORM_CONFIG[platform.platform_name] || PLATFORM_CONFIG.Default;
-  const lastSyncTime = platform.last_synced_at
-    ? formatDistanceToNow(new Date(platform.last_synced_at), {
-        addSuffix: true,
-      })
-    : "never";
+  const lastSyncTime = formatTimeAgo(platform.last_synced_at);
   const hasDetails =
     platform.details &&
     Object.keys(platform.details).length > 0 &&

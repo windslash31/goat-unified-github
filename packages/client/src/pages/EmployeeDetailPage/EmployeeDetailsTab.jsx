@@ -18,6 +18,7 @@ import { StatusBadge } from "../../components/ui/StatusBadge";
 import { Button } from "../../components/ui/Button";
 import api from "../../api/api";
 import toast from "react-hot-toast";
+import { formatDate } from "../../utils/formatters";
 
 const AssetButton = ({ employee, onAssetClick }) => {
   const [isAssetLoading, setIsAssetLoading] = useState(false);
@@ -31,25 +32,18 @@ const AssetButton = ({ employee, onAssetClick }) => {
 
     setIsAssetLoading(true);
     try {
-      const response = await api.get(
+      const { data: assetDetails } = await api.get(
         `/api/jira/asset/search?name=${encodeURIComponent(assetName)}`
       );
 
-      const assetDetails = response.data;
-
-      if (assetDetails && typeof assetDetails === 'object' && Object.keys(assetDetails).length > 0) {
-        try {
-          onAssetClick(assetDetails);
-        } catch (callbackError) {
-            toast.error("An error occurred while displaying the asset details.");
-        }
+      if (assetDetails && Object.keys(assetDetails).length > 0) {
+        onAssetClick(assetDetails);
       } else {
         toast.error(`No details found for asset: ${assetName}`);
       }
-
     } catch (error) {
-      const errorMessage = error.response?.data?.message || error.message || `Could not load details for ${assetName}.`;
-      toast.error(errorMessage);
+      console.error("Failed to fetch asset details:", error);
+      toast.error(error.message || `Could not load details for ${assetName}.`);
     } finally {
       setIsAssetLoading(false);
     }
@@ -79,15 +73,6 @@ const AssetButton = ({ employee, onAssetClick }) => {
 
 export const EmployeeDetailsTab = memo(
   ({ employee, permissions, navigate, onTicketClick, onAssetClick }) => {
-    const formatDate = (dateString) => {
-      if (!dateString) return "—";
-      return new Date(dateString).toLocaleDateString("en-US", {
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-      });
-    };
-
     const JiraTicketLink = ({ ticketId }) => {
       if (!ticketId) return "—";
       return (
