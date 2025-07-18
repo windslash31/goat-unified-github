@@ -292,7 +292,9 @@ export const EmployeeListPage = () => {
   };
 
   const areAdvancedFiltersActive = useMemo(() => {
-    return Object.values(filters).some((value) => !!value && value !== "all");
+    return Object.entries(filters)
+      .filter(([key]) => key !== "search") // Exclude the 'search' filter
+      .some(([, value]) => !!value && value !== "all");
   }, [filters]);
 
   const handleSelectAll = (e) => {
