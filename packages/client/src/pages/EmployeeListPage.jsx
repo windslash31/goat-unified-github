@@ -7,7 +7,7 @@ import {
   Download,
   Upload,
   Loader,
-  MoreVertical, // --- Added Icon
+  MoreVertical,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { Button } from "../components/ui/Button";
@@ -25,8 +25,12 @@ import { EmployeeImportModal } from "../components/ui/EmployeeImportModal";
 import { EmployeeListSkeleton } from "../components/ui/EmployeeListSkeleton";
 import { DesktopTable } from "../components/employees/DesktopTable";
 import { MobileList } from "../components/employees/MobileList";
+// --- MODIFICATION START: Import useDebounce here ---
+import { useDebounce } from "../hooks/useDebounce";
+// --- MODIFICATION END ---
 
 export const EmployeeListPage = () => {
+  // --- MODIFICATION START: The hook no longer provides search input state ---
   const {
     employees,
     pagination,
@@ -36,9 +40,8 @@ export const EmployeeListPage = () => {
     filters,
     setFilters,
     isLoading,
-    searchInputValue,
-    setSearchInputValue,
   } = useEmployeeTable();
+  // --- MODIFICATION END ---
 
   const [isFilterPopoverOpen, setIsFilterPopoverOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
@@ -47,11 +50,22 @@ export const EmployeeListPage = () => {
   const [selectedRows, setSelectedRows] = useState(new Set());
   const [isBulkActionMenuOpen, setIsBulkActionMenuOpen] = useState(false);
   const [isHeaderMinimized, setIsHeaderMinimized] = useState(false);
-  // --- MODIFICATION START: State and ref for new mobile menu ---
   const [isMobileActionMenuOpen, setIsMobileActionMenuOpen] = useState(false);
   const mobileMenuRef = useRef(null);
-  // --- MODIFICATION END ---
   const pageRef = useRef(null);
+
+  // --- MODIFICATION START: Manage input state locally and debounce it ---
+  const [searchInputValue, setSearchInputValue] = useState(filters.search);
+  const debouncedSearchTerm = useDebounce(searchInputValue, 500);
+
+  useEffect(() => {
+    // This effect runs only when the user stops typing
+    setFilters((prevFilters) => ({
+      ...prevFilters,
+      search: debouncedSearchTerm,
+    }));
+  }, [debouncedSearchTerm, setFilters]);
+  // --- MODIFICATION END ---
 
   const isDesktop = useMediaQuery("(min-width: 768px)");
 
@@ -83,7 +97,6 @@ export const EmployeeListPage = () => {
     return () => mainContent.removeEventListener("scroll", handleScroll);
   }, []);
 
-  // --- MODIFICATION START: Effect to close mobile menu on outside click ---
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (
@@ -96,7 +109,6 @@ export const EmployeeListPage = () => {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
-  // --- MODIFICATION END ---
 
   useEffect(() => {
     setSelectedRows(new Set());
@@ -147,10 +159,11 @@ export const EmployeeListPage = () => {
   const areAdvancedFiltersActive = useMemo(() => {
     return Object.entries(filters).some(([key, value]) => {
       if (key === "status") return value !== "all";
-      if (key === "search") return false;
+      // We check searchInputValue here for immediate UI feedback on the pill
+      if (key === "search") return !!searchInputValue;
       return !!value;
     });
-  }, [filters]);
+  }, [filters, searchInputValue]);
 
   const handleSelectAll = (e) => {
     if (e.target.checked) {
@@ -187,7 +200,6 @@ export const EmployeeListPage = () => {
     });
   };
 
-  // --- MODIFICATION START: Updated SearchAndFilterActions ---
   const SearchAndFilterActions = ({
     isMinimized = false,
     isMobile = false,
@@ -300,9 +312,9 @@ export const EmployeeListPage = () => {
       </div>
     </>
   );
-  // --- MODIFICATION END ---
 
-  if (isLoading) {
+  if (isLoading && !employees.length) {
+    // Only show full skeleton on initial load
     return (
       <div className="p-4 sm:p-6">
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
@@ -412,6 +424,8 @@ export const EmployeeListPage = () => {
       <FilterPills
         filters={filters}
         setFilters={setFilters}
+        // --- MODIFICATION: Pass the live input value to the pills for immediate feedback ---
+        searchInputValue={searchInputValue}
         setSearchInputValue={setSearchInputValue}
         options={filterOptions}
         onClear={handleClearFilters}

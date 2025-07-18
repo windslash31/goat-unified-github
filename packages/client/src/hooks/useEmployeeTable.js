@@ -11,14 +11,11 @@ const fetchEmployees = async (filters, pagination, sorting) => {
     sortOrder: sorting.sortOrder,
   });
 
+  // --- MODIFICATION: This logic is now cleaner and just uses the passed-in filters ---
   for (const key in filters) {
-    if (key !== 'search' && filters[key] && filters[key] !== "all") {
+    if (filters[key] && filters[key] !== "all") {
       queryParams.append(key, filters[key]);
     }
-  }
-
-  if (filters.search) {
-      queryParams.append('search', filters.search);
   }
 
   const { data } = await api.get(`/api/employees?${queryParams.toString()}`);
@@ -50,18 +47,11 @@ export const useEmployeeTable = () => {
     sortOrder: "asc",
   });
 
-  const [searchInputValue, setSearchInputValue] = useState("");
-  const debouncedSearchTerm = useDebounce(searchInputValue, 500);
-
-  const queryFilters = useMemo(() => ({
-      ...filters,
-      search: debouncedSearchTerm,
-  }), [filters, debouncedSearchTerm]);
-
-
+  // --- MODIFICATION START: Removed all search input and debouncing logic from this hook ---
   const { data, isLoading, isFetching } = useQuery({
-    queryKey: ["employees", queryFilters, pagination.currentPage, sorting],
-    queryFn: () => fetchEmployees(queryFilters, pagination, sorting),
+    queryKey: ["employees", filters, pagination.currentPage, sorting],
+    queryFn: () => fetchEmployees(filters, pagination, sorting),
+    // --- MODIFICATION END ---
     keepPreviousData: true,
     onSuccess: (data) => {
       setPagination((prev) => ({
@@ -73,9 +63,8 @@ export const useEmployeeTable = () => {
   });
 
   useEffect(() => {
-    setPagination(prev => ({ ...prev, currentPage: 1 }));
-  }, [queryFilters, sorting]);
-
+    setPagination((prev) => ({ ...prev, currentPage: 1 }));
+  }, [filters, sorting]);
 
   return {
     employees: data?.employees || [],
@@ -86,7 +75,6 @@ export const useEmployeeTable = () => {
     filters,
     setFilters,
     isLoading: isLoading || isFetching,
-    searchInputValue,
-    setSearchInputValue,
+    // --- MODIFICATION: Removed searchInputValue and setSearchInputValue from return ---
   };
 };
