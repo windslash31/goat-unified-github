@@ -12,6 +12,10 @@ import {
   Building,
   User,
   Package,
+  Monitor,
+  Receipt,
+  FilePlus,
+  Edit,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "./Button";
@@ -137,7 +141,7 @@ export const AssetDetailModal = ({ asset, onClose }) => {
                 value={asset.Location}
               />
               <DetailRow
-                icon={<Laptop size={14} />}
+                icon={<Monitor size={14} />}
                 label="Operating System"
                 value={asset["Operating System"]}
               />
@@ -149,17 +153,17 @@ export const AssetDetailModal = ({ asset, onClose }) => {
                 value={asset["Invoice Number"]}
               />
               <DetailRow
-                icon={<Calendar size={14} />}
+                icon={<Receipt size={14} />}
                 label="Buying Years"
                 value={asset["Buying Years"]}
               />
               <DetailRow
-                icon={<Calendar size={14} />}
+                icon={<FilePlus size={14} />}
                 label="Created"
                 value={formatDate(asset.Created)}
               />
               <DetailRow
-                icon={<Calendar size={14} />}
+                icon={<Edit size={14} />}
                 label="Updated"
                 value={formatDate(asset.Updated)}
               />
