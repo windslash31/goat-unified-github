@@ -1,4 +1,11 @@
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, {
+  useState,
+  useEffect,
+  useRef,
+  useMemo,
+  memo,
+  useCallback,
+} from "react";
 import {
   Search,
   Filter as FilterIcon,
@@ -25,12 +32,168 @@ import { EmployeeImportModal } from "../components/ui/EmployeeImportModal";
 import { EmployeeListSkeleton } from "../components/ui/EmployeeListSkeleton";
 import { DesktopTable } from "../components/employees/DesktopTable";
 import { MobileList } from "../components/employees/MobileList";
-// --- MODIFICATION START: Import useDebounce here ---
 import { useDebounce } from "../hooks/useDebounce";
+
+// --- MODIFICATION START: Created a new memoized component to isolate state ---
+const SearchAndFilterActions = memo(
+  ({
+    initialSearch,
+    onSearchChange,
+    isLoading,
+    areAdvancedFiltersActive,
+    filterOptions,
+    filters,
+    setFilters,
+    handleClearFilters,
+    handleExport,
+    setIsImportModalOpen,
+    isMobile,
+    isMinimized,
+  }) => {
+    const [searchInputValue, setSearchInputValue] = useState(initialSearch);
+    const debouncedSearchTerm = useDebounce(searchInputValue, 500);
+    const [isFilterPopoverOpen, setIsFilterPopoverOpen] = useState(false);
+    const filterButtonRef = useRef(null);
+    const [isMobileActionMenuOpen, setIsMobileActionMenuOpen] = useState(false);
+    const mobileMenuRef = useRef(null);
+
+    useEffect(() => {
+      onSearchChange(debouncedSearchTerm);
+    }, [debouncedSearchTerm, onSearchChange]);
+
+    // Sync local state if filters are cleared externally
+    useEffect(() => {
+      if (initialSearch !== searchInputValue) {
+        setSearchInputValue(initialSearch);
+      }
+    }, [initialSearch]);
+
+    useEffect(() => {
+      const handleClickOutside = (event) => {
+        if (
+          mobileMenuRef.current &&
+          !mobileMenuRef.current.contains(event.target)
+        ) {
+          setIsMobileActionMenuOpen(false);
+        }
+      };
+      document.addEventListener("mousedown", handleClickOutside);
+      return () =>
+        document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
+
+    return (
+      <>
+        <div className="relative flex-grow">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Search..."
+            value={searchInputValue}
+            onChange={(e) => setSearchInputValue(e.target.value)}
+            className={`w-full pl-10 pr-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-kredivo-primary focus:outline-none ${
+              isMinimized ? "sm:w-full" : "sm:w-64"
+            }`}
+          />
+          {isLoading && (
+            <Loader className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-gray-400" />
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="relative">
+            <button
+              ref={filterButtonRef}
+              onClick={() => setIsFilterPopoverOpen(!isFilterPopoverOpen)}
+              className={`flex items-center gap-2 px-4 py-2 border rounded-md text-sm font-medium transition-colors ${
+                areAdvancedFiltersActive || isFilterPopoverOpen
+                  ? "bg-kredivo-light text-kredivo-dark-text border-kredivo-primary/30"
+                  : "bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700"
+              }`}
+            >
+              <FilterIcon size={16} />
+              {!isMinimized && <span>Advanced</span>}
+              {areAdvancedFiltersActive && !isMinimized && (
+                <div className="w-2 h-2 bg-kredivo-primary rounded-full"></div>
+              )}
+            </button>
+            {isFilterPopoverOpen && (
+              <FilterPopover
+                initialFilters={filters}
+                onApply={setFilters}
+                onClear={handleClearFilters}
+                onClose={() => setIsFilterPopoverOpen(false)}
+                options={filterOptions}
+                buttonRef={filterButtonRef}
+              />
+            )}
+          </div>
+          {!isMinimized && !isMobile && (
+            <>
+              <Button onClick={handleExport} variant="secondary">
+                <Download className="w-4 h-4 mr-2" /> Export
+              </Button>
+              <Button
+                onClick={() => setIsImportModalOpen(true)}
+                variant="secondary"
+              >
+                <Upload className="w-4 h-4 mr-2" /> Import
+              </Button>
+            </>
+          )}
+          {isMobile && !isMinimized && (
+            <div className="relative" ref={mobileMenuRef}>
+              <button
+                onClick={() => setIsMobileActionMenuOpen((prev) => !prev)}
+                className="p-2 border rounded-md bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700"
+              >
+                <MoreVertical size={20} />
+              </button>
+              <AnimatePresence>
+                {isMobileActionMenuOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.95, y: -10 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.95, y: -10 }}
+                    transition={{ duration: 0.15 }}
+                    className="absolute top-full right-0 mt-2 w-48 bg-white dark:bg-gray-800 border dark:border-gray-700 rounded-lg shadow-xl z-20"
+                  >
+                    <ul>
+                      <li>
+                        <button
+                          onClick={() => {
+                            handleExport();
+                            setIsMobileActionMenuOpen(false);
+                          }}
+                          className="w-full text-left flex items-center gap-3 px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700"
+                        >
+                          <Download className="w-4 h-4" /> Export
+                        </button>
+                      </li>
+                      <li>
+                        <button
+                          onClick={() => {
+                            setIsImportModalOpen(true);
+                            setIsMobileActionMenuOpen(false);
+                          }}
+                          className="w-full text-left flex items-center gap-3 px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700"
+                        >
+                          <Upload className="w-4 h-4" /> Import
+                        </button>
+                      </li>
+                    </ul>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          )}
+        </div>
+      </>
+    );
+  }
+);
 // --- MODIFICATION END ---
 
 export const EmployeeListPage = () => {
-  // --- MODIFICATION START: The hook no longer provides search input state ---
   const {
     employees,
     pagination,
@@ -41,31 +204,12 @@ export const EmployeeListPage = () => {
     setFilters,
     isLoading,
   } = useEmployeeTable();
-  // --- MODIFICATION END ---
 
-  const [isFilterPopoverOpen, setIsFilterPopoverOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
-  const filterButtonRef = useRef(null);
-
   const [selectedRows, setSelectedRows] = useState(new Set());
   const [isBulkActionMenuOpen, setIsBulkActionMenuOpen] = useState(false);
   const [isHeaderMinimized, setIsHeaderMinimized] = useState(false);
-  const [isMobileActionMenuOpen, setIsMobileActionMenuOpen] = useState(false);
-  const mobileMenuRef = useRef(null);
   const pageRef = useRef(null);
-
-  // --- MODIFICATION START: Manage input state locally and debounce it ---
-  const [searchInputValue, setSearchInputValue] = useState(filters.search);
-  const debouncedSearchTerm = useDebounce(searchInputValue, 500);
-
-  useEffect(() => {
-    // This effect runs only when the user stops typing
-    setFilters((prevFilters) => ({
-      ...prevFilters,
-      search: debouncedSearchTerm,
-    }));
-  }, [debouncedSearchTerm, setFilters]);
-  // --- MODIFICATION END ---
 
   const isDesktop = useMediaQuery("(min-width: 768px)");
 
@@ -84,35 +228,27 @@ export const EmployeeListPage = () => {
   useEffect(() => {
     const mainContent = document.querySelector("main");
     if (!mainContent) return;
-
     const handleScroll = () => {
-      if (mainContent.scrollTop > 50) {
-        setIsHeaderMinimized(true);
-      } else {
-        setIsHeaderMinimized(false);
-      }
+      setIsHeaderMinimized(mainContent.scrollTop > 50);
     };
-
     mainContent.addEventListener("scroll", handleScroll);
     return () => mainContent.removeEventListener("scroll", handleScroll);
   }, []);
 
   useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (
-        mobileMenuRef.current &&
-        !mobileMenuRef.current.contains(event.target)
-      ) {
-        setIsMobileActionMenuOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  useEffect(() => {
     setSelectedRows(new Set());
   }, [filters, pagination.currentPage, employees]);
+
+  // --- MODIFICATION START: Callback for the child component to update filters ---
+  const handleSearchChange = useCallback(
+    (searchTerm) => {
+      setFilters((prevFilters) => ({
+        ...prevFilters,
+        search: searchTerm,
+      }));
+    },
+    [setFilters]
+  );
 
   const handleClearFilters = () => {
     setFilters({
@@ -127,17 +263,11 @@ export const EmployeeListPage = () => {
       application_id: "",
     });
     setPagination((prev) => ({ ...prev, currentPage: 1 }));
-    setSearchInputValue("");
   };
+  // --- MODIFICATION END ---
 
   const handleExport = async () => {
-    const queryParams = new URLSearchParams();
-    for (const key in filters) {
-      if (filters[key] && filters[key] !== "all") {
-        queryParams.append(key, filters[key]);
-      }
-    }
-
+    const queryParams = new URLSearchParams(filters);
     try {
       const response = await api.get(
         `/api/employees/export?${queryParams.toString()}`,
@@ -157,13 +287,8 @@ export const EmployeeListPage = () => {
   };
 
   const areAdvancedFiltersActive = useMemo(() => {
-    return Object.entries(filters).some(([key, value]) => {
-      if (key === "status") return value !== "all";
-      // We check searchInputValue here for immediate UI feedback on the pill
-      if (key === "search") return !!searchInputValue;
-      return !!value;
-    });
-  }, [filters, searchInputValue]);
+    return Object.values(filters).some((value) => !!value && value !== "all");
+  }, [filters]);
 
   const handleSelectAll = (e) => {
     if (e.target.checked) {
@@ -200,121 +325,7 @@ export const EmployeeListPage = () => {
     });
   };
 
-  const SearchAndFilterActions = ({
-    isMinimized = false,
-    isMobile = false,
-  }) => (
-    <>
-      <div className="relative flex-grow">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-        <input
-          type="text"
-          placeholder="Search..."
-          value={searchInputValue}
-          onChange={(e) => setSearchInputValue(e.target.value)}
-          className={`w-full pl-10 pr-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-kredivo-primary focus:outline-none ${
-            isMinimized ? "sm:w-full" : "sm:w-64"
-          }`}
-        />
-        {isLoading && (
-          <Loader className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-gray-400" />
-        )}
-      </div>
-      <div className="flex items-center gap-2">
-        <div className="relative">
-          <button
-            ref={filterButtonRef}
-            onClick={() => setIsFilterPopoverOpen(!isFilterPopoverOpen)}
-            className={`flex items-center gap-2 px-4 py-2 border rounded-md text-sm font-medium transition-colors ${
-              areAdvancedFiltersActive || isFilterPopoverOpen
-                ? "bg-kredivo-light text-kredivo-dark-text border-kredivo-primary/30"
-                : "bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700"
-            }`}
-          >
-            <FilterIcon size={16} />
-            {!isMinimized && <span>Advanced</span>}
-            {areAdvancedFiltersActive && !isMinimized && (
-              <div className="w-2 h-2 bg-kredivo-primary rounded-full"></div>
-            )}
-          </button>
-          {isFilterPopoverOpen && (
-            <FilterPopover
-              initialFilters={filters}
-              onApply={setFilters}
-              onClear={handleClearFilters}
-              onClose={() => setIsFilterPopoverOpen(false)}
-              options={filterOptions}
-              buttonRef={filterButtonRef}
-            />
-          )}
-        </div>
-        {!isMinimized && !isMobile && (
-          <>
-            <Button onClick={handleExport} variant="secondary">
-              <Download className="w-4 h-4 mr-2" />
-              Export
-            </Button>
-            <Button
-              onClick={() => setIsImportModalOpen(true)}
-              variant="secondary"
-            >
-              <Upload className="w-4 h-4 mr-2" />
-              Import
-            </Button>
-          </>
-        )}
-        {isMobile && !isMinimized && (
-          <div className="relative" ref={mobileMenuRef}>
-            <button
-              onClick={() => setIsMobileActionMenuOpen((prev) => !prev)}
-              className="p-2 border rounded-md bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700"
-            >
-              <MoreVertical size={20} />
-            </button>
-            <AnimatePresence>
-              {isMobileActionMenuOpen && (
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.95, y: -10 }}
-                  animate={{ opacity: 1, scale: 1, y: 0 }}
-                  exit={{ opacity: 0, scale: 0.95, y: -10 }}
-                  transition={{ duration: 0.15 }}
-                  className="absolute top-full right-0 mt-2 w-48 bg-white dark:bg-gray-800 border dark:border-gray-700 rounded-lg shadow-xl z-20"
-                >
-                  <ul>
-                    <li>
-                      <button
-                        onClick={() => {
-                          handleExport();
-                          setIsMobileActionMenuOpen(false);
-                        }}
-                        className="w-full text-left flex items-center gap-3 px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700"
-                      >
-                        <Download className="w-4 h-4" /> Export
-                      </button>
-                    </li>
-                    <li>
-                      <button
-                        onClick={() => {
-                          setIsImportModalOpen(true);
-                          setIsMobileActionMenuOpen(false);
-                        }}
-                        className="w-full text-left flex items-center gap-3 px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700"
-                      >
-                        <Upload className="w-4 h-4" /> Import
-                      </button>
-                    </li>
-                  </ul>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-        )}
-      </div>
-    </>
-  );
-
   if (isLoading && !employees.length) {
-    // Only show full skeleton on initial load
     return (
       <div className="p-4 sm:p-6">
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
@@ -327,6 +338,22 @@ export const EmployeeListPage = () => {
       </div>
     );
   }
+
+  // --- MODIFICATION START: Define props for the new component ---
+  const searchFilterProps = {
+    initialSearch: filters.search,
+    onSearchChange: handleSearchChange,
+    isLoading: isLoading,
+    areAdvancedFiltersActive: areAdvancedFiltersActive,
+    filterOptions: filterOptions,
+    filters: filters,
+    setFilters: setFilters,
+    handleClearFilters: handleClearFilters,
+    handleExport: handleExport,
+    setIsImportModalOpen: setIsImportModalOpen,
+  };
+  // --- MODIFICATION END ---
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -347,7 +374,11 @@ export const EmployeeListPage = () => {
               transition={{ type: "spring", stiffness: 400, damping: 40 }}
               className="fixed top-16 left-0 right-0 p-4 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border-b border-gray-200 dark:border-gray-700 z-20 flex items-center gap-2"
             >
-              <SearchAndFilterActions isMinimized={true} isMobile={true} />
+              <SearchAndFilterActions
+                {...searchFilterProps}
+                isMinimized={true}
+                isMobile={true}
+              />
             </motion.div>
           )}
         </AnimatePresence>
@@ -406,16 +437,17 @@ export const EmployeeListPage = () => {
                     Employees
                   </h1>
                   <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap">
-                    {isDesktop ? (
-                      <SearchAndFilterActions />
-                    ) : (
-                      <div className="w-full flex items-center gap-2">
-                        <SearchAndFilterActions isMobile={true} />
-                      </div>
-                    )}
+                    {/* --- MODIFICATION START: Use props to render the component --- */}
+                    <SearchAndFilterActions
+                      {...searchFilterProps}
+                      isMobile={!isDesktop}
+                    />
+                    {/* --- MODIFICATION END --- */}
                   </div>
                 </motion.div>
-              ) : null}
+              ) : (
+                <div className="min-h-[56px] w-full" />
+              )}
             </AnimatePresence>
           </>
         )}
@@ -424,9 +456,7 @@ export const EmployeeListPage = () => {
       <FilterPills
         filters={filters}
         setFilters={setFilters}
-        // --- MODIFICATION: Pass the live input value to the pills for immediate feedback ---
-        searchInputValue={searchInputValue}
-        setSearchInputValue={setSearchInputValue}
+        // No longer need to pass setSearchInputValue to pills
         options={filterOptions}
         onClear={handleClearFilters}
       />

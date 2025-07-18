@@ -11,7 +11,6 @@ const fetchEmployees = async (filters, pagination, sorting) => {
     sortOrder: sorting.sortOrder,
   });
 
-  // --- MODIFICATION: This logic is now cleaner and just uses the passed-in filters ---
   for (const key in filters) {
     if (filters[key] && filters[key] !== "all") {
       queryParams.append(key, filters[key]);
@@ -47,11 +46,9 @@ export const useEmployeeTable = () => {
     sortOrder: "asc",
   });
 
-  // --- MODIFICATION START: Removed all search input and debouncing logic from this hook ---
   const { data, isLoading, isFetching } = useQuery({
     queryKey: ["employees", filters, pagination.currentPage, sorting],
     queryFn: () => fetchEmployees(filters, pagination, sorting),
-    // --- MODIFICATION END ---
     keepPreviousData: true,
     onSuccess: (data) => {
       setPagination((prev) => ({
@@ -75,6 +72,5 @@ export const useEmployeeTable = () => {
     filters,
     setFilters,
     isLoading: isLoading || isFetching,
-    // --- MODIFICATION: Removed searchInputValue and setSearchInputValue from return ---
   };
 };
