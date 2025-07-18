@@ -6,6 +6,7 @@ import { ConfirmationModal } from "./ConfirmationModal";
 import { NewApiKeyModal } from "./NewApiKeyModal";
 import api from "../../api/api";
 import { motion, AnimatePresence } from "framer-motion";
+import { formatDate } from "../../utils/formatters";
 
 export const ApiKeyManagerModal = ({ user, onClose }) => {
   const [keys, setKeys] = useState([]);
@@ -120,12 +121,9 @@ export const ApiKeyManagerModal = ({ user, onClose }) => {
                       <div>
                         <p className="font-semibold">{key.description}</p>
                         <p className="text-xs text-gray-500">
-                          Created:{" "}
-                          {new Date(key.created_at).toLocaleDateString()}
+                          Created: {formatDate(key.created_at)}
                           {key.expires_at
-                            ? ` | Expires: ${new Date(
-                                key.expires_at
-                              ).toLocaleDateString()}`
+                            ? ` | Expires: ${formatDate(key.expires_at)}`
                             : " | No Expiration"}
                         </p>
                       </div>

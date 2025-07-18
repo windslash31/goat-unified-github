@@ -1,6 +1,7 @@
 import React, { useState, memo } from "react";
 import { Edit, User, Info, ChevronDown, Key } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { formatDateTime } from "../../utils/formatters";
 
 const DetailItem = ({ label, value }) => {
   if (value === null || typeof value === "undefined" || value === "")
@@ -83,7 +84,7 @@ const AtlassianLogEntry = memo(({ log, isExpanded, onToggle }) => {
               {log.summary}
             </p>
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-              {new Date(log.created).toLocaleString()}
+              {formatDateTime(log.created)}
             </p>
           </div>
         </div>

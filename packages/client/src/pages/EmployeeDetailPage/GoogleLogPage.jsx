@@ -1,6 +1,7 @@
 import React, { useState, memo } from "react";
 import { Shield, Server, ChevronDown, User, Info } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { formatDateTime } from "../../utils/formatters";
 
 const DetailItem = ({ label, value }) => {
   if (value === null || typeof value === "undefined" || value === "")
@@ -84,7 +85,7 @@ const GoogleLogEntry = memo(({ log, isExpanded, onToggle }) => {
               </div>
             </div>
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-              {new Date(log.id.time).toLocaleString()}
+              {formatDateTime(log.id.time)}
             </p>
             <p className="flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400 mt-2">
               <Server size={14} /> {log.ipAddress || "N/A"}

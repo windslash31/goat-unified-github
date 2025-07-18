@@ -17,6 +17,7 @@ import {
 import { Button } from "../../components/ui/Button";
 import { CustomSelect } from "../../components/ui/CustomSelect";
 import { motion, AnimatePresence } from "framer-motion";
+import { formatDateTime } from "../../utils/formatters";
 
 const LogStatusBadge = ({ success }) => {
   const isSuccess = success;
@@ -165,7 +166,7 @@ export const JumpCloudLogPage = memo(({ logs, loading, error }) => {
                       </div>
                     </div>
                     <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                      {new Date(log.timestamp).toLocaleString()}
+                      {formatDateTime(log.timestamp)}
                     </p>
                     <div className="flex items-center gap-4 text-sm text-gray-500 dark:text-gray-400 mt-2">
                       <span className="flex items-center gap-1.5">
