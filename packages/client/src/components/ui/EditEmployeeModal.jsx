@@ -3,15 +3,13 @@ import toast from "react-hot-toast";
 import { Button } from "../../components/ui/Button";
 import { CustomSelect } from "./CustomSelect";
 import { motion, AnimatePresence } from "framer-motion";
-import { useFetchFilterOptions } from "../../hooks/useFetchFilterOptions"; // Corrected import
+import { useFetchFilterOptions } from "../../hooks/useFetchFilterOptions";
 import api from "../../api/api";
-
-// The local 'useFetchOptions' hook should be removed from here if it still exists.
+import { X } from "lucide-react";
 
 export const EditEmployeeModal = ({ employee, onClose, onSave }) => {
   const [formData, setFormData] = useState({ ...employee });
 
-  // These calls will now work correctly because the hook is properly imported.
   const legalEntities = useFetchFilterOptions(
     "employees/options/legal_entities"
   );
@@ -102,10 +100,16 @@ export const EditEmployeeModal = ({ employee, onClose, onSave }) => {
           transition={{ duration: 0.2 }}
           className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-3xl h-full max-h-[90vh] flex flex-col"
         >
-          <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+          <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
             <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
               Edit {employee.first_name}'s Profile
             </h3>
+            <button
+              onClick={onClose}
+              className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"
+            >
+              <X className="w-5 h-5" />
+            </button>
           </div>
           <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto">
             <div className="p-6 space-y-8">

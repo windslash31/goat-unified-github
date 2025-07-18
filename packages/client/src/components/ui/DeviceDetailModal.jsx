@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { Button } from "./Button";
 
-// A reusable row for displaying details, now with an icon
+// A reusable row for displaying details
 const DetailRow = ({ label, value, icon, isMono = false }) => (
   <div className="flex items-start py-2.5 border-b border-gray-200 dark:border-gray-700 last:border-b-0">
     <dt className="w-1/3 text-gray-500 dark:text-gray-400 flex-shrink-0 flex items-center gap-2">
@@ -83,13 +83,12 @@ export const DeviceDetailModal = ({ device, onClose }) => {
             <h3 className="text-lg font-semibold">
               {device.displayName || device.hostname}
             </h3>
-            <Button
+            <button
               onClick={onClose}
-              variant="secondary"
-              className="p-1 h-auto"
+              className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"
             >
-              <X size={20} />
-            </Button>
+              <X className="w-5 h-5" />
+            </button>
           </div>
 
           <div className="p-6 overflow-y-auto space-y-2">
@@ -159,12 +158,6 @@ export const DeviceDetailModal = ({ device, onClose }) => {
                 No valid IPv4 addresses found.
               </p>
             )}
-          </div>
-
-          <div className="px-6 py-3 bg-gray-50 dark:bg-gray-700/50 border-t border-gray-200 dark:border-gray-600 text-right">
-            <Button onClick={onClose} variant="secondary">
-              Close
-            </Button>
           </div>
         </motion.div>
       </motion.div>
