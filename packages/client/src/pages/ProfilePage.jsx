@@ -26,6 +26,7 @@ import { useAuthStore } from "../stores/authStore";
 import { useModalStore } from "../stores/modalStore";
 import api from "../api/api";
 import { EmployeeDetailSkeleton } from "../components/ui/EmployeeDetailSkeleton";
+import { EmployeeApplicationsTab } from "./EmployeeDetailPage/EmployeeApplicationsTab";
 
 const fetchMe = async () => {
   const { data } = await api.get("/api/me");
@@ -142,11 +143,14 @@ export const ProfilePage = ({ employee, permissions, onLogout, user }) => {
   };
 
   const handleAssetClick = (assetDetails) => {
-    if (assetDetails && typeof assetDetails === 'object') {
+    if (assetDetails && typeof assetDetails === "object") {
       setSelectedAsset(assetDetails);
       setIsAssetModalOpen(true);
     } else {
-      console.error("handleAssetClick was called with invalid data:", assetDetails);
+      console.error(
+        "handleAssetClick was called with invalid data:",
+        assetDetails
+      );
     }
   };
 
@@ -187,7 +191,7 @@ export const ProfilePage = ({ employee, permissions, onLogout, user }) => {
           employee={currentEmployee}
           permissions={permissions}
           onTicketClick={handleTicketClick}
-          onAssetClick={handleAssetClick} 
+          onAssetClick={handleAssetClick}
         />
       )}
       {activeTab === "devices" && (

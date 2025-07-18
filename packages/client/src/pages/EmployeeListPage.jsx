@@ -18,45 +18,65 @@ import { EmptyState } from "../components/ui/EmptyState";
 import { useFetchFilterOptions } from "../hooks/useFetchFilterOptions";
 import { useMediaQuery } from "../hooks/useMediaQuery";
 import { useEmployeeTable } from "../hooks/useEmployeeTable";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import api from "../api/api";
 import { EmployeeImportModal } from "../components/ui/EmployeeImportModal";
 import { EmployeeListSkeleton } from "../components/ui/EmployeeListSkeleton";
 import { DesktopTable } from "../components/employees/DesktopTable";
 import { MobileList } from "../components/employees/MobileList";
 
-
 export const EmployeeListPage = () => {
-    
   const {
-      employees,
-      pagination,
-      setPagination,
-      sorting,
-      setSorting,
-      filters,
-      setFilters,
-      isLoading,
-      searchInputValue,
-      setSearchInputValue,
+    employees,
+    pagination,
+    setPagination,
+    sorting,
+    setSorting,
+    filters,
+    setFilters,
+    isLoading,
+    searchInputValue,
+    setSearchInputValue,
   } = useEmployeeTable();
-    
+
   const [isFilterPopoverOpen, setIsFilterPopoverOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const filterButtonRef = useRef(null);
-  
+
   const [selectedRows, setSelectedRows] = useState(new Set());
   const [isBulkActionMenuOpen, setIsBulkActionMenuOpen] = useState(false);
+  const [isHeaderMinimized, setIsHeaderMinimized] = useState(false);
+  const pageRef = useRef(null);
 
   const isDesktop = useMediaQuery("(min-width: 768px)");
 
   const filterOptions = {
     legalEntities: useFetchFilterOptions("employees/options/legal_entities"),
-    officeLocations: useFetchFilterOptions("employees/options/office_locations"),
+    officeLocations: useFetchFilterOptions(
+      "employees/options/office_locations"
+    ),
     employeeTypes: useFetchFilterOptions("employees/options/employee_types"),
-    employeeSubTypes: useFetchFilterOptions("employees/options/employee_sub_types"),
+    employeeSubTypes: useFetchFilterOptions(
+      "employees/options/employee_sub_types"
+    ),
     applications: useFetchFilterOptions("applications"),
   };
+
+  useEffect(() => {
+    const mainContent = document.querySelector("main");
+    if (!mainContent) return;
+
+    const handleScroll = () => {
+      if (mainContent.scrollTop > 50) {
+        setIsHeaderMinimized(true);
+      } else {
+        setIsHeaderMinimized(false);
+      }
+    };
+
+    mainContent.addEventListener("scroll", handleScroll);
+    return () => mainContent.removeEventListener("scroll", handleScroll);
+  }, []);
 
   useEffect(() => {
     setSelectedRows(new Set());
@@ -131,13 +151,10 @@ export const EmployeeListPage = () => {
   };
 
   const handleBulkDeactivate = async () => {
-    const promise = api.post(
-      `/api/employees/bulk-deactivate`,
-      {
-        employeeIds: Array.from(selectedRows),
-        platforms: ["google", "slack", "jumpcloud", "atlassian"],
-      }
-    );
+    const promise = api.post(`/api/employees/bulk-deactivate`, {
+      employeeIds: Array.from(selectedRows),
+      platforms: ["google", "slack", "jumpcloud", "atlassian"],
+    });
 
     toast.promise(promise, {
       loading: "Processing bulk deactivation...",
@@ -149,6 +166,70 @@ export const EmployeeListPage = () => {
       setSelectedRows(new Set());
     });
   };
+
+  const SearchAndFilterActions = ({ isMinimized = false }) => (
+    <>
+      <div className="relative flex-grow">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+        <input
+          type="text"
+          placeholder="Search employees..."
+          value={searchInputValue}
+          onChange={(e) => setSearchInputValue(e.target.value)}
+          className={`w-full pl-10 pr-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-kredivo-primary focus:outline-none ${
+            isMinimized ? "sm:w-full" : "sm:w-64"
+          }`}
+        />
+        {isLoading && (
+          <Loader className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-gray-400" />
+        )}
+      </div>
+      <div className="flex items-center gap-2">
+        <div className="relative">
+          <button
+            ref={filterButtonRef}
+            onClick={() => setIsFilterPopoverOpen(!isFilterPopoverOpen)}
+            className={`flex items-center gap-2 px-4 py-2 border rounded-md text-sm font-medium transition-colors ${
+              areAdvancedFiltersActive || isFilterPopoverOpen
+                ? "bg-kredivo-light text-kredivo-dark-text border-kredivo-primary/30"
+                : "bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700"
+            }`}
+          >
+            <FilterIcon size={16} />
+            {!isMinimized && <span>Advanced</span>}
+            {areAdvancedFiltersActive && !isMinimized && (
+              <div className="w-2 h-2 bg-kredivo-primary rounded-full"></div>
+            )}
+          </button>
+          {isFilterPopoverOpen && (
+            <FilterPopover
+              initialFilters={filters}
+              onApply={setFilters}
+              onClear={handleClearFilters}
+              onClose={() => setIsFilterPopoverOpen(false)}
+              options={filterOptions}
+              buttonRef={filterButtonRef}
+            />
+          )}
+        </div>
+        {!isMinimized && (
+          <>
+            <Button onClick={handleExport} variant="secondary">
+              <Download className="w-4 h-4 mr-2" />
+              Export
+            </Button>
+            <Button
+              onClick={() => setIsImportModalOpen(true)}
+              variant="secondary"
+            >
+              <Upload className="w-4 h-4 mr-2" />
+              Import
+            </Button>
+          </>
+        )}
+      </div>
+    </>
+  );
 
   if (isLoading) {
     return (
@@ -170,7 +251,24 @@ export const EmployeeListPage = () => {
       exit={{ opacity: 0, y: -20 }}
       transition={{ duration: 0.3 }}
       className="p-4 sm:p-6"
+      ref={pageRef}
     >
+      {!isDesktop && (
+        <AnimatePresence>
+          {isHeaderMinimized && (
+            <motion.div
+              initial={{ y: -100, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: -100, opacity: 0 }}
+              transition={{ type: "spring", stiffness: 300, damping: 30 }}
+              className="fixed top-16 left-0 right-0 p-4 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border-b border-gray-200 dark:border-gray-700 z-20 flex items-center gap-2"
+            >
+              <SearchAndFilterActions isMinimized={true} />
+            </motion.div>
+          )}
+        </AnimatePresence>
+      )}
+
       <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mb-2 min-h-[40px]">
         {isDesktop && selectedRows.size > 0 ? (
           <div className="w-full flex justify-between items-center bg-kredivo-light p-2 rounded-lg">
@@ -214,59 +312,13 @@ export const EmployeeListPage = () => {
               Employees
             </h1>
             <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap">
-              <div className="relative flex-grow">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Search employees..."
-                  value={searchInputValue}
-                  onChange={(e) => setSearchInputValue(e.target.value)}
-                  className="w-full sm:w-64 pl-10 pr-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-kredivo-primary focus:outline-none"
-                />
-                {isLoading && (
-                  <Loader className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-gray-400" />
-                )}
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="relative">
-                  <button
-                    ref={filterButtonRef}
-                    onClick={() => setIsFilterPopoverOpen(!isFilterPopoverOpen)}
-                    className={`flex items-center gap-2 px-4 py-2 border rounded-md text-sm font-medium transition-colors ${
-                      areAdvancedFiltersActive || isFilterPopoverOpen
-                        ? "bg-kredivo-light text-kredivo-dark-text border-kredivo-primary/30"
-                        : "bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700"
-                    }`}
-                  >
-                    <FilterIcon size={16} />
-                    <span>Advanced</span>
-                    {areAdvancedFiltersActive && (
-                      <div className="w-2 h-2 bg-kredivo-primary rounded-full"></div>
-                    )}
-                  </button>
-                  {isFilterPopoverOpen && (
-                    <FilterPopover
-                      initialFilters={filters}
-                      onApply={setFilters}
-                      onClear={handleClearFilters}
-                      onClose={() => setIsFilterPopoverOpen(false)}
-                      options={filterOptions}
-                      buttonRef={filterButtonRef}
-                    />
-                  )}
+              {isDesktop ? (
+                <SearchAndFilterActions />
+              ) : (
+                <div className="w-full flex items-center gap-2">
+                  <SearchAndFilterActions />
                 </div>
-                <Button onClick={handleExport} variant="secondary">
-                  <Download className="w-4 h-4 mr-2" />
-                  Export
-                </Button>
-                <Button
-                  onClick={() => setIsImportModalOpen(true)}
-                  variant="secondary"
-                >
-                  <Upload className="w-4 h-4 mr-2" />
-                  Import
-                </Button>
-              </div>
+              )}
             </div>
           </>
         )}
