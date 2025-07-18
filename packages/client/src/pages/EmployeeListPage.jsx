@@ -267,7 +267,12 @@ export const EmployeeListPage = () => {
   // --- MODIFICATION END ---
 
   const handleExport = async () => {
-    const queryParams = new URLSearchParams(filters);
+    const sanitizedFilters = Object.fromEntries(
+      Object.entries(filters).filter(
+        ([_, value]) => value !== null && value !== undefined && value !== ""
+      )
+    );
+    const queryParams = new URLSearchParams(sanitizedFilters);
     try {
       const response = await api.get(
         `/api/employees/export?${queryParams.toString()}`,
