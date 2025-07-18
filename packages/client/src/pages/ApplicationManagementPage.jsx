@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
-import { PlusCircle, Edit, Trash2 } from "lucide-react";
+import { PlusCircle, Edit, Trash2, Briefcase } from "lucide-react";
 import { Button } from "../components/ui/Button";
 import api from "../api/api";
 import { motion } from "framer-motion";
@@ -30,7 +30,8 @@ export const ApplicationManagementPage = () => {
       setNewAppName("");
     },
     onError: (err) => {
-      const errorMessage = err.response?.data?.message || "Failed to create application.";
+      const errorMessage =
+        err.response?.data?.message || "Failed to create application.";
       toast.error(errorMessage);
     },
   });
@@ -43,8 +44,9 @@ export const ApplicationManagementPage = () => {
       setEditingApp(null);
     },
     onError: (err) => {
-        const errorMessage = err.response?.data?.message || "Failed to update application.";
-        toast.error(errorMessage);
+      const errorMessage =
+        err.response?.data?.message || "Failed to update application.";
+      toast.error(errorMessage);
     },
   });
 
@@ -55,8 +57,9 @@ export const ApplicationManagementPage = () => {
       queryClient.invalidateQueries(["applications"]);
     },
     onError: (err) => {
-        const errorMessage = err.response?.data?.message || "Failed to delete application.";
-        toast.error(errorMessage);
+      const errorMessage =
+        err.response?.data?.message || "Failed to delete application.";
+      toast.error(errorMessage);
     },
   });
 
@@ -114,66 +117,76 @@ export const ApplicationManagementPage = () => {
         </div>
         <div>
           <h2 className="text-lg font-semibold mb-2">Existing Applications</h2>
-          <ul className="space-y-2">
-            {applications?.map((app) => (
-              <li
-                key={app.id}
-                className="flex items-center justify-between p-2 bg-gray-100 dark:bg-gray-800 rounded-md"
-              >
-                {editingApp?.id === app.id ? (
-                  <form
-                    onSubmit={handleUpdate}
-                    className="flex-grow flex gap-2"
-                  >
-                    <input
-                      type="text"
-                      value={editingApp.name}
-                      onChange={(e) =>
-                        setEditingApp({ ...editingApp, name: e.target.value })
-                      }
-                      className="flex-grow px-3 py-1 border rounded-md dark:bg-gray-700 dark:border-gray-600"
-                    />
-                    <Button
-                      type="submit"
-                      size="sm"
-                      disabled={updateMutation.isLoading}
+          {applications && applications.length > 0 ? (
+            <ul className="space-y-2">
+              {applications.map((app) => (
+                <li
+                  key={app.id}
+                  className="flex items-center justify-between p-2 bg-gray-100 dark:bg-gray-800 rounded-md"
+                >
+                  {editingApp?.id === app.id ? (
+                    <form
+                      onSubmit={handleUpdate}
+                      className="flex-grow flex gap-2"
                     >
-                      Save
-                    </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="secondary"
-                      onClick={() => setEditingApp(null)}
-                    >
-                      Cancel
-                    </Button>
-                  </form>
-                ) : (
-                  <>
-                    <span>{app.name}</span>
-                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={editingApp.name}
+                        onChange={(e) =>
+                          setEditingApp({ ...editingApp, name: e.target.value })
+                        }
+                        className="flex-grow px-3 py-1 border rounded-md dark:bg-gray-700 dark:border-gray-600"
+                      />
                       <Button
+                        type="submit"
+                        size="sm"
+                        disabled={updateMutation.isLoading}
+                      >
+                        Save
+                      </Button>
+                      <Button
+                        type="button"
                         size="sm"
                         variant="secondary"
-                        onClick={() => setEditingApp(app)}
+                        onClick={() => setEditingApp(null)}
                       >
-                        <Edit size={14} />
+                        Cancel
                       </Button>
-                      <Button
-                        size="sm"
-                        variant="danger"
-                        onClick={() => deleteMutation.mutate(app.id)}
-                        disabled={deleteMutation.isLoading}
-                      >
-                        <Trash2 size={14} />
-                      </Button>
-                    </div>
-                  </>
-                )}
-              </li>
-            ))}
-          </ul>
+                    </form>
+                  ) : (
+                    <>
+                      <span>{app.name}</span>
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => setEditingApp(app)}
+                        >
+                          <Edit size={14} />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="danger"
+                          onClick={() => deleteMutation.mutate(app.id)}
+                          disabled={deleteMutation.isLoading}
+                        >
+                          <Trash2 size={14} />
+                        </Button>
+                      </div>
+                    </>
+                  )}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <div className="text-center py-10 text-gray-500 dark:text-gray-400 border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-lg">
+              <Briefcase className="mx-auto w-10 h-10 text-gray-400" />
+              <p className="font-semibold mt-4">No Applications Found</p>
+              <p className="text-sm mt-1">
+                Add a new application using the form on the left.
+              </p>
+            </div>
+          )}
         </div>
       </div>
     </motion.div>
