@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -167,27 +167,27 @@ export const EmployeeDetailPage = ({ permissions, onLogout }) => {
     setIsMoreMenuOpen(false);
   };
 
-  const handleTicketClick = useCallback((ticketId) => {
+  const handleTicketClick = (ticketId) => {
     if (ticketId) {
       setSelectedTicketId(ticketId);
       setIsJiraModalOpen(true);
     }
-  }, []);
+  };
 
-  const handleAssetClick = useCallback((asset) => {
+  const handleAssetClick = (asset) => {
     if (asset) {
       setSelectedAsset(asset);
       setIsAssetModalOpen(true);
     }
-  }, []);
+  };
 
-  const handleEdit = useCallback(() => {
+  const handleEdit = () => {
     openModal("editEmployee", employee);
-  }, [employee, openModal]);
+  };
 
-  const handleDeactivate = useCallback(() => {
+  const handleDeactivate = () => {
     openModal("deactivateEmployee", employee);
-  }, [employee, openModal]);
+  };
 
   const TabButton = ({ id, label, shortLabel, icon }) => (
     <button
