@@ -330,7 +330,6 @@ const getEmployeeDevices = async (req, res, next) => {
   }
 };
 
-// --- START: NEW CONTROLLER FUNCTION ---
 const syncPlatformStatus = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -370,8 +369,6 @@ const triggerPlatformSync = async (req, res, next) => {
   }
 };
 
-// --- END: NEW CONTROLLER FUNCTION ---
-
 module.exports = {
   listEmployees,
   getEmployee,
@@ -394,4 +391,5 @@ module.exports = {
   getEmployeeImportTemplate,
   getEmployeeDevices,
   syncPlatformStatus,
+  triggerPlatformSync,
 };
