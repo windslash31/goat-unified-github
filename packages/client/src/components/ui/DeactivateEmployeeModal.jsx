@@ -3,6 +3,8 @@ import toast from "react-hot-toast";
 import { ShieldAlert, X } from "lucide-react";
 import { Button } from "./Button";
 import { motion, AnimatePresence } from "framer-motion";
+import useApiMutation from '../../hooks/useApiMutation';
+import api from "../../api/api";
 
 const PlatformIcon = ({ platform }) => {
   const icons = { google: "G", slack: "S", jumpcloud: "J", atlassian: "A" };
@@ -30,7 +32,13 @@ export const DeactivateEmployeeModal = ({
 }) => {
   const platforms = ["google", "slack", "jumpcloud", "atlassian"];
   const [selectedPlatforms, setSelectedPlatforms] = useState(platforms);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const mutation = useApiMutation({
+    mutationFn: (platformsToDeactivate) =>
+      api.post(`/api/employees/${employee.id}/deactivate`, { platforms: platformsToDeactivate }),
+    queryKeyToInvalidate: 'employees',
+    errorMessage: 'An error occurred during suspension',
+  });
 
   const handleToggle = (platform) => {
     setSelectedPlatforms((prev) =>
@@ -45,48 +53,25 @@ export const DeactivateEmployeeModal = ({
     else setSelectedPlatforms(platforms);
   };
 
-  const handleSubmit = async () => {
-    setIsSubmitting(true);
-    const token = localStorage.getItem("accessToken");
+  const handleSubmit = () => {
+    mutation.mutate(selectedPlatforms, {
+      onSuccess: (data) => {
+        const successCount = data.data.results.filter(
+          (r) => r.status === "SUCCESS"
+        ).length;
+        const failCount = data.data.results.filter(
+          (r) => r.status === "FAILED"
+        ).length;
+        toast.success(
+          `Suspension process finished. Success: ${successCount}, Failed: ${failCount}.`
+        );
 
-    try {
-      const response = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL}/api/employees/${
-          employee.id
-        }/deactivate`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ platforms: selectedPlatforms }),
+        if (onDeactivateSuccess) {
+          onDeactivateSuccess();
         }
-      );
-
-      const data = await response.json();
-      if (!response.ok)
-        throw new Error(data.message || "Failed to process suspensions.");
-
-      const successCount = data.results.filter(
-        (r) => r.status === "SUCCESS"
-      ).length;
-      const failCount = data.results.filter(
-        (r) => r.status === "FAILED"
-      ).length;
-      toast.success(
-        `Suspension process finished. Success: ${successCount}, Failed: ${failCount}.`
-      );
-
-      if (onDeactivateSuccess) {
-        onDeactivateSuccess();
-      }
-      onClose();
-    } catch (error) {
-      toast.error(error.message || "An error occurred.");
-    } finally {
-      setIsSubmitting(false);
-    }
+        onClose();
+      },
+    });
   };
 
   return (
@@ -192,7 +177,7 @@ export const DeactivateEmployeeModal = ({
             <Button
               type="button"
               onClick={onClose}
-              disabled={isSubmitting}
+              disabled={mutation.isLoading}
               className="w-full mt-3 sm:mt-0 sm:w-auto inline-flex justify-center rounded-md border border-gray-300 dark:border-gray-500 shadow-sm px-4 py-2 bg-white dark:bg-gray-600 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-500 focus:outline-none"
             >
               Cancel
@@ -200,10 +185,10 @@ export const DeactivateEmployeeModal = ({
             <Button
               type="button"
               onClick={handleSubmit}
-              disabled={isSubmitting || selectedPlatforms.length === 0}
+              disabled={mutation.isLoading || selectedPlatforms.length === 0}
               className="w-full sm:w-auto sm:ml-3 inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isSubmitting
+              {mutation.isLoading
                 ? "Suspending..."
                 : `Confirm Suspension (${selectedPlatforms.length})`}
             </Button>

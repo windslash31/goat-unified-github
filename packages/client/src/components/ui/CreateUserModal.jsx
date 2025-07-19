@@ -47,8 +47,11 @@ export const CreateUserModal = ({ roles, onClose, onUserCreated }) => {
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
                 Create New User
               </h3>
-              <button type="button" onClick={onClose} /* ... */>
-                <X className="w-5 h-5" />
+              <button
+                type="button"
+                onClick={onClose}
+                className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"
+              >                <X className="w-5 h-5" />
               </button>
             </div>
             <div className="p-6">
