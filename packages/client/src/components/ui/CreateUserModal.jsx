@@ -1,56 +1,35 @@
-import React, { useState } from "react";
-import toast from "react-hot-toast";
+import React from "react";
+import { useForm, Controller } from "react-hook-form";
 import { Button } from "./Button";
 import { CustomSelect } from "./CustomSelect";
 import { motion, AnimatePresence } from "framer-motion";
 import { X } from "lucide-react";
+import useApiMutation from '../../hooks/useApiMutation';
+import  api  from "../../api/api";
 
 export const CreateUserModal = ({ roles, onClose, onUserCreated }) => {
-  const [formData, setFormData] = useState({
-    fullName: "",
-    email: "",
-    roleId: "",
+  const {
+    register,
+    handleSubmit,
+    control,
+    formState: { errors, isValid },
+  } = useForm({
+    mode: "onChange",
   });
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-  };
+  const mutation = useApiMutation({
+    mutationFn: (newUser) => api.post('/api/users', newUser),
+    queryKeyToInvalidate: 'users',
+    successMessage: 'User created successfully!',
+    errorMessage: 'Failed to create user',
+  });
 
-  const handleRoleChange = (newRoleId) => {
-    setFormData((prev) => ({ ...prev, roleId: newRoleId }));
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setIsSubmitting(true);
-    const token = localStorage.getItem("accessToken");
-
-    try {
-      const response = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL}/api/users`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(formData),
-        }
-      );
-
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.message || "Failed to create user.");
-      }
-
-      onUserCreated(data.temporaryPassword);
-    } catch (error) {
-      toast.error(error.message || "An error occurred.");
-    } finally {
-      setIsSubmitting(false);
-    }
+  const onSubmit = (data) => {
+    mutation.mutate(data, {
+      onSuccess: (responseData) => {
+        onUserCreated(responseData.data.temporaryPassword);
+      },
+    });
   };
 
   const roleOptions = roles.map((role) => ({ id: role.id, name: role.name }));
@@ -58,28 +37,17 @@ export const CreateUserModal = ({ roles, onClose, onUserCreated }) => {
   return (
     <AnimatePresence>
       <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
         className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-50"
       >
         <motion.div
-          initial={{ scale: 0.9, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          exit={{ scale: 0.9, opacity: 0 }}
-          transition={{ duration: 0.2 }}
           className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-md"
         >
-          <form onSubmit={handleSubmit}>
+          <form onSubmit={handleSubmit(onSubmit)}>
             <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
                 Create New User
               </h3>
-              <button
-                type="button"
-                onClick={onClose}
-                className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"
-              >
+              <button type="button" onClick={onClose} /* ... */>
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -90,21 +58,16 @@ export const CreateUserModal = ({ roles, onClose, onUserCreated }) => {
               </p>
               <div className="mt-6 space-y-4">
                 <div>
-                  <label
-                    htmlFor="fullName"
-                    className="block text-sm font-medium"
-                  >
+                  <label htmlFor="fullName" className="block text-sm font-medium">
                     Full Name
                   </label>
                   <input
                     type="text"
-                    name="fullName"
                     id="fullName"
-                    required
-                    value={formData.fullName}
-                    onChange={handleChange}
+                    {...register("fullName", { required: "Full name is required" })}
                     className="mt-1 w-full px-3 py-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
                   />
+                  {errors.fullName && <p className="text-red-500 text-xs mt-1">{errors.fullName.message}</p>}
                 </div>
                 <div>
                   <label htmlFor="email" className="block text-sm font-medium">
@@ -112,25 +75,31 @@ export const CreateUserModal = ({ roles, onClose, onUserCreated }) => {
                   </label>
                   <input
                     type="email"
-                    name="email"
                     id="email"
-                    required
-                    value={formData.email}
-                    onChange={handleChange}
+                    {...register("email", { required: "Email is required" })}
                     className="mt-1 w-full px-3 py-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
                   />
+                   {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email.message}</p>}
                 </div>
                 <div>
                   <label htmlFor="roleId" className="block text-sm font-medium">
                     Role
                   </label>
-                  <CustomSelect
-                    id="roleId"
-                    value={formData.roleId}
-                    options={roleOptions}
-                    onChange={handleRoleChange}
-                    placeholder="Select a role..."
+                  <Controller
+                    name="roleId"
+                    control={control}
+                    rules={{ required: "Role is required" }}
+                    render={({ field }) => (
+                      <CustomSelect
+                        id="roleId"
+                        options={roleOptions}
+                        value={field.value}
+                        onChange={field.onChange}
+                        placeholder="Select a role..."
+                      />
+                    )}
                   />
+                   {errors.roleId && <p className="text-red-500 text-xs mt-1">{errors.roleId.message}</p>}
                 </div>
               </div>
             </div>
@@ -138,17 +107,17 @@ export const CreateUserModal = ({ roles, onClose, onUserCreated }) => {
               <Button
                 type="button"
                 onClick={onClose}
-                disabled={isSubmitting}
+                disabled={mutation.isLoading}
                 variant="secondary"
               >
                 Cancel
               </Button>
               <Button
                 type="submit"
-                disabled={isSubmitting || !formData.roleId}
+                disabled={!isValid || mutation.isLoading}
                 variant="primary"
               >
-                {isSubmitting ? "Creating..." : "Create User"}
+                {mutation.isLoading ? "Creating..." : "Create User"}
               </Button>
             </div>
           </form>
