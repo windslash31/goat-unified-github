@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState } from "react";
 import toast from "react-hot-toast";
+import { useQuery } from "@tanstack/react-query";
 import { KeyRound, Plus, Trash2, X } from "lucide-react";
 import { Button } from "./Button";
 import { ConfirmationModal } from "./ConfirmationModal";
@@ -7,59 +8,60 @@ import { NewApiKeyModal } from "./NewApiKeyModal";
 import api from "../../api/api";
 import { motion, AnimatePresence } from "framer-motion";
 import { formatDate } from "../../utils/formatters";
+import useApiMutation from '../../hooks/useApiMutation';
+
+const fetchKeys = async (userId) => {
+  const { data } = await api.get(`/api/users/${userId}/api-keys`);
+  return data;
+};
 
 export const ApiKeyManagerModal = ({ user, onClose }) => {
-  const [keys, setKeys] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [description, setDescription] = useState("");
   const [expiresInDays, setExpiresInDays] = useState(30);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
   const [keyToDelete, setKeyToDelete] = useState(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-
   const [newlyGeneratedKey, setNewlyGeneratedKey] = useState(null);
 
-  const fetchKeys = useCallback(async () => {
-    setLoading(true);
-    try {
-      const { data } = await api.get(`/api/users/${user.id}/api-keys`);
-      setKeys(data);
-    } catch (error) {
-      toast.error("Failed to load API keys.");
-      console.error(error);
-    } finally {
-      setLoading(false);
-    }
-  }, [user.id]);
+  const { data: keys = [], isLoading: loading, isError } = useQuery({
+    queryKey: ['apiKeys', user.id],
+    queryFn: () => fetchKeys(user.id),
+  });
 
-  useEffect(() => {
-    fetchKeys();
-  }, [fetchKeys]);
+  const createKeyMutation = useApiMutation({
+    mutationFn: (newKeyData) => api.post(`/api/users/${user.id}/api-keys`, newKeyData),
+    queryKeyToInvalidate: ['apiKeys', user.id],
+    errorMessage: "Failed to generate API key",
+  });
 
-  const handleGenerateKey = async (e) => {
+  const deleteKeyMutation = useApiMutation({
+    mutationFn: (keyId) => api.delete(`/api/users/api-keys/${keyId}`),
+    queryKeyToInvalidate: ['apiKeys', user.id],
+    successMessage: "API Key revoked successfully!",
+    errorMessage: "Failed to revoke API key",
+  });
+
+  const handleGenerateKey = (e) => {
     e.preventDefault();
     if (!description.trim()) {
-      toast.error("Please provide a description for the key.");
-      return;
+      return toast.error("Please provide a description for the key.");
     }
-    setIsSubmitting(true);
-    try {
-      const { data } = await api.post(`/api/users/${user.id}/api-keys`, {
-        description,
-        expiresInDays,
-      });
-      setNewlyGeneratedKey(data.newKey); // Show the new key modal
-      setDescription("");
-      setExpiresInDays(30); // Reset to default
-      fetchKeys(); // Refresh the list of keys
-    } catch (error) {
-      toast.error(
-        error.response?.data?.message || "Failed to generate API key."
-      );
-    } finally {
-      setIsSubmitting(false);
-    }
+    createKeyMutation.mutate({ description, expiresInDays }, {
+      onSuccess: (data) => {
+        setNewlyGeneratedKey(data.data.newKey);
+        setDescription("");
+        setExpiresInDays(30);
+      }
+    });
+  };
+
+  const handleDeleteKey = () => {
+    if (!keyToDelete) return;
+    deleteKeyMutation.mutate(keyToDelete.id, {
+      onSuccess: () => {
+        setIsDeleteModalOpen(false);
+        setKeyToDelete(null);
+      }
+    });
   };
 
   const openDeleteModal = (key) => {
@@ -67,19 +69,11 @@ export const ApiKeyManagerModal = ({ user, onClose }) => {
     setIsDeleteModalOpen(true);
   };
 
-  const handleDeleteKey = async () => {
-    if (!keyToDelete) return;
-    try {
-      await api.delete(`/api/users/api-keys/${keyToDelete.id}`);
-      toast.success("API Key revoked successfully!");
-      fetchKeys(); // Refresh list
-    } catch (error) {
-      toast.error("Failed to revoke API key.");
-    } finally {
-      setIsDeleteModalOpen(false);
-      setKeyToDelete(null);
-    }
-  };
+  if (isError) {
+      toast.error("Failed to load API keys.");
+      onClose();
+      return null;
+  }
 
   return (
     <>
@@ -131,8 +125,10 @@ export const ApiKeyManagerModal = ({ user, onClose }) => {
                         onClick={() => openDeleteModal(key)}
                         variant="danger"
                         className="px-2 py-1 text-xs"
+                        disabled={deleteKeyMutation.isLoading && keyToDelete?.id === key.id}
                       >
-                        <Trash2 className="w-3 h-3 mr-1" /> Revoke
+                        <Trash2 className="w-3 h-3 mr-1" />
+                        {deleteKeyMutation.isLoading && keyToDelete?.id === key.id ? 'Revoking...' : 'Revoke'}
                       </Button>
                     </li>
                   ))}
@@ -176,12 +172,12 @@ export const ApiKeyManagerModal = ({ user, onClose }) => {
                 </div>
                 <Button
                   type="submit"
-                  disabled={isSubmitting}
+                  disabled={createKeyMutation.isLoading}
                   variant="primary"
                   className="w-full sm:w-auto justify-center"
                 >
                   <Plus className="w-4 h-4 mr-2" />
-                  {isSubmitting ? "Generating..." : "Generate"}
+                  {createKeyMutation.isLoading ? "Generating..." : "Generate"}
                 </Button>
               </div>
             </form>
@@ -196,6 +192,7 @@ export const ApiKeyManagerModal = ({ user, onClose }) => {
         title="Revoke API Key"
         message={`This will permanently revoke the key. This action is irreversible.`}
         confirmationText={keyToDelete?.description}
+        isConfirming={deleteKeyMutation.isLoading}
       />
 
       {newlyGeneratedKey && (
