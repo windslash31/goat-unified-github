@@ -19,8 +19,28 @@ import { motion } from "framer-motion";
 import { DashboardSkeleton } from "../components/ui/DashboardSkeleton";
 import { formatDateTime } from "../utils/formatters";
 
-const fetchDashboardData = async () => {
-  const { data } = await api.get("/api/dashboard");
+const fetchDashboardStats = async () => {
+  const { data } = await api.get("/api/dashboard/stats");
+  return data;
+};
+
+const fetchLicenseStats = async () => {
+  const { data } = await api.get("/api/dashboard/license-stats");
+  return data;
+};
+
+const fetchLocationDistribution = async () => {
+  const { data } = await api.get("/api/dashboard/distribution");
+  return data;
+};
+
+const fetchRecentActivity = async () => {
+  const { data } = await api.get("/api/dashboard/activity");
+  return data;
+};
+
+const fetchRecentTickets = async () => {
+  const { data } = await api.get("/api/dashboard/tickets");
   return data;
 };
 
@@ -151,21 +171,38 @@ const ActivityListItem = ({ log }) => {
 };
 
 export const DashboardPage = () => {
-  const { data, isLoading, error } = useQuery({
-    queryKey: ["dashboardData"],
-    queryFn: fetchDashboardData,
+  const { data: stats, isLoading: isLoadingStats } = useQuery({
+    queryKey: ["dashboardStats"],
+    queryFn: fetchDashboardStats,
   });
 
-  if (isLoading) return <DashboardSkeleton />;
-  if (error)
+  const { data: licenseStats, isLoading: isLoadingLicenses } = useQuery({
+    queryKey: ["dashboardLicenseStats"],
+    queryFn: fetchLicenseStats,
+  });
+
+  const { data: distribution, isLoading: isLoadingDistribution } = useQuery({
+    queryKey: ["dashboardDistribution"],
+    queryFn: fetchLocationDistribution,
+  });
+
+  const { data: recentActivity, isLoading: isLoadingActivity } = useQuery({
+    queryKey: ["dashboardRecentActivity"],
+    queryFn: fetchRecentActivity,
+  });
+
+  const { data: recentTickets, isLoading: isLoadingTickets } = useQuery({
+    queryKey: ["dashboardRecentTickets"],
+    queryFn: fetchRecentTickets,
+  });
+
+  if (isLoadingStats) return <DashboardSkeleton />;
+  if (!stats)
     return (
       <div className="p-6 text-center text-red-500">
         Could not load dashboard data.
       </div>
     );
-
-  const { stats, recentActivity, recentTickets, licenseStats, distribution } =
-    data || {};
 
   return (
     <motion.div
@@ -219,71 +256,87 @@ export const DashboardPage = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         <div className="lg:col-span-8 space-y-6">
-          {licenseStats && (
-            <BarChart data={licenseStats} title="License Utilization" />
+          {isLoadingLicenses ? (
+            <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm h-48 animate-pulse border border-gray-200 dark:border-gray-700"></div>
+          ) : (
+            licenseStats && (
+              <BarChart data={licenseStats} title="License Utilization" />
+            )
           )}
-          {distribution && (
-            <DistributionList
-              data={distribution}
-              title="Active Employees by Location"
-            />
+          {isLoadingDistribution ? (
+            <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm h-48 animate-pulse border border-gray-200 dark:border-gray-700"></div>
+          ) : (
+            distribution && (
+              <DistributionList
+                data={distribution}
+                title="Active Employees by Location"
+              />
+            )
           )}
         </div>
 
         <div className="lg:col-span-4 space-y-6">
-          {recentActivity && (
-            <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
-              <h2 className="text-lg font-semibold mb-2 flex items-center gap-2">
-                <Activity /> Recent Activity
-              </h2>
-              <div className="space-y-2">
-                {recentActivity.map((log) => (
-                  <ActivityListItem key={log.id} log={log} />
-                ))}
+          {isLoadingActivity ? (
+            <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm h-64 animate-pulse border border-gray-200 dark:border-gray-700"></div>
+          ) : (
+            recentActivity && (
+              <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+                <h2 className="text-lg font-semibold mb-2 flex items-center gap-2">
+                  <Activity /> Recent Activity
+                </h2>
+                <div className="space-y-2">
+                  {recentActivity.map((log) => (
+                    <ActivityListItem key={log.id} log={log} />
+                  ))}
+                </div>
               </div>
-            </div>
+            )
           )}
-          {recentTickets && (
-            <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
-              <h2 className="text-lg font-semibold mb-2 flex items-center gap-2">
-                <Ticket /> Recent Tickets
-              </h2>
-              <div className="space-y-2">
-                {recentTickets.map((ticket) => (
-                  <div
-                    key={`${ticket.ticket_type}-${ticket.id}`}
-                    className="flex items-center gap-4 py-2"
-                  >
+          {isLoadingTickets ? (
+            <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm h-64 animate-pulse border border-gray-200 dark:border-gray-700"></div>
+          ) : (
+            recentTickets && (
+              <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+                <h2 className="text-lg font-semibold mb-2 flex items-center gap-2">
+                  <Ticket /> Recent Tickets
+                </h2>
+                <div className="space-y-2">
+                  {recentTickets.map((ticket) => (
                     <div
-                      className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                        ticket.ticket_type === "Onboarding"
-                          ? "bg-green-100"
-                          : "bg-red-100"
-                      }`}
+                      key={`${ticket.ticket_type}-${ticket.id}`}
+                      className="flex items-center gap-4 py-2"
                     >
-                      <Ticket
-                        className={`w-5 h-5 ${
+                      <div
+                        className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${
                           ticket.ticket_type === "Onboarding"
-                            ? "text-green-600"
-                            : "text-red-600"
+                            ? "bg-green-100"
+                            : "bg-red-100"
                         }`}
-                      />
+                      >
+                        <Ticket
+                          className={`w-5 h-5 ${
+                            ticket.ticket_type === "Onboarding"
+                              ? "text-green-600"
+                              : "text-red-600"
+                          }`}
+                        />
+                      </div>
+                      <div>
+                        <p className="text-sm">
+                          <span className="font-semibold">
+                            {ticket.ticket_type}:
+                          </span>{" "}
+                          {ticket.first_name} {ticket.last_name}
+                        </p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                          {ticket.ticket_id}
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-sm">
-                        <span className="font-semibold">
-                          {ticket.ticket_type}:
-                        </span>{" "}
-                        {ticket.first_name} {ticket.last_name}
-                      </p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">
-                        {ticket.ticket_id}
-                      </p>
-                    </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
-            </div>
+            )
           )}
         </div>
       </div>

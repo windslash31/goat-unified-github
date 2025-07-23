@@ -190,7 +190,7 @@ const AppContent = () => {
     return (
       <Suspense
         fallback={
-          <div className="flex h-screen w-full items-center justify-center text-lg">
+          <div className="flex h-screen w-screen items-center justify-center text-lg">
             Loading...
           </div>
         }
@@ -290,11 +290,12 @@ const AppContent = () => {
               </Suspense>
             }
           >
+            {/* --- THIS IS THE FIX --- */}
             <Route
               path="users"
               element={
                 <Suspense fallback={<UserManagementSkeleton />}>
-                  <UserManagementSkeleton />
+                  <UserManagementPage />
                 </Suspense>
               }
             />
