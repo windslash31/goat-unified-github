@@ -6,20 +6,13 @@ import toast from "react-hot-toast";
 import { Button } from "./Button";
 import { motion, AnimatePresence } from "framer-motion";
 import { JIRA_ISSUE_TYPE_MAPPERS } from "../../config/jiraFieldMapping";
+import api from "../../api/api";
 
-const fetchTicketDetails = async (ticketId, token) => {
-  if (!ticketId || !token) return null;
-  const response = await fetch(
-    `${import.meta.env.VITE_API_BASE_URL}/api/jira/ticket/${ticketId}`,
-    {
-      headers: { Authorization: `Bearer ${token}` },
-    }
-  );
-  if (!response.ok) {
-    const err = await response.json();
-    throw new Error(err.message || "Failed to fetch Jira ticket details.");
-  }
-  return response.json();
+const fetchTicketDetails = async (ticketId) => {
+  if (!ticketId) return null;
+  // The 'api' instance automatically includes the auth header
+  const { data } = await api.get(`/api/jira/ticket/${ticketId}`);
+  return data;
 };
 
 const DetailRow = ({ label, value, type, isMono }) => {
@@ -84,16 +77,14 @@ const AssetDetails = ({ asset }) => {
 };
 
 export const JiraTicketModal = ({ ticketId, onClose }) => {
-  const token = localStorage.getItem("accessToken");
-
   const {
     data: ticket,
     error,
     isLoading,
   } = useQuery({
     queryKey: ["jiraTicket", ticketId],
-    queryFn: () => fetchTicketDetails(ticketId, token),
-    enabled: !!ticketId && !!token,
+    queryFn: () => fetchTicketDetails(ticketId),
+    enabled: !!ticketId,
   });
 
   useEffect(() => {
