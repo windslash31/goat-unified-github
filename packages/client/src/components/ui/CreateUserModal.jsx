@@ -4,6 +4,7 @@ import { Button } from "./Button";
 import { CustomSelect } from "./CustomSelect";
 import { motion, AnimatePresence } from "framer-motion";
 import { X } from "lucide-react";
+import api from "../../api/api";
 
 export const CreateUserModal = ({ roles, onClose, onUserCreated }) => {
   const [formData, setFormData] = useState({
@@ -25,29 +26,12 @@ export const CreateUserModal = ({ roles, onClose, onUserCreated }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
-    const token = localStorage.getItem("accessToken");
 
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL}/api/users`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(formData),
-        }
-      );
-
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.message || "Failed to create user.");
-      }
-
+      const { data } = await api.post("/api/users", formData);
       onUserCreated(data.temporaryPassword);
     } catch (error) {
-      toast.error(error.message || "An error occurred.");
+      toast.error(error.response?.data?.message || "An error occurred.");
     } finally {
       setIsSubmitting(false);
     }

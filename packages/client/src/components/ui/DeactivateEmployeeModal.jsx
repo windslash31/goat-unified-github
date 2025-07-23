@@ -3,6 +3,7 @@ import toast from "react-hot-toast";
 import { ShieldAlert, X } from "lucide-react";
 import { Button } from "./Button";
 import { motion, AnimatePresence } from "framer-motion";
+import api from "../../api/api";
 
 const PlatformIcon = ({ platform }) => {
   const icons = { google: "G", slack: "S", jumpcloud: "J", atlassian: "A" };
@@ -47,26 +48,12 @@ export const DeactivateEmployeeModal = ({
 
   const handleSubmit = async () => {
     setIsSubmitting(true);
-    const token = localStorage.getItem("accessToken");
 
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL}/api/employees/${
-          employee.id
-        }/deactivate`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ platforms: selectedPlatforms }),
-        }
+      const { data } = await api.post(
+        `/api/employees/${employee.id}/deactivate`,
+        { platforms: selectedPlatforms }
       );
-
-      const data = await response.json();
-      if (!response.ok)
-        throw new Error(data.message || "Failed to process suspensions.");
 
       const successCount = data.results.filter(
         (r) => r.status === "SUCCESS"
@@ -83,7 +70,7 @@ export const DeactivateEmployeeModal = ({
       }
       onClose();
     } catch (error) {
-      toast.error(error.message || "An error occurred.");
+      toast.error(error.response?.data?.message || "An error occurred.");
     } finally {
       setIsSubmitting(false);
     }

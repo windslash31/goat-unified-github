@@ -5,6 +5,7 @@ import { Button } from "../../components/ui/Button";
 import { JumpCloudLogPage } from "./JumpcloudLogPage";
 import { GoogleLogPage } from "./GoogleLogPage";
 import { SlackLogPage } from "./SlackLogPage";
+import api from "../../api/api";
 
 const platformOptions = [
   { id: "jumpcloud", name: "JumpCloud" },
@@ -38,28 +39,22 @@ export const PlatformLogPage = ({ employeeId, onLogout }) => {
     fetched: false,
   });
 
-  // Centralized filter state
   const [filterParams, setFilterParams] = useState({
     startTime: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
       .toISOString()
       .split("T")[0],
     endTime: new Date().toISOString().split("T")[0],
     limit: 100,
-    service: "all", // Add service to the filter state
+    service: "all",
   });
 
   const fetchLogData = useCallback(async () => {
     if (!employeeId) return;
 
     setLogData({ data: [], loading: true, error: null, fetched: false });
-    const token = localStorage.getItem("accessToken");
-    if (!token) {
-      onLogout();
-      return;
-    }
 
     let url;
-    const baseUrl = `${import.meta.env.VITE_API_BASE_URL}/api/employees/${employeeId}`; // Changed from process.env.REACT_APP_API_BASE_URL
+    const baseUrl = `/api/employees/${employeeId}`;
 
     switch (selectedPlatform) {
       case "jumpcloud":
@@ -67,7 +62,7 @@ export const PlatformLogPage = ({ employeeId, onLogout }) => {
           startTime: filterParams.startTime,
           endTime: filterParams.endTime,
           limit: filterParams.limit,
-          service: filterParams.service, // Include service in the request
+          service: filterParams.service,
         });
         url = `${baseUrl}/jumpcloud-logs?${params.toString()}`;
         break;
@@ -88,24 +83,17 @@ export const PlatformLogPage = ({ employeeId, onLogout }) => {
     }
 
     try {
-      const response = await fetch(url, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!response.ok) {
-        const err = await response.json();
-        throw new Error(err.message || "Failed to fetch logs");
-      }
-      const data = await response.json();
+      const { data } = await api.get(url);
       setLogData({ data, loading: false, error: null, fetched: true });
     } catch (error) {
       setLogData({
         data: [],
         loading: false,
-        error: error.message,
+        error: error.response?.data?.message || "Failed to fetch logs",
         fetched: true,
       });
     }
-  }, [employeeId, selectedPlatform, filterParams, onLogout]);
+  }, [employeeId, selectedPlatform, filterParams]);
 
   const handleFilterChange = (e) => {
     setFilterParams((prev) => ({ ...prev, [e.target.name]: e.target.value }));
