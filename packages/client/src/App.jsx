@@ -1,12 +1,7 @@
 // src/App.jsx
 import React, { Suspense, lazy, useCallback, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  Routes,
-  Route,
-  useLocation,
-  Navigate,
-} from "react-router-dom";
+import { Routes, Route, useLocation, Navigate } from "react-router-dom";
 import { BreadcrumbProvider, useBreadcrumb } from "./context/BreadcrumbContext";
 import { ThemeProvider } from "./context/ThemeContext";
 import { MainLayout } from "./components/layout/MainLayout";
@@ -161,23 +156,26 @@ const AppContent = () => {
     }
 
     const pageTitleMap = {
-        profile: { name: "Profile", path: "/profile" },
-        employees: { name: "Employees", path: "/employees" },
-        settings: { name: "Settings", path: "/settings" },
-        users: { name: "User Management", path: "/settings/users" },
-        roles: { name: "Roles & Permissions", path: "/settings/roles" },
-        applications: { name: "Application Management", path: "/settings/applications"},
-        "access-denied": { name: "Access Denied", path: "/access-denied" },
-        logs: { name: "Logs" },
-        activity: { name: "Activity Log", path: "/logs/activity" },
+      profile: { name: "Profile", path: "/profile" },
+      employees: { name: "Employees", path: "/employees" },
+      settings: { name: "Settings", path: "/settings" },
+      users: { name: "User Management", path: "/settings/users" },
+      roles: { name: "Roles & Permissions", path: "/settings/roles" },
+      applications: {
+        name: "Application Management",
+        path: "/settings/applications",
+      },
+      "access-denied": { name: "Access Denied", path: "/access-denied" },
+      logs: { name: "Logs" },
+      activity: { name: "Activity Log", path: "/logs/activity" },
     };
 
     const crumbs = pathParts.reduce((acc, part) => {
-        const mappedCrumb = pageTitleMap[part];
-        if(mappedCrumb && mappedCrumb.path) {
-            acc.push(mappedCrumb);
-        }
-        return acc;
+      const mappedCrumb = pageTitleMap[part];
+      if (mappedCrumb && mappedCrumb.path) {
+        acc.push(mappedCrumb);
+      }
+      return acc;
     }, []);
 
     const finalCrumbs =
@@ -190,12 +188,18 @@ const AppContent = () => {
 
   if (!isAuthenticated) {
     return (
-        <Suspense fallback={<div className="flex h-screen w-screen items-center justify-center text-lg">Loading...</div>}>
-            <Routes>
-                <Route path="/login" element={<LoginPage />} />
-                <Route path="*" element={<Navigate to="/login" replace />} />
-            </Routes>
-        </Suspense>
+      <Suspense
+        fallback={
+          <div className="flex h-screen w-full items-center justify-center text-lg">
+            Loading...
+          </div>
+        }
+      >
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="*" element={<Navigate to="/login" replace />} />
+        </Routes>
+      </Suspense>
     );
   }
 
@@ -221,7 +225,14 @@ const AppContent = () => {
           }
         >
           <Route element={<ProtectedRoute permission="dashboard:view" />}>
-            <Route path="/dashboard" element={<Suspense fallback={<DashboardSkeleton />}><DashboardPage /></Suspense>} />
+            <Route
+              path="/dashboard"
+              element={
+                <Suspense fallback={<DashboardSkeleton />}>
+                  <DashboardPage />
+                </Suspense>
+              }
+            />
           </Route>
 
           <Route
@@ -229,10 +240,10 @@ const AppContent = () => {
             element={
               <Suspense fallback={<EmployeeDetailSkeleton />}>
                 <ProfilePage
-                    employee={currentUserEmployeeRecord}
-                    permissions={user.permissions}
-                    onLogout={handleLogout}
-                    user={user}
+                  employee={currentUserEmployeeRecord}
+                  permissions={user.permissions}
+                  onLogout={handleLogout}
+                  user={user}
                 />
               </Suspense>
             }
@@ -241,7 +252,7 @@ const AppContent = () => {
           <Route
             path="/employees"
             element={
-              <Suspense fallback={<EmployeeListSkeleton count={10}/>}>
+              <Suspense fallback={<EmployeeListSkeleton count={10} />}>
                 <EmployeeListPage />
               </Suspense>
             }
@@ -251,8 +262,8 @@ const AppContent = () => {
             element={
               <Suspense fallback={<EmployeeDetailSkeleton />}>
                 <EmployeeDetailPage
-                    permissions={user.permissions}
-                    onLogout={handleLogout}
+                  permissions={user.permissions}
+                  onLogout={handleLogout}
                 />
               </Suspense>
             }
@@ -261,18 +272,47 @@ const AppContent = () => {
           <Route element={<ProtectedRoute permission="log:read" />}>
             <Route
               path="/logs/activity"
-              element={<Suspense fallback={<ActivityLogSkeleton />}><ActivityLogPage onLogout={handleLogout} /></Suspense>}
+              element={
+                <Suspense fallback={<ActivityLogSkeleton />}>
+                  <ActivityLogPage onLogout={handleLogout} />
+                </Suspense>
+              }
             />
           </Route>
 
           <Route path="/access-denied" element={<AccessDeniedPage />} />
 
-          <Route path="/settings" element={<Suspense fallback={<SettingsSkeleton />}><SettingsPage /></Suspense>}>
-            <Route path="users" element={<Suspense fallback={<UserManagementSkeleton />}><UserManagementPage /></Suspense>} />
-            <Route path="roles" element={<Suspense fallback={<RoleManagementSkeleton />}><RoleManagementPage /></Suspense>} />
+          <Route
+            path="/settings"
+            element={
+              <Suspense fallback={<SettingsSkeleton />}>
+                <SettingsPage />
+              </Suspense>
+            }
+          >
+            <Route
+              path="users"
+              element={
+                <Suspense fallback={<UserManagementSkeleton />}>
+                  <UserManagementSkeleton />
+                </Suspense>
+              }
+            />
+            <Route
+              path="roles"
+              element={
+                <Suspense fallback={<RoleManagementSkeleton />}>
+                  <RoleManagementPage />
+                </Suspense>
+              }
+            />
             <Route
               path="applications"
-              element={<Suspense fallback={<ApplicationManagementSkeleton />}><ApplicationManagementPage /></Suspense>}
+              element={
+                <Suspense fallback={<ApplicationManagementSkeleton />}>
+                  <ApplicationManagementPage />
+                </Suspense>
+              }
             />
           </Route>
 
@@ -289,14 +329,14 @@ const AppContent = () => {
         </Route>
       </Routes>
 
-      {modal === 'editEmployee' && (
+      {modal === "editEmployee" && (
         <EditEmployeeModal
           employee={modalData}
           onClose={closeModal}
           onSave={handleUpdateEmployee}
         />
       )}
-      {modal === 'deactivateEmployee' && (
+      {modal === "deactivateEmployee" && (
         <DeactivateEmployeeModal
           employee={modalData}
           onClose={closeModal}
@@ -311,7 +351,7 @@ export default function App() {
   return (
     <ThemeProvider>
       <BreadcrumbProvider>
-          <AppContent />
+        <AppContent />
       </BreadcrumbProvider>
     </ThemeProvider>
   );

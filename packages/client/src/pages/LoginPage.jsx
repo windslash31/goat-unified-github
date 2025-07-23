@@ -19,7 +19,6 @@ export const LoginPage = () => {
       // No navigation needed, App.js will react to the store change and navigate away
     } catch (err) {
       if (err.response) {
-        // --- MODIFICATION START ---
         // Specifically handle the 429 Too Many Requests error
         if (err.response.status === 429) {
           setError(err.response.data); // The rate limiter often sends a plain text message
@@ -29,7 +28,6 @@ export const LoginPage = () => {
             err.response.data.message || "Invalid credentials or server error."
           );
         }
-        // --- MODIFICATION END ---
       } else if (err.request) {
         setError("Could not connect to the server. Please check your network.");
       } else {
@@ -41,7 +39,7 @@ export const LoginPage = () => {
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="fixed inset-0 flex items-center justify-center bg-gray-50 dark:bg-gray-900 p-4">
       <div className="w-full max-w-md p-8 space-y-6 bg-white dark:bg-gray-800 rounded-2xl shadow-xl">
         <div className="text-center">
           <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-kredivo-light">
