@@ -1,7 +1,7 @@
 import React, { useState } from "react";
-import { ShieldCheck } from "lucide-react";
 import { Button } from "../components/ui/Button";
 import { useAuthStore } from "../stores/authStore";
+import logo from "../assets/logo.png";
 
 export const LoginPage = () => {
   const [email, setEmail] = useState("");
@@ -42,9 +42,11 @@ export const LoginPage = () => {
     <div className="fixed inset-0 flex items-center justify-center bg-gray-50 dark:bg-gray-900 p-4">
       <div className="w-full max-w-md p-8 space-y-6 bg-white dark:bg-gray-800 rounded-2xl shadow-xl">
         <div className="text-center">
-          <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-kredivo-light">
-            <ShieldCheck className="h-6 w-6 text-kredivo-primary" />
-          </div>
+          <img
+            src={logo}
+            alt="Kredivo Logo"
+            className="w-8 h-8 flex-shrink-0"
+          />
           <h2 className="mt-6 text-3xl font-bold text-gray-900 dark:text-white">
             Sign in to G.O.A.T
           </h2>
