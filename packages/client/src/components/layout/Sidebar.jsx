@@ -10,6 +10,7 @@ import {
   LogOut,
   UserCircle,
   UsersRound,
+  UserCog,
 } from "lucide-react";
 import { createContext, useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
@@ -59,7 +60,7 @@ export function Sidebar({ onLogout, isMobileOpen, setMobileOpen }) {
       id: "managed-accounts",
       path: "/managed-accounts",
       label: "Managed Accounts",
-      icon: <UsersRound size={20} />,
+      icon: <UserCog size={20} />,
       visible: permissions.includes("managed_account:manage"),
     },
     {
