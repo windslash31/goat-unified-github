@@ -21,6 +21,8 @@ import {
   PlusCircle,
   FilePlus,
   Filter as FilterIcon,
+  // ✨ FIX: Import Trash2 icon
+  Trash2,
 } from "lucide-react";
 import { Button } from "../components/ui/Button";
 import { FilterPopover } from "../components/ui/FilterPopover";
@@ -29,16 +31,12 @@ import api from "../api/api";
 import { motion } from "framer-motion";
 import { ActivityLogSkeleton } from "../components/ui/ActivityLogSkeleton";
 import { CustomSelect } from "../components/ui/CustomSelect";
-// --- MODIFICATION START ---
 import { formatDate, formatDateTime } from "../utils/formatters";
-// --- MODIFICATION END ---
 
 const formatValue = (value) => {
   if (value === null || typeof value === "undefined") return '""';
   if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}/.test(value)) {
-    // --- MODIFICATION START ---
     return `"${formatDate(value)}"`;
-    // --- MODIFICATION END ---
   }
   try {
     const obj = JSON.parse(value);
@@ -47,6 +45,8 @@ const formatValue = (value) => {
     return `"${String(value)}"`;
   }
 };
+
+// --- (Other detail components like ApplicationAccessDetail, etc. remain here) ---
 
 const ApplicationAccessDetail = ({ details }) => (
   <div className="flex items-start">
@@ -107,9 +107,7 @@ const ApiKeyCreateDetail = ({ details }) => (
       <p className="text-sm text-gray-500">
         Expires:{" "}
         <span className="font-medium">
-          {/* --- MODIFICATION START --- */}
           {details.expires ? formatDateTime(details.expires) : "Never"}
-          {/* --- MODIFICATION END --- */}
         </span>
       </p>
     </div>
@@ -327,6 +325,90 @@ const EmployeeProfileViewDetail = ({ targetUser }) => (
   </div>
 );
 
+// ✨ FIX: Add new components for Managed Account logs
+const ManagedAccountCreateDetail = ({ details }) => (
+  <div className="flex items-start">
+    <PlusCircle className="w-4 h-4 text-green-500 mr-2 mt-1 flex-shrink-0" />
+    <div>
+      <p>
+        Created new managed account:{" "}
+        <span className="font-semibold">{details.name}</span>
+      </p>
+      <p className="text-sm text-gray-500">
+        Identifier:{" "}
+        <span className="font-medium">{details.account_identifier}</span>
+      </p>
+      <p className="text-sm text-gray-500">
+        Type:{" "}
+        <span className="font-medium">
+          {details.account_type.replace(/_/g, " ")}
+        </span>
+      </p>
+    </div>
+  </div>
+);
+
+const ManagedAccountDeleteDetail = ({ details }) => (
+  <div className="flex items-start">
+    <Trash2 className="w-4 h-4 text-red-500 mr-2 mt-1 flex-shrink-0" />
+    <div>
+      <p>
+        Deleted managed account:{" "}
+        <span className="font-semibold">{details.name}</span>
+      </p>
+      <p className="text-sm text-gray-500">
+        Identifier:{" "}
+        <span className="font-medium">{details.account_identifier}</span>
+      </p>
+    </div>
+  </div>
+);
+
+const ManagedAccountUpdateDetail = ({ changes }) => {
+  const { from, to } = changes;
+  const changedFields = Object.keys(to).filter((key) => {
+    if (key === "id" || key === "created_at" || key === "updated_at")
+      return false;
+    return String(from[key]) !== String(to[key]);
+  });
+
+  if (changedFields.length === 0) {
+    return (
+      <div className="flex items-start">
+        <Info className="w-4 h-4 text-gray-500 mr-2 mt-1 shrink-0" />
+        <p>An update was made with no changes to the data.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      {changedFields.map((field) => (
+        <div key={field} className="flex items-start">
+          <Edit className="w-4 h-4 text-blue-500 mr-2 mt-1 shrink-0" />
+          <div>
+            <strong className="font-semibold">
+              {field
+                .replace(/_/g, " ")
+                .replace(/\b\w/g, (l) => l.toUpperCase())}
+              :
+            </strong>
+            <div className="flex items-center gap-2 mt-1">
+              <span className="line-through text-red-500 dark:text-red-400">
+                {formatValue(from[field])}
+              </span>
+              <ChevronRight className="w-4 h-4 text-gray-400" />
+              <span className="font-bold text-green-600 dark:text-green-400">
+                {formatValue(to[field])}
+              </span>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
+
 const LogDetailContent = ({ log, roles }) => {
   if (!log.details || Object.keys(log.details).length === 0) return null;
 
@@ -362,6 +444,16 @@ const LogDetailContent = ({ log, roles }) => {
     MANUAL_PLATFORM_SUSPENSION: (
       <SuspensionDetail results={log.details.deactivation_results} />
     ),
+    // ✨ FIX: Add Managed Account action types to the component map
+    MANAGED_ACCOUNT_CREATE: (
+      <ManagedAccountCreateDetail details={log.details.createdAccount} />
+    ),
+    MANAGED_ACCOUNT_UPDATE: (
+      <ManagedAccountUpdateDetail changes={log.details.changes} />
+    ),
+    MANAGED_ACCOUNT_DELETE: (
+      <ManagedAccountDeleteDetail details={log.details.deletedAccount} />
+    ),
   };
 
   return (
@@ -393,6 +485,7 @@ const LogDetailContent = ({ log, roles }) => {
   );
 };
 
+// --- (The rest of the ActivityLogPage component remains the same) ---
 const ActivityLogItem = ({ log, roles, isExpanded, onToggle }) => {
   const getActionIcon = (actionType) => {
     if (
@@ -430,6 +523,14 @@ const ActivityLogItem = ({ log, roles, isExpanded, onToggle }) => {
       return `Role: ${log.details?.roleName}`;
     if (log.action_type.startsWith("API_KEY"))
       return log.target_user_email || "N/A";
+    // ✨ FIX: Add display name for managed account logs
+    if (log.action_type.startsWith("MANAGED_ACCOUNT_")) {
+      const account =
+        log.details?.createdAccount ||
+        log.details?.changes?.to ||
+        log.details?.deletedAccount;
+      return account?.name || "Managed Account";
+    }
     return "System";
   };
 
@@ -457,11 +558,9 @@ const ActivityLogItem = ({ log, roles, isExpanded, onToggle }) => {
               on{" "}
               <span className="font-medium">{getTargetDisplayName(log)}</span>
             </p>
-            {/* --- MODIFICATION START --- */}
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
               {formatDateTime(log.timestamp)}
             </p>
-            {/* --- MODIFICATION END --- */}
           </div>
         </div>
       </button>

@@ -1,4 +1,3 @@
-// src/App.jsx
 import React, { Suspense, lazy, useCallback, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Routes, Route, useLocation, Navigate } from "react-router-dom";
@@ -74,6 +73,10 @@ const SettingsPage = lazy(() =>
   }))
 );
 
+const ManagedAccountsPage = lazy(() =>
+  import("./pages/ManagedAccounts/ManagedAccountsPage")
+);
+
 const fetchMe = async () => {
   const { data } = await api.get("/api/auth/me");
   return data;
@@ -120,6 +123,7 @@ const AppContent = () => {
       "/access-denied",
       "/dashboard",
       "/settings",
+      "/managed-accounts",
     ];
     if (nonDynamicPaths.includes(location.pathname)) {
       setDynamicCrumbs([]);
@@ -168,6 +172,10 @@ const AppContent = () => {
       "access-denied": { name: "Access Denied", path: "/access-denied" },
       logs: { name: "Logs" },
       activity: { name: "Activity Log", path: "/logs/activity" },
+      "managed-accounts": {
+        name: "Managed Accounts",
+        path: "/managed-accounts",
+      },
     };
 
     const crumbs = pathParts.reduce((acc, part) => {
@@ -268,6 +276,18 @@ const AppContent = () => {
               </Suspense>
             }
           />
+          <Route
+            element={<ProtectedRoute permission="managed_account:manage" />}
+          >
+            <Route
+              path="/managed-accounts"
+              element={
+                <Suspense fallback={<EmployeeListSkeleton count={5} />}>
+                  <ManagedAccountsPage />
+                </Suspense>
+              }
+            />
+          </Route>
 
           <Route element={<ProtectedRoute permission="log:read" />}>
             <Route
@@ -290,7 +310,6 @@ const AppContent = () => {
               </Suspense>
             }
           >
-            {/* --- THIS IS THE FIX --- */}
             <Route
               path="users"
               element={

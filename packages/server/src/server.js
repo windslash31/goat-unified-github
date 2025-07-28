@@ -11,6 +11,7 @@ const dashboardRoutes = require("./api/routes/dashboard");
 const logRoutes = require("./api/routes/logs");
 const jiraRoutes = require("./api/routes/jira");
 const userRoutes = require("./api/routes/users");
+const managedAccountRoutes = require("./api/routes/managedAccount");
 const { schedulePlatformSync } = require("./cron/platformSync");
 
 const app = express();
@@ -23,7 +24,6 @@ if (config.clientUrl) {
 
 const corsOptions = {
   origin: function (origin, callback) {
-
     if (!origin || whitelist.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
@@ -48,6 +48,7 @@ app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/logs", logRoutes);
 app.use("/api/jira", jiraRoutes);
 app.use("/api/users", userRoutes);
+app.use("/api/managed-accounts", managedAccountRoutes);
 
 // Global error handler
 app.use((err, req, res, next) => {
