@@ -22,7 +22,7 @@ import { LicensesTab } from "./LicensesTab";
 import { UnifiedTimelinePage } from "./UnifiedTimelinePage";
 import { PlatformLogPage } from "./PlatformLogPage";
 import { DevicesTab } from "./DevicesTab";
-import AtlassianAccessTab from "./AtlassianAccessTab";
+import ApplicationAccessTab from "./ApplicationAccessTab";
 import { motion, AnimatePresence } from "framer-motion";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
 import api from "../../api/api";
@@ -101,9 +101,9 @@ export const EmployeeDetailPage = ({ permissions, onLogout }) => {
       permission: true,
     },
     {
-      id: "atlassian-access",
-      label: "Atlassian Access",
-      shortLabel: "Atlassian",
+      id: "application-access",
+      label: "Application Access",
+      shortLabel: "Access",
       icon: <Briefcase size={16} />,
       permission: true,
     },
@@ -232,7 +232,7 @@ export const EmployeeDetailPage = ({ permissions, onLogout }) => {
           onTicketClick={handleTicketClick}
         />
       )}
-      {activeTab === "atlassian-access" && <AtlassianAccessTab />}
+      {activeTab === "application-access" && <ApplicationAccessTab />}
       {activeTab === "licenses" && <LicensesTab employeeId={employeeId} />}
       {activeTab === "platform-logs" && (
         <PlatformLogPage employeeId={employeeId} onLogout={onLogout} />
