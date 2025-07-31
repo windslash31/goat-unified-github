@@ -55,20 +55,14 @@ export const EmployeeDetailHeader = ({
       {/* Desktop Buttons */}
       <div className="hidden md:flex self-start items-center gap-2">
         {permissions.includes("employee:update") && (
-          <Button
-            onClick={() => onEdit(employee)}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 transition-colors"
-          >
-            <Edit className="w-4 h-4" /> Edit
+          <Button onClick={() => onEdit(employee)} variant="primary">
+            <Edit className="w-4 h-4 mr-2" /> Edit
           </Button>
         )}
         {permissions.includes("employee:deactivate") && !isOwnProfile && (
-          <button
-            onClick={() => onDeactivate(employee)}
-            className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white font-semibold rounded-lg shadow-md hover:bg-red-700 transition-colors"
-          >
-            <UserX className="w-4 h-4" /> Suspend Access
-          </button>
+          <Button onClick={() => onDeactivate(employee)} variant="danger">
+            <UserX className="w-4 h-4 mr-2" /> Suspend Access
+          </Button>
         )}
       </div>
 
