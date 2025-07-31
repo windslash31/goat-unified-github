@@ -327,44 +327,54 @@ const getAtlassianAccessByAccountId = async (atlassianAccountId) => {
     };
   }
 
-  // Fetch Jira Projects
   const jiraProjectsQuery = `
-    SELECT DISTINCT p.project_id, p.project_key, p.project_name
-    FROM jira_projects p
-    JOIN jira_project_permissions jpp ON p.project_id = jpp.project_id
-    WHERE jpp.actor_id = $1 AND jpp.actor_type = 'user'
+    SELECT DISTINCT p.project_id, p.project_key, p.project_name, r.role_name
+    FROM jira_project_permissions jpp
+    JOIN jira_projects p ON p.project_id = jpp.project_id
+    LEFT JOIN jira_roles r ON r.role_id = jpp.role_id
+    WHERE jpp.actor_id = $1 AND jpp.actor_type = 'user';
   `;
   const jiraRes = await pool.query(jiraProjectsQuery, [atlassianAccountId]);
 
-  // Fetch Bitbucket Repositories
   const bitbucketReposQuery = `
     SELECT DISTINCT br.repo_uuid, br.full_name, brp.permission_level
     FROM bitbucket_repositories br
     JOIN bitbucket_repository_permissions brp ON br.repo_uuid = brp.repo_uuid
-    WHERE brp.user_account_id = $1
+    WHERE brp.user_account_id = $1;
   `;
   const bitbucketRes = await pool.query(bitbucketReposQuery, [
     atlassianAccountId,
   ]);
 
-  // Fetch Confluence Spaces
   const confluenceSpacesQuery = `
-    SELECT DISTINCT cs.id, cs.key, cs.name, csp.operation
-    FROM confluence_space cs
-    JOIN confluence_space_permission csp ON cs.id = csp.space_id
-    WHERE csp.principal_id = $1 AND csp.principal_type = 'user'
+    SELECT cs.id, cs.key, cs.name, csp.operation
+    FROM confluence_space_permission csp
+    JOIN confluence_space cs ON cs.id = csp.space_id
+    WHERE csp.principal_id = $1 AND csp.principal_type = 'user';
   `;
   const confluenceRes = await pool.query(confluenceSpacesQuery, [
     atlassianAccountId,
   ]);
 
+  const confluenceSpaces = confluenceRes.rows.reduce((acc, row) => {
+    if (!acc[row.id]) {
+      acc[row.id] = {
+        id: row.id,
+        key: row.key,
+        name: row.name,
+        permissions: [],
+      };
+    }
+    acc[row.id].permissions.push(row.operation);
+    return acc;
+  }, {});
+
   return {
     jiraProjects: jiraRes.rows,
     bitbucketRepositories: bitbucketRes.rows,
-    confluenceSpaces: confluenceRes.rows,
+    confluenceSpaces: Object.values(confluenceSpaces),
   };
 };
-
 module.exports = {
   getUserStatus,
   deactivateUser,
