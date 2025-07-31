@@ -8,11 +8,11 @@ import {
   ChevronDown,
   Search,
   Filter,
-  X,
 } from "lucide-react";
 import api from "../../api/api";
 import { EmployeeDetailSkeleton } from "../../components/ui/EmployeeDetailSkeleton";
 import { motion, AnimatePresence } from "framer-motion";
+import { CustomSelect } from "../../components/ui/CustomSelect";
 
 const fetchAtlassianAccess = async (employeeId) => {
   const { data } = await api.get(
@@ -21,10 +21,15 @@ const fetchAtlassianAccess = async (employeeId) => {
   return data;
 };
 
+// HELPER HOOK
 const useOutsideClick = (ref, callback) => {
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (ref.current && !ref.current.contains(event.target)) {
+      if (
+        ref.current &&
+        !ref.current.contains(event.target) &&
+        !event.target.closest('[data-role="custom-select-options"]')
+      ) {
         callback();
       }
     };
@@ -36,16 +41,16 @@ const useOutsideClick = (ref, callback) => {
 const PermissionBadge = ({ level }) => {
   if (!level) return null;
   const lowerLevel = level.toLowerCase();
-  let color = "bg-blue-500"; // Default
+  let color = "bg-gray-500 dark:bg-gray-600";
   if (lowerLevel.includes("admin")) color = "bg-red-500";
   else if (lowerLevel.includes("delete")) color = "bg-yellow-600";
-  else if (lowerLevel.includes("read") || lowerLevel.includes("view"))
-    color = "bg-gray-500";
   else if (lowerLevel.includes("export")) color = "bg-green-600";
+  else if (lowerLevel.includes("write") || lowerLevel.includes("create"))
+    color = "bg-blue-500";
 
   return (
     <span
-      className={`text-xs text-white capitalize ${color} px-2 py-0.5 rounded-full whitespace-nowrap`}
+      className={`text-xs font-medium text-white capitalize ${color} px-2 py-1 rounded-full whitespace-nowrap`}
     >
       {level.replace(/_/g, " ")}
     </span>
@@ -56,6 +61,7 @@ const FilterDropdown = ({ options, selected, onChange }) => {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef(null);
   useOutsideClick(dropdownRef, () => setIsOpen(false));
+  const isActive = isOpen || selected.length > 0;
 
   const handleSelect = (option) => {
     const newSelected = selected.includes(option)
@@ -68,12 +74,16 @@ const FilterDropdown = ({ options, selected, onChange }) => {
     <div className="relative" ref={dropdownRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 p-2 border rounded-md text-sm hover:bg-gray-100 dark:hover:bg-gray-700"
+        className={`flex h-full w-full items-center justify-center gap-2 px-4 py-2 border rounded-md text-sm font-medium focus:outline-none transition-colors ${
+          isActive
+            ? "bg-kredivo-light text-kredivo-dark-text border-transparent"
+            : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700"
+        }`}
       >
-        <Filter size={14} />
+        <Filter size={16} />
         <span>Filter</span>
         {selected.length > 0 && (
-          <span className="text-xs bg-kredivo-primary text-white rounded-full px-1.5 py-0.5">
+          <span className="text-xs bg-kredivo-primary text-white rounded-full w-5 h-5 flex items-center justify-center">
             {selected.length}
           </span>
         )}
@@ -84,13 +94,13 @@ const FilterDropdown = ({ options, selected, onChange }) => {
             initial={{ opacity: 0, y: -5 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -5 }}
-            className="absolute right-0 mt-2 w-56 bg-white dark:bg-gray-800 border rounded-md shadow-lg z-20"
+            className="origin-top-right absolute right-0 mt-2 w-56 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg z-20"
           >
             <div className="p-2">
               {options.map((option) => (
                 <label
                   key={option}
-                  className="flex items-center gap-2 p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md cursor-pointer"
+                  className="flex items-center gap-3 p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md cursor-pointer"
                 >
                   <input
                     type="checkbox"
@@ -98,7 +108,9 @@ const FilterDropdown = ({ options, selected, onChange }) => {
                     onChange={() => handleSelect(option)}
                     className="h-4 w-4 rounded border-gray-300 text-kredivo-primary focus:ring-kredivo-primary"
                   />
-                  <span>{option}</span>
+                  <span className="text-sm text-gray-700 dark:text-gray-300">
+                    {option}
+                  </span>
                 </label>
               ))}
             </div>
@@ -109,7 +121,7 @@ const FilterDropdown = ({ options, selected, onChange }) => {
   );
 };
 
-const CollapsibleSection = ({
+const AccessSection = ({
   title,
   icon,
   items,
@@ -120,17 +132,22 @@ const CollapsibleSection = ({
 }) => {
   const [isOpen, setIsOpen] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
-  const [sortOption, setSortOption] = useState("name-asc");
+  const [sortOption, setSortOption] = useState(`${nameKey}-asc`);
   const [selectedPermissions, setSelectedPermissions] = useState([]);
 
   const permissionOptions = useMemo(() => {
-    const allPermissions = items.flatMap((item) => item[permissionKey] || []);
+    const allPermissions = items
+      .flatMap((item) =>
+        Array.isArray(item[permissionKey])
+          ? item[permissionKey]
+          : [item[permissionKey]]
+      )
+      .filter(Boolean);
     return [...new Set(allPermissions)].sort();
   }, [items, permissionKey]);
 
   const displayedItems = useMemo(() => {
     let filtered = [...items];
-
     if (searchTerm) {
       filtered = filtered.filter((item) =>
         item[nameKey]
@@ -139,7 +156,6 @@ const CollapsibleSection = ({
           .includes(searchTerm.toLowerCase())
       );
     }
-
     if (selectedPermissions.length > 0) {
       filtered = filtered.filter((item) => {
         const itemPerms = Array.isArray(item[permissionKey])
@@ -148,16 +164,16 @@ const CollapsibleSection = ({
         return selectedPermissions.some((sp) => itemPerms.includes(sp));
       });
     }
-
     filtered.sort((a, b) => {
       const [key, order] = sortOption.split("-");
       const valA = a[key] || "";
       const valB = b[key] || "";
-      if (valA < valB) return order === "asc" ? -1 : 1;
-      if (valA > valB) return order === "asc" ? 1 : -1;
+      if (valA.toLowerCase() < valB.toLowerCase())
+        return order === "asc" ? -1 : 1;
+      if (valA.toLowerCase() > valB.toLowerCase())
+        return order === "asc" ? 1 : -1;
       return 0;
     });
-
     return filtered;
   }, [
     items,
@@ -169,24 +185,28 @@ const CollapsibleSection = ({
   ]);
 
   const hasContent = items && items.length > 0;
+  const sortOptions = [
+    { id: `${nameKey}-asc`, name: "Sort A-Z" },
+    { id: `${nameKey}-desc`, name: "Sort Z-A" },
+  ];
 
   return (
-    <div className="mb-4 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden bg-white dark:bg-gray-800">
+    <div className="mb-4 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden bg-white dark:bg-gray-900/50">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full flex justify-between items-center p-4 bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700/80"
+        className="w-full flex justify-between items-center p-4 bg-gray-50 dark:bg-gray-800/80 hover:bg-gray-100 dark:hover:bg-gray-700/80"
       >
         <div className="flex items-center gap-3">
           {icon}
           <h3 className="font-semibold text-gray-800 dark:text-gray-200">
             {title}
           </h3>
-          <span className="text-sm bg-gray-200 dark:bg-gray-600 px-2 py-0.5 rounded-full">
+          <span className="text-sm bg-gray-200 dark:bg-gray-600 px-2 py-0.5 rounded-full font-medium">
             {items.length}
           </span>
         </div>
         <ChevronDown
-          className={`w-5 h-5 transition-transform ${
+          className={`w-5 h-5 text-gray-500 transition-transform ${
             isOpen ? "rotate-180" : ""
           }`}
         />
@@ -206,24 +226,23 @@ const CollapsibleSection = ({
                 <>
                   <div className="flex flex-col sm:flex-row gap-2 mb-4">
                     <div className="relative flex-grow">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                       <input
                         type="text"
                         placeholder={`Search ${title}...`}
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-kredivo-primary focus:outline-none"
+                        className="w-full pl-10 pr-4 py-2.5 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-offset-2 focus:ring-kredivo-primary dark:focus:ring-offset-gray-900"
                       />
                     </div>
                     <div className="flex items-center gap-2">
-                      <select
-                        value={sortOption}
-                        onChange={(e) => setSortOption(e.target.value)}
-                        className="p-2 border rounded-md text-sm bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-kredivo-primary focus:outline-none"
-                      >
-                        <option value={`${nameKey}-asc`}>Sort A-Z</option>
-                        <option value={`${nameKey}-desc`}>Sort Z-A</option>
-                      </select>
+                      <div className="w-40">
+                        <CustomSelect
+                          options={sortOptions}
+                          value={sortOption}
+                          onChange={setSortOption}
+                        />
+                      </div>
                       <FilterDropdown
                         options={permissionOptions}
                         selected={selectedPermissions}
@@ -235,7 +254,7 @@ const CollapsibleSection = ({
                     {displayedItems.map((item) => (
                       <li
                         key={itemKeyFn(item)}
-                        className="py-2.5 flex justify-between items-center gap-2"
+                        className="py-3 flex justify-between items-center gap-2"
                       >
                         {renderItem(item)}
                       </li>
@@ -275,7 +294,7 @@ const AtlassianAccessTab = () => {
 
   return (
     <div className="p-4 sm:p-0">
-      <CollapsibleSection
+      <AccessSection
         title="Jira Projects"
         icon={<Code size={20} />}
         items={data.jiraProjects || []}
@@ -284,7 +303,7 @@ const AtlassianAccessTab = () => {
         permissionKey="role_name"
         renderItem={(project) => (
           <>
-            <span className="truncate">
+            <span className="truncate font-medium text-gray-800 dark:text-gray-200">
               {project.project_name} ({project.project_key})
             </span>
             <PermissionBadge level={project.role_name} />
@@ -292,7 +311,7 @@ const AtlassianAccessTab = () => {
         )}
       />
 
-      <CollapsibleSection
+      <AccessSection
         title="Bitbucket Repositories"
         icon={<GitBranch size={20} />}
         items={data.bitbucketRepositories || []}
@@ -301,13 +320,15 @@ const AtlassianAccessTab = () => {
         permissionKey="permission_level"
         renderItem={(repo) => (
           <>
-            <span className="truncate">{repo.full_name}</span>
+            <span className="truncate font-medium text-gray-800 dark:text-gray-200">
+              {repo.full_name}
+            </span>
             <PermissionBadge level={repo.permission_level} />
           </>
         )}
       />
 
-      <CollapsibleSection
+      <AccessSection
         title="Confluence Spaces"
         icon={<Book size={20} />}
         items={data.confluenceSpaces || []}
@@ -316,10 +337,10 @@ const AtlassianAccessTab = () => {
         permissionKey="permissions"
         renderItem={(space) => (
           <>
-            <span className="truncate">
+            <span className="truncate font-medium text-gray-800 dark:text-gray-200">
               {space.name} ({space.key})
             </span>
-            <div className="flex flex-wrap items-center justify-end gap-1">
+            <div className="flex flex-wrap items-center justify-end gap-1.5">
               {Array.isArray(space.permissions) &&
                 space.permissions.map((p) => (
                   <PermissionBadge key={p} level={p} />
