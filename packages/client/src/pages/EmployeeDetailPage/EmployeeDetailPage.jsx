@@ -10,6 +10,7 @@ import {
   BookLock,
   Laptop,
   MoreVertical,
+  Briefcase,
 } from "lucide-react";
 import { useBreadcrumb } from "../../context/BreadcrumbContext";
 import { EmployeeDetailHeader } from "./EmployeeDetailHeader";
@@ -21,6 +22,7 @@ import { LicensesTab } from "./LicensesTab";
 import { UnifiedTimelinePage } from "./UnifiedTimelinePage";
 import { PlatformLogPage } from "./PlatformLogPage";
 import { DevicesTab } from "./DevicesTab";
+import AtlassianAccessTab from "./AtlassianAccessTab";
 import { motion, AnimatePresence } from "framer-motion";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
 import api from "../../api/api";
@@ -96,6 +98,13 @@ export const EmployeeDetailPage = ({ permissions, onLogout }) => {
       label: "Apps & Platforms",
       shortLabel: "Access",
       icon: <LayoutGrid size={16} />,
+      permission: true,
+    },
+    {
+      id: "atlassian-access",
+      label: "Atlassian Access",
+      shortLabel: "Atlassian",
+      icon: <Briefcase size={16} />,
       permission: true,
     },
     {
@@ -223,6 +232,7 @@ export const EmployeeDetailPage = ({ permissions, onLogout }) => {
           onTicketClick={handleTicketClick}
         />
       )}
+      {activeTab === "atlassian-access" && <AtlassianAccessTab />}
       {activeTab === "licenses" && <LicensesTab employeeId={employeeId} />}
       {activeTab === "platform-logs" && (
         <PlatformLogPage employeeId={employeeId} onLogout={onLogout} />

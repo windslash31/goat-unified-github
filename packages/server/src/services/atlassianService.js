@@ -1,6 +1,7 @@
 const fetch = require("node-fetch");
 const axios = require("axios");
 const config = require("../config/config");
+const pool = require("../config/db");
 
 const getUserStatus = async (email) => {
   if (
@@ -138,7 +139,7 @@ const getTicketDetails = async (ticketId) => {
         laptopType: fields.customfield_11531?.value,
         officeLocation: fields.customfield_10729?.value,
         employeeSubType: fields.customfield_11557?.value,
-        employeeStatus: fields.customfield_11551?.value, 
+        employeeStatus: fields.customfield_11551?.value,
 
         resignationDate: fields.customfield_10727,
         accessCutoffDate: fields.customfield_10982,
@@ -249,7 +250,7 @@ const findAssetByName = async (assetName) => {
 
   const body = {
     qlQuery: `objectType = "Laptops" AND (key = "${assetName}" OR label = "${assetName}")`,
-    resultsPerPage: 1, 
+    resultsPerPage: 1,
   };
 
   try {
@@ -308,10 +309,68 @@ const findAssetByName = async (assetName) => {
   }
 };
 
+const getJiraUserByEmail = async (email) => {
+  if (!email) return null;
+  const res = await pool.query(
+    "SELECT account_id FROM atlassian_users WHERE email_address = $1",
+    [email]
+  );
+  return res.rows[0] || null;
+};
+
+const getAtlassianAccessByAccountId = async (atlassianAccountId) => {
+  if (!atlassianAccountId) {
+    return {
+      jiraProjects: [],
+      bitbucketRepositories: [],
+      confluenceSpaces: [],
+    };
+  }
+
+  // Fetch Jira Projects
+  const jiraProjectsQuery = `
+    SELECT DISTINCT p.project_id, p.project_key, p.project_name
+    FROM jira_projects p
+    JOIN jira_project_permissions jpp ON p.project_id = jpp.project_id
+    WHERE jpp.actor_id = $1 AND jpp.actor_type = 'user'
+  `;
+  const jiraRes = await pool.query(jiraProjectsQuery, [atlassianAccountId]);
+
+  // Fetch Bitbucket Repositories
+  const bitbucketReposQuery = `
+    SELECT DISTINCT br.repo_uuid, br.full_name, brp.permission_level
+    FROM bitbucket_repositories br
+    JOIN bitbucket_repository_permissions brp ON br.repo_uuid = brp.repo_uuid
+    WHERE brp.user_account_id = $1
+  `;
+  const bitbucketRes = await pool.query(bitbucketReposQuery, [
+    atlassianAccountId,
+  ]);
+
+  // Fetch Confluence Spaces
+  const confluenceSpacesQuery = `
+    SELECT DISTINCT cs.id, cs.key, cs.name, csp.operation
+    FROM confluence_space cs
+    JOIN confluence_space_permission csp ON cs.id = csp.space_id
+    WHERE csp.principal_id = $1 AND csp.principal_type = 'user'
+  `;
+  const confluenceRes = await pool.query(confluenceSpacesQuery, [
+    atlassianAccountId,
+  ]);
+
+  return {
+    jiraProjects: jiraRes.rows,
+    bitbucketRepositories: bitbucketRes.rows,
+    confluenceSpaces: confluenceRes.rows,
+  };
+};
+
 module.exports = {
   getUserStatus,
   deactivateUser,
   getTicketDetails,
   getAssetDetails,
   findAssetByName,
+  getJiraUserByEmail,
+  getAtlassianAccessByAccountId,
 };

@@ -1,6 +1,10 @@
 const employeeService = require("../../services/employeeService");
 const { logActivity } = require("../../services/logService");
 const { Parser } = require("json2csv");
+const {
+  getJiraUserByEmail,
+  getAtlassianAccessByAccountId,
+} = require("../../services/atlassianService");
 
 const listEmployees = async (req, res, next) => {
   try {
@@ -364,6 +368,32 @@ const triggerPlatformSync = async (req, res, next) => {
   }
 };
 
+const getEmployeeAtlassianAccess = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const employee = await employeeService.getEmployeeById(id);
+    if (!employee) {
+      return res.status(404).json({ message: "Employee not found" });
+    }
+
+    const atlassianUser = await getJiraUserByEmail(employee.employee_email);
+    if (!atlassianUser) {
+      return res.json({
+        jiraProjects: [],
+        bitbucketRepositories: [],
+        confluenceSpaces: [],
+      });
+    }
+
+    const accessDetails = await getAtlassianAccessByAccountId(
+      atlassianUser.account_id
+    );
+    res.json(accessDetails);
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   listEmployees,
   getEmployee,
@@ -387,4 +417,5 @@ module.exports = {
   getEmployeeDevices,
   syncPlatformStatus,
   triggerPlatformSync,
+  getEmployeeAtlassianAccess,
 };

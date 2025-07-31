@@ -1,3 +1,5 @@
+// packages/server/src/api/routes/employees.js
+
 const express = require("express");
 const router = express.Router();
 const multer = require("multer");
@@ -90,6 +92,14 @@ router.post(
   authenticateToken,
   authorize("employee:update"),
   employeeController.syncPlatformStatus
+);
+
+// --- NEW ROUTE ---
+router.get(
+  "/:id/atlassian-access",
+  authenticateToken,
+  authorizeAdminOrSelf, // Or another appropriate authorization
+  employeeController.getEmployeeAtlassianAccess
 );
 
 router.get(
