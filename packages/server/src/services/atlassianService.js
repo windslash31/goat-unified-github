@@ -1,7 +1,7 @@
 const fetch = require("node-fetch");
 const axios = require("axios");
 const config = require("../config/config");
-const pool = require("../config/db");
+const db = require("../config/db");
 
 const getUserStatus = async (email) => {
   if (
@@ -311,7 +311,7 @@ const findAssetByName = async (assetName) => {
 
 const getJiraUserByEmail = async (email) => {
   if (!email) return null;
-  const res = await pool.query(
+  const res = await db.query(
     "SELECT account_id FROM atlassian_users WHERE email_address = $1",
     [email]
   );
@@ -334,7 +334,7 @@ const getAtlassianAccessByAccountId = async (atlassianAccountId) => {
     LEFT JOIN jira_roles r ON r.role_id = jpp.role_id
     WHERE jpp.actor_id = $1 AND jpp.actor_type = 'user';
   `;
-  const jiraRes = await pool.query(jiraProjectsQuery, [atlassianAccountId]);
+  const jiraRes = await db.query(jiraProjectsQuery, [atlassianAccountId]);
 
   const bitbucketReposQuery = `
     SELECT DISTINCT br.repo_uuid, br.full_name, brp.permission_level
@@ -342,7 +342,7 @@ const getAtlassianAccessByAccountId = async (atlassianAccountId) => {
     JOIN bitbucket_repository_permissions brp ON br.repo_uuid = brp.repo_uuid
     WHERE brp.user_account_id = $1;
   `;
-  const bitbucketRes = await pool.query(bitbucketReposQuery, [
+  const bitbucketRes = await db.query(bitbucketReposQuery, [
     atlassianAccountId,
   ]);
 
@@ -352,7 +352,7 @@ const getAtlassianAccessByAccountId = async (atlassianAccountId) => {
     JOIN confluence_space cs ON cs.id = csp.space_id
     WHERE csp.principal_id = $1 AND csp.principal_type = 'user';
   `;
-  const confluenceRes = await pool.query(confluenceSpacesQuery, [
+  const confluenceRes = await db.query(confluenceSpacesQuery, [
     atlassianAccountId,
   ]);
 
@@ -386,7 +386,7 @@ const syncUserData = async (employeeId, email) => {
       statusResult.status === "Error" ||
       statusResult.status === "Not Found"
     ) {
-      await pool.query("DELETE FROM atlassian_users WHERE email_address = $1", [
+      await db.query("DELETE FROM atlassian_users WHERE email_address = $1", [
         email,
       ]);
       console.log(
@@ -416,10 +416,105 @@ const syncUserData = async (employeeId, email) => {
       statusResult.status, // This will insert the string 'Active', 'Suspended', etc.
     ];
 
-    await pool.query(query, values);
+    await db.query(query, values);
     console.log(`SYNC: Successfully synced Atlassian user ${email}`);
   } catch (error) {
     console.error(`SYNC: Error during Atlassian sync for ${email}:`, error);
+  }
+};
+
+const syncAllAtlassianUsers = async () => {
+  console.log("Starting Atlassian user sync...");
+  if (!config.atlassian.orgId || !config.atlassian.orgToken) {
+    throw new Error(
+      "Atlassian Organization ID or Organization API Token is not configured."
+    );
+  }
+
+  let allUsers = [];
+  let nextCursor = null;
+  let keepFetching = true;
+
+  // --- FIX: Use the new Bearer token for authorization ---
+  const headers = {
+    Authorization: `Bearer ${config.atlassian.orgToken}`,
+    Accept: "application/json",
+  };
+
+  // The rest of the function remains the same
+  while (keepFetching) {
+    const url = `https://api.atlassian.com/admin/v1/orgs/${
+      config.atlassian.orgId
+    }/users?limit=100${nextCursor ? `&cursor=${nextCursor}` : ""}`;
+
+    try {
+      const response = await fetch(url, { headers });
+      if (!response.ok) {
+        const errorBody = await response.text();
+        throw new Error(
+          `Atlassian API Error: ${response.status} - ${errorBody}`
+        );
+      }
+
+      const page = await response.json();
+      const users = page.data;
+
+      if (users && users.length > 0) {
+        allUsers = allUsers.concat(users);
+      }
+
+      if (page.links && page.links.next) {
+        const nextUrl = new URL(page.links.next);
+        nextCursor = nextUrl.searchParams.get("cursor");
+      } else {
+        keepFetching = false;
+      }
+    } catch (error) {
+      console.error("Failed to fetch a page of Atlassian users:", error);
+      keepFetching = false;
+    }
+  }
+
+  if (allUsers.length === 0) {
+    console.log("No users found in Atlassian to sync.");
+    return;
+  }
+
+  const client = await db.pool.connect();
+  try {
+    await client.query("BEGIN");
+    for (const user of allUsers) {
+      const query = `
+        INSERT INTO atlassian_users (
+          account_id, email_address, display_name, account_status, 
+          billable, product_access, last_updated_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, NOW())
+        ON CONFLICT (account_id) DO UPDATE SET
+          email_address = EXCLUDED.email_address,
+          display_name = EXCLUDED.display_name,
+          account_status = EXCLUDED.account_status,
+          billable = EXCLUDED.billable,
+          product_access = EXCLUDED.product_access,
+          last_updated_at = NOW();
+      `;
+      const values = [
+        user.account_id,
+        user.email,
+        user.name,
+        user.account_status,
+        user.is_billable,
+        user.product_access ? JSON.stringify(user.product_access) : null,
+      ];
+      await client.query(query, values);
+    }
+    await client.query("COMMIT");
+    console.log(`Successfully synced ${allUsers.length} Atlassian users.`);
+  } catch (error) {
+    await client.query("ROLLBACK");
+    console.error("Error during Atlassian user database sync:", error);
+    throw error;
+  } finally {
+    client.release();
   }
 };
 
@@ -432,4 +527,5 @@ module.exports = {
   getJiraUserByEmail,
   getAtlassianAccessByAccountId,
   syncUserData,
+  syncAllAtlassianUsers,
 };

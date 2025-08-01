@@ -36,6 +36,8 @@ module.exports = {
     apiUser: process.env.ATLASSIAN_API_USER,
     domain: process.env.ATLASSIAN_DOMAIN,
     workspaceId: process.env.ATLASSIAN_WORKSPACE_ID,
+    orgId: process.env.ATLASSIAN_ORG_ID,
+    orgToken: process.env.ATLASSIAN_ORG_TOKEN,
   },
   nodeEnv: process.env.NODE_ENV || "development",
 };

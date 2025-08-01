@@ -13,6 +13,7 @@ const jiraRoutes = require("./api/routes/jira");
 const userRoutes = require("./api/routes/users");
 const managedAccountRoutes = require("./api/routes/managedAccount");
 const { schedulePlatformSync } = require("./cron/platformSync");
+const { scheduleAtlassianSync } = require("./cron/atlassianSync"); // to test atlassian sync
 
 const app = express();
 app.set("trust proxy", 1);
@@ -63,6 +64,7 @@ app.listen(PORT, () => {
   if (config.nodeEnv === "production") {
     schedulePlatformSync();
   }
+  scheduleAtlassianSync();
 });
 
 module.exports = app;
