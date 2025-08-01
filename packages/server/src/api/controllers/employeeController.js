@@ -337,8 +337,9 @@ const getEmployeeDevices = async (req, res, next) => {
 const syncPlatformStatus = async (req, res, next) => {
   try {
     const { id } = req.params;
-    // The service function now handles the core logic
-    const updatedStatuses = await employeeService.syncPlatformStatus(
+    // --- THIS IS THE NEW "FORCE REFRESH" LOGIC ---
+    // It calls the new service function to perform a live sync
+    const updatedStatuses = await employeeService.forceSyncPlatformStatus(
       parseInt(id, 10)
     );
     res.json({
@@ -394,6 +395,18 @@ const getEmployeeAtlassianAccess = async (req, res, next) => {
   }
 };
 
+const getEmployeeApplicationAccess = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const accessDetails = await employeeService.getApplicationAccess(
+      parseInt(id, 10)
+    );
+    res.json(accessDetails);
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   listEmployees,
   getEmployee,
@@ -418,4 +431,5 @@ module.exports = {
   syncPlatformStatus,
   triggerPlatformSync,
   getEmployeeAtlassianAccess,
+  getEmployeeApplicationAccess,
 };

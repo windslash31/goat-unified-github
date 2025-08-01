@@ -94,12 +94,18 @@ router.post(
   employeeController.syncPlatformStatus
 );
 
-// --- NEW ROUTE ---
 router.get(
-  "/:id/atlassian-access",
+  "/:id/application-access",
   authenticateToken,
-  authorizeAdminOrSelf, // Or another appropriate authorization
-  employeeController.getEmployeeAtlassianAccess
+  authorizeAdminOrSelf,
+  employeeController.getEmployeeApplicationAccess
+);
+
+router.post(
+  "/:id/sync-status",
+  authenticateToken,
+  authorize("employee:update"),
+  employeeController.syncPlatformStatus
 );
 
 router.get(

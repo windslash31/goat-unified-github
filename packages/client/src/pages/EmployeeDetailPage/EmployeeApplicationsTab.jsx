@@ -1,5 +1,5 @@
 import React, { memo, useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "../../api/api";
 import {
   Ticket,
@@ -7,22 +7,23 @@ import {
   RefreshCw,
   CheckCircle,
   XCircle,
-  Info,
-  Hash,
-  Cpu,
-  HardDrive,
-  Monitor,
-  Shield,
 } from "lucide-react";
 import { PLATFORM_CONFIG } from "../../config/platforms";
 import { formatTimeAgo } from "../../utils/formatters";
 import { motion, AnimatePresence } from "framer-motion";
 
+const fetchPlatformStatuses = async (employeeId) => {
+  const { data } = await api.get(
+    `/api/employees/${employeeId}/platform-statuses`
+  );
+  return data;
+};
+
 const PlatformStatusBadge = ({ status }) => {
   const styles = {
     Active: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300",
+    active: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300",
     Suspended: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300",
-    Deactivated: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300",
     "Not Found":
       "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300",
     Error:
@@ -30,7 +31,7 @@ const PlatformStatusBadge = ({ status }) => {
   };
   return (
     <span
-      className={`px-2.5 py-0.5 text-xs font-semibold rounded-full whitespace-nowrap ${
+      className={`px-2.5 py-0.5 text-xs font-semibold rounded-full whitespace-nowrap capitalize ${
         styles[status] || styles["Error"]
       }`}
     >
@@ -53,7 +54,7 @@ const PlatformRowSkeleton = () => (
   </div>
 );
 
-const DetailItem = ({ label, value, isMono = false }) => {
+const DetailItem = ({ label, value }) => {
   if (value === null || typeof value === "undefined" || value === "")
     return null;
   return (
@@ -61,11 +62,7 @@ const DetailItem = ({ label, value, isMono = false }) => {
       <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 sm:col-span-1">
         {label}
       </dt>
-      <dd
-        className={`text-sm text-gray-800 dark:text-gray-200 sm:col-span-2 break-words ${
-          isMono ? "font-mono text-xs" : ""
-        }`}
-      >
+      <dd className="text-sm text-gray-800 dark:text-gray-200 sm:col-span-2 break-words">
         {value}
       </dd>
     </div>
@@ -164,9 +161,9 @@ const PlatformDetailView = ({ platformName, details }) => {
           <DetailSectionHeader>Core User Identity</DetailSectionHeader>
           <DetailItem label="Username" value={details.coreIdentity?.username} />
           <DetailItem label="Email" value={details.coreIdentity?.email} />
-          <DetailItem label="ID" value={details.coreIdentity?.id} isMono />
+          <DetailItem label="ID" value={details.coreIdentity?.id} />
 
-          <DetailSectionHeader>Account Status & Security</DetailSectionHeader>
+          <DetailSectionHeader>Account Status</DetailSectionHeader>
           <DetailItem label="State" value={details.accountStatus?.state} />
           <DetailItem
             label="Activated"
@@ -184,23 +181,53 @@ const PlatformDetailView = ({ platformName, details }) => {
             label="Password Expired"
             value={formatBoolean(details.accountStatus?.passwordExpired)}
           />
+
+          <DetailSectionHeader>User Details</DetailSectionHeader>
+          <DetailItem label="Job Title" value={details.userDetails?.jobTitle} />
           <DetailItem
-            label="MFA Status"
-            value={details.accountStatus?.mfaStatus}
+            label="Department"
+            value={details.userDetails?.department}
+          />
+          <DetailItem label="Company" value={details.userDetails?.company} />
+          <DetailItem label="Location" value={details.userDetails?.location} />
+
+          <DetailSectionHeader>Permissions</DetailSectionHeader>
+          <DetailItem
+            label="Sudo (Admin)"
+            value={formatBoolean(details.permissions?.sudo)}
           />
 
-          <DetailSectionHeader>Permissions & Access</DetailSectionHeader>
+          <DetailSectionHeader>Security</DetailSectionHeader>
           <DetailItem
-            label="Admin"
-            value={formatBoolean(details.permissions?.isAdmin)}
+            label="Overall MFA Status"
+            value={details.security?.mfaEnrollment?.overallStatus}
           />
           <DetailItem
-            label="Sudo Access"
-            value={formatBoolean(details.permissions?.hasSudo)}
+            label="TOTP Status"
+            value={details.security?.mfaEnrollment?.totpStatus}
           />
           <DetailItem
-            label="Tags"
-            value={details.permissions?.tags?.join(", ")}
+            label="Push Status"
+            value={details.security?.mfaEnrollment?.pushStatus}
+          />
+          <DetailItem
+            label="WebAuthn Status"
+            value={details.security?.mfaEnrollment?.webAuthnStatus}
+          />
+
+          <DetailSectionHeader>Custom Attributes</DetailSectionHeader>
+          <DetailItem
+            label="Attributes"
+            value={
+              details.customAttributes &&
+              details.customAttributes.length > 0 ? (
+                <pre className="text-xs p-2 bg-gray-200 dark:bg-gray-700 rounded-md">
+                  {JSON.stringify(details.customAttributes, null, 2)}
+                </pre>
+              ) : (
+                "None"
+              )
+            }
           />
         </>
       );
@@ -216,12 +243,12 @@ const PlatformDetailView = ({ platformName, details }) => {
 
 const PlatformStatusCard = memo(({ platform, isExpanded, onToggle }) => {
   const platformConfig =
-    PLATFORM_CONFIG[platform.platform_name] || PLATFORM_CONFIG.Default;
-  const lastSyncTime = formatTimeAgo(platform.last_synced_at);
+    PLATFORM_CONFIG[platform.platform] || PLATFORM_CONFIG.Default;
+  const lastSyncTime = platform.details?.last_synced_at
+    ? formatTimeAgo(platform.details.last_synced_at)
+    : formatTimeAgo(platform.last_synced_at);
   const hasDetails =
-    platform.details &&
-    Object.keys(platform.details).length > 0 &&
-    !platform.details.error;
+    platform.details && Object.keys(platform.details).length > 0;
 
   return (
     <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
@@ -233,13 +260,13 @@ const PlatformStatusCard = memo(({ platform, isExpanded, onToggle }) => {
         <div className="flex items-start gap-4">
           <img
             src={platformConfig.logo}
-            alt={`${platform.platform_name} Logo`}
+            alt={`${platform.platform} Logo`}
             className="w-8 h-8 mt-1 flex-shrink-0"
           />
           <div className="flex-grow min-w-0">
             <div className="flex justify-between items-start">
               <p className="font-semibold text-gray-800 dark:text-gray-200 truncate">
-                {platform.platform_name}
+                {platform.platform}
               </p>
               <div className="flex-shrink-0 flex items-center gap-2 pl-2">
                 <PlatformStatusBadge status={platform.status} />
@@ -253,7 +280,7 @@ const PlatformStatusCard = memo(({ platform, isExpanded, onToggle }) => {
               </div>
             </div>
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-              Last synced: {lastSyncTime}
+              {lastSyncTime ? `Last synced: ${lastSyncTime}` : "Live"}
             </p>
           </div>
         </div>
@@ -270,7 +297,7 @@ const PlatformStatusCard = memo(({ platform, isExpanded, onToggle }) => {
             <div className="pt-4 mt-4 border-t border-gray-200 dark:border-gray-700">
               <div className="p-3 bg-gray-100 dark:bg-gray-900/70 rounded-lg shadow-inner">
                 <PlatformDetailView
-                  platformName={platform.platform_name}
+                  platformName={platform.platform}
                   details={platform.details}
                 />
               </div>
@@ -283,23 +310,21 @@ const PlatformStatusCard = memo(({ platform, isExpanded, onToggle }) => {
 });
 
 export const EmployeeApplicationsTab = memo(
-  ({
-    employeeId,
-    applications,
-    platformStatuses,
-    isLoading,
-    onTicketClick,
-  }) => {
+  ({ employeeId, applications, onTicketClick }) => {
     const [expandedPlatform, setExpandedPlatform] = useState(null);
     const queryClient = useQueryClient();
 
-    const { mutate: syncPlatformStatus, isPending: isSyncing } = useMutation({
+    const { data: platformStatuses, isLoading } = useQuery({
+      queryKey: ["platformStatuses", employeeId],
+      queryFn: () => fetchPlatformStatuses(employeeId),
+    });
+
+    const { mutate: forceSync, isPending: isSyncing } = useMutation({
       mutationFn: () => api.post(`/api/employees/${employeeId}/sync-status`),
       onSuccess: () => {
         queryClient.invalidateQueries({
-          queryKey: ["employee", String(employeeId)],
+          queryKey: ["platformStatuses", employeeId],
         });
-        queryClient.invalidateQueries({ queryKey: ["me"] });
       },
       onError: (error) => {
         console.error("Failed to sync platform statuses:", error);
@@ -320,7 +345,7 @@ export const EmployeeApplicationsTab = memo(
               Platform Access Status
             </h3>
             <button
-              onClick={() => syncPlatformStatus()}
+              onClick={() => forceSync()}
               disabled={isSyncing}
               className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md shadow-sm text-white bg-kredivo-primary hover:bg-kredivo-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-kredivo-primary disabled:opacity-50"
             >
@@ -331,8 +356,7 @@ export const EmployeeApplicationsTab = memo(
             </button>
           </div>
           <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-            Live status of the employee's account on integrated external
-            platforms.
+            Status of the employee's account on integrated external platforms.
           </p>
           <div className="space-y-4">
             {isLoading ? (
@@ -343,14 +367,12 @@ export const EmployeeApplicationsTab = memo(
                 <PlatformRowSkeleton />
               </>
             ) : (
-              platformStatuses.map((platform) => (
+              platformStatuses?.map((platform) => (
                 <PlatformStatusCard
-                  key={platform.platform_name}
+                  key={platform.platform}
                   platform={platform}
-                  isExpanded={expandedPlatform === platform.platform_name}
-                  onToggle={() =>
-                    togglePlatformExpansion(platform.platform_name)
-                  }
+                  isExpanded={expandedPlatform === platform.platform}
+                  onToggle={() => togglePlatformExpansion(platform.platform)}
                 />
               ))
             )}

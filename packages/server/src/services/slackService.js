@@ -1,4 +1,5 @@
 const { WebClient } = require("@slack/web-api");
+const db = require("../config/db");
 
 let web;
 const getWebClient = () => {
@@ -133,8 +134,58 @@ const getAuditLogs = async (email) => {
   }
 };
 
+const syncUserData = async (employeeId, email) => {
+  console.log(`SYNC: Starting Slack sync for ${email}`);
+  try {
+    const statusResult = await getUserStatus(email);
+
+    if (
+      statusResult.status === "Error" ||
+      statusResult.status === "Not Found"
+    ) {
+      await db.query("DELETE FROM slack_users WHERE email = $1", [email]);
+      console.log(
+        `SYNC: User ${email} not found or error in Slack. Removed from local DB.`
+      );
+      return;
+    }
+
+    const userDetails = statusResult.details;
+    const query = `
+      INSERT INTO slack_users (
+        user_id, email, status, is_admin, is_owner, 
+        is_restricted, is_ultra_restricted, last_synced_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+      ON CONFLICT (user_id) DO UPDATE SET
+        email = EXCLUDED.email,
+        status = EXCLUDED.status,
+        is_admin = EXCLUDED.is_admin,
+        is_owner = EXCLUDED.is_owner,
+        is_restricted = EXCLUDED.is_restricted,
+        is_ultra_restricted = EXCLUDED.is_ultra_restricted,
+        last_synced_at = NOW();
+    `;
+
+    const values = [
+      userDetails.id,
+      email,
+      statusResult.status,
+      userDetails.is_admin,
+      userDetails.is_owner,
+      userDetails.is_restricted,
+      userDetails.is_ultra_restricted,
+    ];
+
+    await db.query(query, values);
+    console.log(`SYNC: Successfully synced Slack user ${email}`);
+  } catch (error) {
+    console.error(`SYNC: Error during Slack sync for ${email}:`, error);
+  }
+};
+
 module.exports = {
   getUserStatus,
   deactivateUser,
   getAuditLogs,
+  syncUserData,
 };

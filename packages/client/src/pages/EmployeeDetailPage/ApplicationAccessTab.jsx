@@ -8,15 +8,16 @@ import {
   ChevronDown,
   Search,
   Filter,
+  KeyRound,
 } from "lucide-react";
 import api from "../../api/api";
 import { EmployeeDetailSkeleton } from "../../components/ui/EmployeeDetailSkeleton";
 import { motion, AnimatePresence } from "framer-motion";
 import { CustomSelect } from "../../components/ui/CustomSelect";
 
-const fetchAtlassianAccess = async (employeeId) => {
+const fetchApplicationAccess = async (employeeId) => {
   const { data } = await api.get(
-    `/api/employees/${employeeId}/atlassian-access`
+    `/api/employees/${employeeId}/application-access`
   );
   return data;
 };
@@ -37,6 +38,8 @@ const useOutsideClick = (ref, callback) => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [ref, callback]);
 };
+
+// UI COMPONENTS
 
 const PermissionBadge = ({ level }) => {
   if (!level) return null;
@@ -120,6 +123,8 @@ const FilterDropdown = ({ options, selected, onChange }) => {
     </div>
   );
 };
+
+// MAIN SECTIONS
 
 const AccessSection = ({
   title,
@@ -279,11 +284,13 @@ const AccessSection = ({
   );
 };
 
-const AtlassianAccessTab = () => {
+// MAIN COMPONENT
+
+const ApplicationAccessTab = () => {
   const { employeeId } = useParams();
   const { data, isLoading, isError, error } = useQuery({
-    queryKey: ["atlassianAccess", employeeId],
-    queryFn: () => fetchAtlassianAccess(employeeId),
+    queryKey: ["applicationAccess", employeeId],
+    queryFn: () => fetchApplicationAccess(employeeId),
   });
 
   if (isLoading) return <EmployeeDetailSkeleton />;
@@ -294,63 +301,85 @@ const AtlassianAccessTab = () => {
 
   return (
     <div className="p-4 sm:p-0">
-      <AccessSection
-        title="Jira Projects"
-        icon={<Code size={20} />}
-        items={data.jiraProjects || []}
-        itemKeyFn={(project) => `${project.project_id}-${project.role_name}`}
-        nameKey="project_name"
-        permissionKey="role_name"
-        renderItem={(project) => (
-          <>
-            <span className="truncate font-medium text-gray-800 dark:text-gray-200">
-              {project.project_name} ({project.project_key})
-            </span>
-            <PermissionBadge level={project.role_name} />
-          </>
-        )}
-      />
+      <div className="mb-6">
+        <h2 className="text-xl font-bold mb-4 text-gray-800 dark:text-gray-200">
+          Atlassian
+        </h2>
+        <AccessSection
+          title="Jira Projects"
+          icon={<Code size={20} />}
+          items={data.atlassian?.jiraProjects || []}
+          itemKeyFn={(project) => `${project.project_id}-${project.role_name}`}
+          nameKey="project_name"
+          permissionKey="role_name"
+          renderItem={(project) => (
+            <>
+              <span className="truncate font-medium text-gray-800 dark:text-gray-200">
+                {project.project_name} ({project.project_key})
+              </span>
+              <PermissionBadge level={project.role_name} />
+            </>
+          )}
+        />
+        <AccessSection
+          title="Bitbucket Repositories"
+          icon={<GitBranch size={20} />}
+          items={data.atlassian?.bitbucketRepositories || []}
+          itemKeyFn={(repo) => `${repo.repo_uuid}-${repo.permission_level}`}
+          nameKey="full_name"
+          permissionKey="permission_level"
+          renderItem={(repo) => (
+            <>
+              <span className="truncate font-medium text-gray-800 dark:text-gray-200">
+                {repo.full_name}
+              </span>
+              <PermissionBadge level={repo.permission_level} />
+            </>
+          )}
+        />
+        <AccessSection
+          title="Confluence Spaces"
+          icon={<Book size={20} />}
+          items={data.atlassian?.confluenceSpaces || []}
+          itemKeyFn={(space) => space.id}
+          nameKey="name"
+          permissionKey="permissions"
+          renderItem={(space) => (
+            <>
+              <span className="truncate font-medium text-gray-800 dark:text-gray-200">
+                {space.name} ({space.key})
+              </span>
+              <div className="flex flex-wrap items-center justify-end gap-1.5">
+                {Array.isArray(space.permissions) &&
+                  space.permissions.map((p) => (
+                    <PermissionBadge key={p} level={p} />
+                  ))}
+              </div>
+            </>
+          )}
+        />
+      </div>
 
-      <AccessSection
-        title="Bitbucket Repositories"
-        icon={<GitBranch size={20} />}
-        items={data.bitbucketRepositories || []}
-        itemKeyFn={(repo) => `${repo.repo_uuid}-${repo.permission_level}`}
-        nameKey="full_name"
-        permissionKey="permission_level"
-        renderItem={(repo) => (
-          <>
+      <div>
+        <h2 className="text-xl font-bold mb-4 text-gray-800 dark:text-gray-200">
+          JumpCloud SSO
+        </h2>
+        <AccessSection
+          title="Applications"
+          icon={<KeyRound size={20} />}
+          items={data.jumpcloud || []}
+          itemKeyFn={(app) => app.id}
+          nameKey="display_label"
+          permissionKey="display_name"
+          renderItem={(app) => (
             <span className="truncate font-medium text-gray-800 dark:text-gray-200">
-              {repo.full_name}
+              {app.display_label}
             </span>
-            <PermissionBadge level={repo.permission_level} />
-          </>
-        )}
-      />
-
-      <AccessSection
-        title="Confluence Spaces"
-        icon={<Book size={20} />}
-        items={data.confluenceSpaces || []}
-        itemKeyFn={(space) => space.id}
-        nameKey="name"
-        permissionKey="permissions"
-        renderItem={(space) => (
-          <>
-            <span className="truncate font-medium text-gray-800 dark:text-gray-200">
-              {space.name} ({space.key})
-            </span>
-            <div className="flex flex-wrap items-center justify-end gap-1.5">
-              {Array.isArray(space.permissions) &&
-                space.permissions.map((p) => (
-                  <PermissionBadge key={p} level={p} />
-                ))}
-            </div>
-          </>
-        )}
-      />
+          )}
+        />
+      </div>
     </div>
   );
 };
 
-export default AtlassianAccessTab;
+export default ApplicationAccessTab;

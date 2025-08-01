@@ -2,6 +2,12 @@ const cron = require("node-cron");
 const db = require("../config/db");
 const employeeService = require("../services/employeeService");
 
+const {
+  syncAllJumpCloudUsers,
+  syncAllJumpCloudApplications,
+  syncAllJumpCloudGroupAssociations,
+} = require("../services/jumpcloudService");
+
 // Define batching constants to avoid overwhelming APIs
 const BATCH_SIZE = 10;
 const DELAY_BETWEEN_BATCHES_MS = 5000; // 5 seconds
@@ -52,17 +58,51 @@ const syncAllUserStatuses = async () => {
   }
 };
 
+// --- New master function for all JumpCloud sync tasks ---
+const syncAllJumpCloudData = async () => {
+  console.log("CRON JOB: Starting full JumpCloud data sync...");
+  try {
+    // These functions will run in order
+    await syncAllJumpCloudUsers();
+    await syncAllJumpCloudApplications();
+    await syncAllJumpCloudGroupAssociations();
+    console.log("CRON JOB: Successfully finished full JumpCloud data sync.");
+  } catch (error) {
+    console.error(
+      "CRON JOB: An error occurred during the JumpCloud data sync:",
+      error
+    );
+    // We throw the error so the main job knows something went wrong
+    throw error;
+  }
+};
+
+// --- New Master Sync Function ---
+const syncAll = async () => {
+  console.log("CRON JOB: Starting full nightly data sync job...");
+  try {
+    // Step 1: Sync all data from platforms like JumpCloud
+    await syncAllJumpCloudData();
+
+    // Step 2: Sync individual employee statuses (your existing logic)
+    await syncAllUserStatuses();
+
+    console.log("CRON JOB: Full nightly data sync finished successfully.");
+  } catch (error) {
+    console.error("CRON JOB: Full nightly data sync failed.", error);
+  }
+};
+
 const schedulePlatformSync = () => {
-  //cron.schedule("* * * * *", syncAllUserStatuses, {
-  // Schedule to run at 2 AM every day in Jakarta's timezone
-  cron.schedule("0 2 * * *", syncAllUserStatuses, {
+  // Schedule the new master 'syncAll' function to run at 2 AM
+  cron.schedule("0 2 * * *", syncAll, {
     scheduled: true,
     timezone: "Asia/Jakarta",
   });
 
   console.log(
-    "Cron job for platform status sync has been scheduled for 2:00 AM (Asia/Jakarta)."
+    "Master cron job for all platform syncs has been scheduled for 2:00 AM (Asia/Jakarta)."
   );
 };
 
-module.exports = { schedulePlatformSync, syncAllUserStatuses };
+module.exports = { schedulePlatformSync, syncAllUserStatuses, syncAll };

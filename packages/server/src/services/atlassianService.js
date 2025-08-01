@@ -375,6 +375,54 @@ const getAtlassianAccessByAccountId = async (atlassianAccountId) => {
     confluenceSpaces: Object.values(confluenceSpaces),
   };
 };
+
+const syncUserData = async (employeeId, email) => {
+  console.log(`SYNC: Starting Atlassian sync for ${email}`);
+  try {
+    const statusResult = await getUserStatus(email);
+
+    // If the user doesn't exist in Atlassian, remove them from our local table.
+    if (
+      statusResult.status === "Error" ||
+      statusResult.status === "Not Found"
+    ) {
+      await pool.query("DELETE FROM atlassian_users WHERE email_address = $1", [
+        email,
+      ]);
+      console.log(
+        `SYNC: User ${email} not found or error in Atlassian. Removed from local DB.`
+      );
+      return;
+    }
+
+    const userDetails = statusResult.details;
+
+    // ✨ FIX: The query now correctly targets the 'account_status' column
+    // as defined in your DDL schema.
+    const query = `
+          INSERT INTO atlassian_users (account_id, email_address, display_name, account_status, last_updated_at)
+          VALUES ($1, $2, $3, $4, NOW())
+          ON CONFLICT (account_id) DO UPDATE SET
+              email_address = EXCLUDED.email_address,
+              display_name = EXCLUDED.display_name,
+              account_status = EXCLUDED.account_status,
+              last_updated_at = NOW();
+      `;
+
+    const values = [
+      userDetails.accountId,
+      userDetails.emailAddress || email,
+      userDetails.displayName,
+      statusResult.status, // This will insert the string 'Active', 'Suspended', etc.
+    ];
+
+    await pool.query(query, values);
+    console.log(`SYNC: Successfully synced Atlassian user ${email}`);
+  } catch (error) {
+    console.error(`SYNC: Error during Atlassian sync for ${email}:`, error);
+  }
+};
+
 module.exports = {
   getUserStatus,
   deactivateUser,
@@ -383,4 +431,5 @@ module.exports = {
   findAssetByName,
   getJiraUserByEmail,
   getAtlassianAccessByAccountId,
+  syncUserData,
 };
