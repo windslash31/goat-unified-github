@@ -63,8 +63,8 @@ app.listen(PORT, () => {
 
   if (config.nodeEnv === "production") {
     schedulePlatformSync();
+    scheduleAtlassianSync();
   }
-  scheduleAtlassianSync();
 });
 
 module.exports = app;

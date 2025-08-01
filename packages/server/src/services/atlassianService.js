@@ -856,6 +856,150 @@ const syncJiraRolesAndPermissions = async () => {
   }
 };
 
+const syncAllBitbucketRepositoriesAndPermissions = async () => {
+  console.log("Starting Bitbucket repository and permissions sync...");
+  if (
+    !config.atlassian.bitbucketWorkspace ||
+    !config.atlassian.bitbucketToken || // For fetching repos
+    !config.atlassian.apiUser || // For fetching permissions
+    !config.atlassian.bitbucketUserToken // For fetching permissions
+  ) {
+    throw new Error("Bitbucket API credentials are not fully configured.");
+  }
+
+  const bitbucketRepoHeaders = {
+    Authorization: `Bearer ${config.atlassian.bitbucketToken}`,
+    Accept: "application/json",
+  };
+
+  const bitbucketPermsHeaders = {
+    Authorization: `Basic ${Buffer.from(
+      `${config.atlassian.apiUser}:${config.atlassian.bitbucketUserToken}`
+    ).toString("base64")}`,
+    Accept: "application/json",
+  };
+
+  let allRepositories = [];
+
+  const lastYear = new Date().getFullYear() - 1;
+  const startDate = `${lastYear}-01-01`;
+  const encodedQuery = encodeURIComponent(`updated_on > "${startDate}"`);
+
+  let nextPageUrl = `https://api.bitbucket.org/2.0/repositories/${config.atlassian.bitbucketWorkspace}?q=${encodedQuery}&sort=-updated_on`;
+
+  // Part 1: Fetch all repositories (This part is correct and unchanged)
+  while (nextPageUrl) {
+    try {
+      const response = await fetch(nextPageUrl, {
+        headers: bitbucketRepoHeaders,
+      });
+      if (!response.ok) {
+        const errorBody = await response.text();
+        throw new Error(
+          `Bitbucket API Error fetching repositories: ${response.status} - ${errorBody}`
+        );
+      }
+      const page = await response.json();
+      const repos = page.values;
+
+      if (repos && repos.length > 0) {
+        allRepositories.push(...repos);
+      }
+      nextPageUrl = page.next;
+    } catch (error) {
+      console.error("Failed to fetch a page of Bitbucket repositories:", error);
+      nextPageUrl = null;
+    }
+  }
+
+  if (allRepositories.length === 0) {
+    console.log("No Bitbucket repositories found to sync.");
+    return;
+  }
+
+  const client = await db.pool.connect();
+  try {
+    // Part 2: Save repositories to the database (This part is correct and unchanged)
+    await client.query("BEGIN");
+    await client.query(
+      "TRUNCATE TABLE bitbucket_repositories RESTART IDENTITY;"
+    );
+    for (const repo of allRepositories) {
+      await client.query(
+        `INSERT INTO bitbucket_repositories (repo_uuid, full_name, name, created_on, updated_on, description, project_name)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [
+          repo.uuid.replace(/[{}]/g, ""),
+          repo.full_name,
+          repo.name,
+          repo.created_on,
+          repo.updated_on,
+          repo.description,
+          repo.project?.name,
+        ]
+      );
+    }
+    await client.query("COMMIT");
+    console.log(
+      `Successfully synced ${allRepositories.length} Bitbucket repositories.`
+    );
+
+    console.log("Starting Bitbucket repository permissions sync...");
+    await client.query(
+      "TRUNCATE TABLE bitbucket_repository_permissions RESTART IDENTITY;"
+    );
+
+    for (const repo of allRepositories) {
+      // Construct the URL exactly as you specified.
+      let permissionsUrl = `https://api.bitbucket.org/2.0/workspaces/${config.atlassian.bitbucketWorkspace}/permissions/repositories/${repo.name}`;
+
+      while (permissionsUrl) {
+        const permissionsResponse = await fetch(permissionsUrl, {
+          headers: bitbucketPermsHeaders,
+        });
+
+        if (!permissionsResponse.ok) {
+          console.warn(
+            `Could not fetch permissions for repo ${repo.full_name}. Status: ${permissionsResponse.status}`
+          );
+          break; // Stop trying for this repository on failure
+        }
+
+        const permissionsData = await permissionsResponse.json();
+        const permissions = permissionsData.values; // Access the 'values' array
+
+        if (permissions && permissions.length > 0) {
+          await client.query("BEGIN");
+          for (const perm of permissions) {
+            // Check for user permissions and save to DB
+            if (perm.user && perm.user.account_id) {
+              await client.query(
+                `INSERT INTO bitbucket_repository_permissions (repo_uuid, user_account_id, permission_level)
+                 VALUES ($1, $2, $3)`,
+                [
+                  repo.uuid.replace(/[{}]/g, ""),
+                  perm.user.account_id,
+                  perm.permission,
+                ]
+              );
+            }
+          }
+          await client.query("COMMIT");
+        }
+        // Handle pagination
+        permissionsUrl = permissionsData.next;
+      }
+    }
+    console.log("Successfully finished syncing Bitbucket permissions.");
+  } catch (error) {
+    await client.query("ROLLBACK");
+    console.error("Error during Bitbucket database sync:", error);
+    throw error;
+  } finally {
+    client.release();
+  }
+};
+
 module.exports = {
   getUserStatus,
   deactivateUser,
@@ -869,4 +1013,5 @@ module.exports = {
   syncAllAtlassianGroupsAndMembers,
   syncAllJiraProjects,
   syncJiraRolesAndPermissions,
+  syncAllBitbucketRepositoriesAndPermissions,
 };

@@ -1369,34 +1369,63 @@ const getApplicationAccess = async (employeeId) => {
     throw new Error("Employee not found");
   }
   try {
+    // --- FIX: The entire atlassianQuery has been updated ---
     const atlassianQuery = `
       WITH user_info AS (
-        SELECT account_id FROM atlassian_users WHERE email_address = $1
+        SELECT account_id
+        FROM atlassian_users
+        WHERE email_address = $1
+      ), user_groups AS (
+        SELECT group_id
+        FROM atlassian_group_members
+        WHERE account_id = (SELECT account_id FROM user_info)
       )
       SELECT
         (
-          SELECT json_agg(p) FROM (
-            SELECT DISTINCT jp.project_id, jp.project_key, jp.project_name, jr.role_name
+          SELECT json_agg(p)
+          FROM (
+            SELECT DISTINCT
+              jp.project_id,
+              jp.project_key,
+              jp.project_name,
+              jr.role_name
             FROM jira_project_permissions jpp
             JOIN jira_projects jp ON jpp.project_id = jp.project_id
             LEFT JOIN jira_roles jr ON jpp.role_id = jr.role_id
-            WHERE jpp.actor_id = (SELECT account_id FROM user_info) AND jpp.actor_type = 'user'
+            WHERE
+              -- Condition 1: Direct user assignment
+              (jpp.actor_type = 'atlassian-user-role-actor' AND jpp.actor_id = (SELECT account_id FROM user_info))
+              OR
+              -- Condition 2: Group-based assignment
+              (jpp.actor_type = 'atlassian-group-role-actor' AND jpp.actor_id IN (SELECT group_id FROM user_groups))
           ) p
         ) as jira_projects,
         (
-          SELECT json_agg(r) FROM (
-            SELECT DISTINCT br.repo_uuid, br.full_name, brp.permission_level
+          SELECT json_agg(r)
+          FROM (
+            SELECT DISTINCT
+              br.repo_uuid,
+              br.full_name,
+              brp.permission_level
             FROM bitbucket_repository_permissions brp
             JOIN bitbucket_repositories br ON brp.repo_uuid = br.repo_uuid
             WHERE brp.user_account_id = (SELECT account_id FROM user_info)
           ) r
         ) as bitbucket_repositories,
         (
-          SELECT json_agg(s) FROM (
-            SELECT cs.id, cs.key, cs.name, json_agg(DISTINCT csp.operation) as permissions
+          SELECT json_agg(s)
+          FROM (
+            SELECT
+              cs.id,
+              cs.key,
+              cs.name,
+              json_agg(DISTINCT csp.operation) as permissions
             FROM confluence_space_permission csp
             JOIN confluence_space cs ON csp.space_id = cs.id
-            WHERE csp.principal_id = (SELECT account_id FROM user_info) AND csp.principal_type = 'user'
+            WHERE
+              (csp.principal_type = 'user' AND csp.principal_id = (SELECT account_id FROM user_info))
+              OR
+              (csp.principal_type = 'group' AND csp.principal_id IN (SELECT group_id FROM user_groups))
             GROUP BY cs.id, cs.key, cs.name
           ) s
         ) as confluence_spaces;
