@@ -1412,7 +1412,7 @@ const getApplicationAccess = async (employeeId) => {
     };
 
     const jumpcloudQuery = `
-      SELECT DISTINCT ja.id, ja.display_name, ja.display_label
+      SELECT DISTINCT ja.*
       FROM jumpcloud_applications ja
       JOIN jumpcloud_application_bindings jab ON ja.id = jab.application_id
       JOIN jumpcloud_user_group_members jugm ON jab.group_id = jugm.group_id

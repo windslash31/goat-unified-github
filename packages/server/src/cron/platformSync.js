@@ -6,7 +6,10 @@ const {
   syncAllJumpCloudUsers,
   syncAllJumpCloudApplications,
   syncAllJumpCloudGroupAssociations,
+  syncAllJumpCloudGroupMembers,
 } = require("../services/jumpcloudService");
+
+let isSyncRunning = false;
 
 // Define batching constants to avoid overwhelming APIs
 const BATCH_SIZE = 10;
@@ -66,6 +69,7 @@ const syncAllJumpCloudData = async () => {
     await syncAllJumpCloudUsers();
     await syncAllJumpCloudApplications();
     await syncAllJumpCloudGroupAssociations();
+    await syncAllJumpCloudGroupMembers(); // Add this line
     console.log("CRON JOB: Successfully finished full JumpCloud data sync.");
   } catch (error) {
     console.error(
@@ -79,6 +83,11 @@ const syncAllJumpCloudData = async () => {
 
 // --- New Master Sync Function ---
 const syncAll = async () => {
+  if (isSyncRunning) {
+    console.log("CRON JOB: Skipping run, previous sync is still in progress.");
+    return;
+  }
+  isSyncRunning = true;
   console.log("CRON JOB: Starting full nightly data sync job...");
   try {
     // Step 1: Sync all data from platforms like JumpCloud
@@ -90,12 +99,16 @@ const syncAll = async () => {
     console.log("CRON JOB: Full nightly data sync finished successfully.");
   } catch (error) {
     console.error("CRON JOB: Full nightly data sync failed.", error);
+  } finally {
+    // IMPORTANT
+    isSyncRunning = false;
+    console.log("CRON JOB: Sync process complete. Releasing lock.");
   }
 };
 
 const schedulePlatformSync = () => {
   // Schedule the new master 'syncAll' function to run at 2 AM
-  cron.schedule("0 2 * * *", syncAll, {
+  cron.schedule("* * * * *", syncAll, {
     scheduled: true,
     timezone: "Asia/Jakarta",
   });

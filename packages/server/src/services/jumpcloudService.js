@@ -9,23 +9,34 @@ const fetchAllJumpCloudUsers = async () => {
   const limit = 100;
   let skip = 0;
   let allUsers = [];
-  let totalCount = 0;
-  do {
+  let keepFetching = true; // Use a flag to control the loop
+
+  // --- MODIFICATION START: Improved pagination logic ---
+  while (keepFetching) {
     const url = `${BASE_URL}/systemusers?limit=${limit}&skip=${skip}`;
     const response = await fetch(url, {
       headers: { "x-api-key": API_KEY, Accept: "application/json" },
     });
-    if (!response.ok)
+
+    if (!response.ok) {
       throw new Error(
         `JumpCloud API Error: ${response.status} ${response.statusText}`
       );
-    const data = await response.json();
-    if (data.results) {
-      allUsers = allUsers.concat(data.results);
     }
-    totalCount = data.totalCount;
-    skip += limit;
-  } while (allUsers.length < totalCount);
+
+    const data = await response.json();
+    const users = data.results || [];
+
+    if (users.length > 0) {
+      allUsers = allUsers.concat(users);
+      skip += limit;
+    }
+
+    if (users.length < limit) {
+      keepFetching = false;
+    }
+  }
+
   return allUsers;
 };
 
@@ -87,7 +98,7 @@ const syncAllJumpCloudUsers = async () => {
         user.sudo, // New field
         user.mfaEnrollment ? JSON.stringify(user.mfaEnrollment) : null, // New field
       ];
-      await pool.query(query, values);
+      await db.query(query, values);
     }
     console.log(`Successfully synced ${users.length} JumpCloud users.`);
   } catch (error) {
@@ -112,34 +123,50 @@ const fetchAllJumpCloudApplications = async () => {
 const syncAllJumpCloudApplications = async () => {
   console.log("Starting JumpCloud application sync...");
   const applications = await fetchAllJumpCloudApplications();
-  if (!applications || applications.length === 0) {
+  if (!applications || !applications.length) {
     console.log("No applications found in JumpCloud to sync.");
     return;
   }
+
   try {
     for (const app of applications) {
+      if (!app._id) {
+        console.warn(
+          `Skipping application with no ID: ${
+            app.displayName || "Name not available"
+          }`
+        );
+        continue;
+      }
+
       const query = `
-        INSERT INTO jumpcloud_applications (id, display_name, display_label, sso_url, sso, updated_at)
-        VALUES ($1, $2, $3, $4, $5, NOW())
+        INSERT INTO jumpcloud_applications (
+          id, display_name, display_label, sso_url, sso, updated_at,
+          description, provision, organization -- Final Columns
+        ) VALUES ($1, $2, $3, $4, $5, NOW(), $6, $7, $8)
         ON CONFLICT (id) DO UPDATE SET
             display_name = EXCLUDED.display_name,
             display_label = EXCLUDED.display_label,
             sso_url = EXCLUDED.sso_url,
             sso = EXCLUDED.sso,
-            updated_at = NOW();
+            updated_at = NOW(),
+            description = EXCLUDED.description,
+            provision = EXCLUDED.provision,
+            organization = EXCLUDED.organization;
       `;
       const values = [
-        app.id,
+        app._id,
         app.displayName,
         app.displayLabel,
-        app.ssoUrl,
-        app.sso,
+        app.sso?.url,
+        app.sso ? JSON.stringify(app.sso) : null,
+        app.description,
+        app.provision ? JSON.stringify(app.provision) : null,
+        app.organization,
       ];
-      await pool.query(query, values);
+      await db.query(query, values);
     }
-    console.log(
-      `Successfully synced ${applications.length} JumpCloud applications.`
-    );
+    console.log(`Successfully synced JumpCloud applications.`);
   } catch (error) {
     console.error("Error during JumpCloud application sync:", error);
     throw error;
@@ -149,7 +176,7 @@ const syncAllJumpCloudApplications = async () => {
 const syncAllJumpCloudGroupAssociations = async () => {
   console.log("Starting JumpCloud group association sync...");
   try {
-    const res = await pool.query("SELECT id FROM jumpcloud_applications");
+    const res = await db.query("SELECT id FROM jumpcloud_applications");
     const applications = res.rows;
     if (applications.length === 0) {
       console.log("No applications in DB to sync associations for.");
@@ -174,7 +201,16 @@ const syncAllJumpCloudGroupAssociations = async () => {
         const group = assoc.to;
         if (group.type !== "user_group") continue;
 
-        await pool.query(
+        let groupName = `Group ${group.id}`;
+        if (
+          group.attributes?.ldapGroups &&
+          group.attributes.ldapGroups.length > 0 &&
+          group.attributes.ldapGroups[0].name
+        ) {
+          groupName = group.attributes.ldapGroups[0].name;
+        }
+
+        await db.query(
           `
             INSERT INTO jumpcloud_user_groups (id, name, updated_at)
             VALUES ($1, $2, NOW())
@@ -182,10 +218,10 @@ const syncAllJumpCloudGroupAssociations = async () => {
                 name = EXCLUDED.name,
                 updated_at = NOW();
         `,
-          [group.id, group.name || `Group ${group.id}`]
+          [group.id, groupName]
         );
 
-        await pool.query(
+        await db.query(
           `
             INSERT INTO jumpcloud_application_bindings (application_id, group_id)
             VALUES ($1, $2)
@@ -432,6 +468,71 @@ const syncUserData = async (employeeId, email) => {
   }
 };
 
+const syncAllJumpCloudGroupMembers = async () => {
+  console.log("Starting JumpCloud group member sync...");
+  try {
+    const res = await db.query("SELECT id FROM jumpcloud_user_groups");
+    const groups = res.rows;
+    if (groups.length === 0) {
+      console.log("No user groups in DB to sync members for.");
+      return;
+    }
+
+    for (const group of groups) {
+      let allMembers = [];
+      let skip = 0;
+      const limit = 100;
+      let keepFetching = true;
+
+      while (keepFetching) {
+        const url = `https://console.jumpcloud.com/api/v2/usergroups/${group.id}/members?limit=${limit}&skip=${skip}`;
+        const response = await fetch(url, {
+          headers: { "x-api-key": API_KEY, Accept: "application/json" },
+        });
+
+        if (!response.ok) {
+          console.error(
+            `Could not fetch members for group ${group.id}: ${response.statusText}`
+          );
+          keepFetching = false;
+          continue;
+        }
+
+        const members = await response.json();
+
+        if (members && members.length > 0) {
+          allMembers = allMembers.concat(members);
+          skip += limit;
+        }
+
+        if (!members || members.length < limit) {
+          keepFetching = false;
+        }
+      }
+      await db.query(
+        "DELETE FROM jumpcloud_user_group_members WHERE group_id = $1",
+        [group.id]
+      );
+
+      if (allMembers.length > 0) {
+        const insertPromises = allMembers
+          .filter((member) => member.to.type === "user")
+          .map((member) => {
+            return db.query(
+              `INSERT INTO jumpcloud_user_group_members (group_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+              [group.id, member.to.id]
+            );
+          });
+        await Promise.all(insertPromises);
+      }
+    }
+    console.log("Successfully synced JumpCloud group members.");
+  } catch (error) {
+    console.error("Error during JumpCloud group member sync:", error);
+    throw error;
+  }
+};
+
 module.exports = {
   suspendUser,
   getUserStatus,
@@ -441,5 +542,6 @@ module.exports = {
   syncAllJumpCloudUsers,
   syncAllJumpCloudApplications,
   syncAllJumpCloudGroupAssociations,
+  syncAllJumpCloudGroupMembers,
   syncUserData,
 };

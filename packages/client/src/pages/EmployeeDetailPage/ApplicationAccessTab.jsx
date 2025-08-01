@@ -126,6 +126,36 @@ const FilterDropdown = ({ options, selected, onChange }) => {
 
 // MAIN SECTIONS
 
+const JumpCloudAppDetails = ({ app }) => {
+  const ssoType = app.sso?.type || "Unknown";
+  const ssoUrl = app.sso?.url || app.sso?.bookmark?.url;
+
+  return (
+    <div className="w-full text-sm">
+      <div className="flex justify-between items-start gap-2">
+        <span className="truncate font-medium text-gray-800 dark:text-gray-200">
+          {app.display_label}
+        </span>
+        <span className="flex-shrink-0 text-xs bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300 px-2.5 py-1 rounded-full capitalize font-semibold">
+          {ssoType}
+        </span>
+      </div>
+      {ssoUrl && (
+        <div className="text-xs text-gray-500 dark:text-gray-400 mt-1.5 truncate">
+          <span className="font-medium">URL:</span> {ssoUrl}
+        </div>
+      )}
+      {app.provision && (
+        <div className="mt-2">
+          <span className="text-xs font-semibold bg-gray-200 dark:bg-gray-700 px-2 py-1 rounded-md text-gray-700 dark:text-gray-300">
+            Provisioning: {app.provision.type}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+};
+
 const AccessSection = ({
   title,
   icon,
@@ -371,11 +401,7 @@ const ApplicationAccessTab = () => {
           itemKeyFn={(app) => app.id}
           nameKey="display_label"
           permissionKey="display_name"
-          renderItem={(app) => (
-            <span className="truncate font-medium text-gray-800 dark:text-gray-200">
-              {app.display_label}
-            </span>
-          )}
+          renderItem={(app) => <JumpCloudAppDetails app={app} />}
         />
       </div>
     </div>

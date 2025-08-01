@@ -191,12 +191,6 @@ const PlatformDetailView = ({ platformName, details }) => {
           <DetailItem label="Company" value={details.userDetails?.company} />
           <DetailItem label="Location" value={details.userDetails?.location} />
 
-          <DetailSectionHeader>Permissions</DetailSectionHeader>
-          <DetailItem
-            label="Sudo (Admin)"
-            value={formatBoolean(details.permissions?.sudo)}
-          />
-
           <DetailSectionHeader>Security</DetailSectionHeader>
           <DetailItem
             label="Overall MFA Status"
