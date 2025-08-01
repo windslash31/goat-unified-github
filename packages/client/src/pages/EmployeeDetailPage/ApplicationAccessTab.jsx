@@ -9,6 +9,7 @@ import {
   Search,
   Filter,
   KeyRound,
+  ExternalLink,
 } from "lucide-react";
 import api from "../../api/api";
 import { EmployeeDetailSkeleton } from "../../components/ui/EmployeeDetailSkeleton";
@@ -335,6 +336,7 @@ const ApplicationAccessTab = () => {
         <h2 className="text-xl font-bold mb-4 text-gray-800 dark:text-gray-200">
           Atlassian
         </h2>
+        {/* JIRA PROJECTS SECTION */}
         <AccessSection
           title="Jira Projects"
           icon={<Code size={20} />}
@@ -343,14 +345,28 @@ const ApplicationAccessTab = () => {
           nameKey="project_name"
           permissionKey="role_name"
           renderItem={(project) => (
-            <>
-              <span className="truncate font-medium text-gray-800 dark:text-gray-200">
-                {project.project_name} ({project.project_key})
-              </span>
-              <PermissionBadge level={project.role_name} />
-            </>
+            <div className="flex justify-between items-start w-full">
+              <div className="flex-grow truncate">
+                <a
+                  href={`https://kredivo.atlassian.net/browse/${project.project_key}`} // Assuming your Atlassian domain
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-medium text-gray-800 dark:text-gray-200 hover:underline flex items-center gap-1.5"
+                >
+                  {project.project_name} ({project.project_key})
+                  <ExternalLink size={14} />
+                </a>
+                <div className="text-xs text-gray-500 capitalize mt-1">
+                  Type: {project.project_type}
+                </div>
+              </div>
+              <div className="flex-shrink-0 ml-4">
+                <PermissionBadge level={project.role_name} />
+              </div>
+            </div>
           )}
         />
+        {/* BITBUCKET REPOSITORIES SECTION */}
         <AccessSection
           title="Bitbucket Repositories"
           icon={<GitBranch size={20} />}
@@ -359,14 +375,32 @@ const ApplicationAccessTab = () => {
           nameKey="full_name"
           permissionKey="permission_level"
           renderItem={(repo) => (
-            <>
-              <span className="truncate font-medium text-gray-800 dark:text-gray-200">
-                {repo.full_name}
-              </span>
-              <PermissionBadge level={repo.permission_level} />
-            </>
+            <div className="flex justify-between items-start w-full">
+              <div className="flex-grow truncate">
+                <a
+                  href={`https://bitbucket.org/${repo.full_name}`} // Standard Bitbucket URL
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-medium text-gray-800 dark:text-gray-200 hover:underline flex items-center gap-1.5"
+                >
+                  {repo.full_name}
+                  <ExternalLink size={14} />
+                </a>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 italic truncate">
+                  {repo.description || "No description."}
+                </p>
+                <p className="text-xs text-gray-400 mt-1">
+                  Project: {repo.project_name || "N/A"} · Last Updated:{" "}
+                  {new Date(repo.updated_on).toLocaleDateString()}
+                </p>
+              </div>
+              <div className="flex-shrink-0 ml-4">
+                <PermissionBadge level={repo.permission_level} />
+              </div>
+            </div>
           )}
         />
+        {/* CONFLUENCE SPACES SECTION */}
         <AccessSection
           title="Confluence Spaces"
           icon={<Book size={20} />}
@@ -375,21 +409,33 @@ const ApplicationAccessTab = () => {
           nameKey="name"
           permissionKey="permissions"
           renderItem={(space) => (
-            <>
-              <span className="truncate font-medium text-gray-800 dark:text-gray-200">
-                {space.name} ({space.key})
-              </span>
-              <div className="flex flex-wrap items-center justify-end gap-1.5">
+            <div className="flex justify-between items-start w-full">
+              <div className="flex-grow truncate">
+                <a
+                  href={`https://kredivo.atlassian.net/wiki/spaces/${space.key}`} // Assuming your Atlassian domain
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-medium text-gray-800 dark:text-gray-200 hover:underline flex items-center gap-1.5"
+                >
+                  {space.name} ({space.key})
+                  <ExternalLink size={14} />
+                </a>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 italic truncate">
+                  {space.description || "No description."}
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center justify-end gap-1.5 ml-4">
                 {Array.isArray(space.permissions) &&
                   space.permissions.map((p) => (
                     <PermissionBadge key={p} level={p} />
                   ))}
               </div>
-            </>
+            </div>
           )}
         />
       </div>
 
+      {/* JUMPCLOUD SECTION */}
       <div>
         <h2 className="text-xl font-bold mb-4 text-gray-800 dark:text-gray-200">
           JumpCloud SSO
@@ -400,7 +446,7 @@ const ApplicationAccessTab = () => {
           items={data.jumpcloud || []}
           itemKeyFn={(app) => app.id}
           nameKey="display_label"
-          permissionKey="display_name"
+          permissionKey="display_name" // Using this key for filtering options
           renderItem={(app) => <JumpCloudAppDetails app={app} />}
         />
       </div>
