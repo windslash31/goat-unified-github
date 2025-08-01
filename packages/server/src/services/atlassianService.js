@@ -662,6 +662,95 @@ const syncAllAtlassianGroupsAndMembers = async () => {
   }
 };
 
+const syncAllJiraProjects = async () => {
+  console.log("Starting Jira project sync...");
+  if (
+    !config.atlassian.domain ||
+    !config.atlassian.apiUser ||
+    !config.atlassian.apiToken
+  ) {
+    throw new Error("Jira API credentials are not fully configured.");
+  }
+
+  let allProjects = [];
+  let startAt = 0;
+  let isLast = false;
+
+  const jiraHeaders = {
+    Authorization: `Basic ${Buffer.from(
+      `${config.atlassian.apiUser}:${config.atlassian.apiToken}`
+    ).toString("base64")}`,
+    Accept: "application/json",
+  };
+
+  while (!isLast) {
+    const url = `https://${config.atlassian.domain}/rest/api/3/project/search?startAt=${startAt}&maxResults=50`;
+    try {
+      const response = await fetch(url, { headers: jiraHeaders });
+      if (!response.ok) {
+        const errorBody = await response.text();
+        throw new Error(
+          `Jira API Error fetching projects: ${response.status} - ${errorBody}`
+        );
+      }
+      const page = await response.json();
+      const projects = page.values;
+
+      if (projects && projects.length > 0) {
+        allProjects.push(...projects);
+      }
+
+      isLast = page.isLast;
+      startAt = page.nextPage
+        ? new URL(page.nextPage).searchParams.get("startAt")
+        : startAt;
+      if (!page.nextPage) isLast = true; // Handle cases where nextPage isn't present
+    } catch (error) {
+      console.error("Failed to fetch a page of Jira projects:", error);
+      isLast = true; // Stop on error
+    }
+  }
+
+  if (allProjects.length === 0) {
+    console.log("No Jira projects found to sync.");
+    return;
+  }
+
+  const client = await db.pool.connect();
+  try {
+    await client.query("BEGIN");
+    for (const project of allProjects) {
+      const query = `
+        INSERT INTO jira_projects (
+          project_id, project_key, project_name, jira_url, project_type, last_updated_at
+        ) VALUES ($1, $2, $3, $4, $5, NOW())
+        ON CONFLICT (project_id) DO UPDATE SET
+          project_key = EXCLUDED.project_key,
+          project_name = EXCLUDED.project_name,
+          jira_url = EXCLUDED.jira_url,
+          project_type = EXCLUDED.project_type,
+          last_updated_at = NOW();
+      `;
+      const values = [
+        project.id,
+        project.key,
+        project.name,
+        project.self,
+        project.projectTypeKey,
+      ];
+      await client.query(query, values);
+    }
+    await client.query("COMMIT");
+    console.log(`Successfully synced ${allProjects.length} Jira projects.`);
+  } catch (error) {
+    await client.query("ROLLBACK");
+    console.error("Error during Jira project database sync:", error);
+    throw error;
+  } finally {
+    client.release();
+  }
+};
+
 module.exports = {
   getUserStatus,
   deactivateUser,
@@ -673,4 +762,5 @@ module.exports = {
   syncUserData,
   syncAllAtlassianUsers,
   syncAllAtlassianGroupsAndMembers,
+  syncAllJiraProjects,
 };
