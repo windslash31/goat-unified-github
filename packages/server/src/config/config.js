@@ -38,6 +38,7 @@ module.exports = {
     workspaceId: process.env.ATLASSIAN_WORKSPACE_ID,
     orgId: process.env.ATLASSIAN_ORG_ID,
     orgToken: process.env.ATLASSIAN_ORG_TOKEN,
+    directoryId: process.env.ATLASSIAN_DIRECTORY_ID,
   },
   nodeEnv: process.env.NODE_ENV || "development",
 };

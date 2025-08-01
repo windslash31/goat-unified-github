@@ -1,12 +1,14 @@
 const cron = require("node-cron");
-const { syncAllAtlassianUsers } = require("../services/atlassianService");
+const {
+  syncAllAtlassianUsers,
+  syncAllAtlassianGroupsAndMembers, // Add this import
+} = require("../services/atlassianService");
 
-// This is the master function for all Atlassian sync tasks.
-// For now, it will only sync users.
 const syncAllAtlassianData = async () => {
   console.log("CRON JOB: Starting Atlassian data sync...");
   try {
     await syncAllAtlassianUsers();
+    await syncAllAtlassianGroupsAndMembers(); // Add this line
     console.log("CRON JOB: Finished Atlassian data sync.");
   } catch (error) {
     console.error(

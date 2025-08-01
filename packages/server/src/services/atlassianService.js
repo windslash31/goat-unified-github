@@ -518,6 +518,150 @@ const syncAllAtlassianUsers = async () => {
   }
 };
 
+const syncAllAtlassianGroupsAndMembers = async () => {
+  console.log("Starting Atlassian group sync...");
+  if (
+    !config.atlassian.orgId ||
+    !config.atlassian.orgToken ||
+    !config.atlassian.directoryId
+  ) {
+    throw new Error(
+      "Atlassian Org ID, Token, or Directory ID is not configured."
+    );
+  }
+
+  let allGroups = [];
+  let nextCursor = null;
+  let keepFetching = true;
+
+  const headers = {
+    Authorization: `Bearer ${config.atlassian.orgToken}`,
+    Accept: "application/json",
+  };
+
+  while (keepFetching) {
+    const url = `https://api.atlassian.com/admin/v2/orgs/${
+      config.atlassian.orgId
+    }/directories/${config.atlassian.directoryId}/groups?limit=100${
+      nextCursor ? `&cursor=${nextCursor}` : ""
+    }`;
+
+    try {
+      const response = await fetch(url, { headers });
+      if (!response.ok) {
+        const errorBody = await response.text();
+        throw new Error(
+          `Atlassian API Error fetching groups: ${response.status} - ${errorBody}`
+        );
+      }
+      const page = await response.json();
+      const groups = page.data;
+
+      if (groups && groups.length > 0) {
+        allGroups = allGroups.concat(groups);
+      }
+
+      if (page.links && page.links.next) {
+        nextCursor = page.links.next; // Use the cursor string directly
+      } else {
+        keepFetching = false;
+      }
+    } catch (error) {
+      console.error("Failed to fetch a page of Atlassian groups:", error);
+      keepFetching = false;
+    }
+  }
+
+  if (allGroups.length === 0) {
+    console.log("No groups found in Atlassian to sync.");
+    return;
+  }
+
+  const client = await db.pool.connect();
+  try {
+    await client.query("BEGIN");
+    for (const group of allGroups) {
+      await client.query(
+        `INSERT INTO atlassian_groups (group_id, group_name, last_updated_at)
+         VALUES ($1, $2, NOW())
+         ON CONFLICT (group_id) DO UPDATE SET group_name = EXCLUDED.group_name, last_updated_at = NOW()`,
+        [group.id, group.name]
+      );
+    }
+    await client.query("COMMIT");
+    console.log(`Successfully synced ${allGroups.length} Atlassian groups.`);
+
+    console.log("Starting Atlassian group member sync...");
+    const jiraHeaders = {
+      Authorization: `Basic ${Buffer.from(
+        `${config.atlassian.apiUser}:${config.atlassian.apiToken}`
+      ).toString("base64")}`,
+      Accept: "application/json",
+    };
+
+    for (const group of allGroups) {
+      let allMembers = [];
+      let startAt = 0;
+      let isLast = false;
+
+      // Loop to handle pagination for group members
+      while (!isLast) {
+        const memberUrl = `https://${config.atlassian.domain}/rest/api/3/group/member?groupId=${group.id}&startAt=${startAt}&maxResults=50`;
+        try {
+          const memberResponse = await fetch(memberUrl, {
+            headers: jiraHeaders,
+          });
+          if (!memberResponse.ok) {
+            // It's common for some org-level groups not to exist in Jira, so we'll warn instead of erroring.
+            console.warn(
+              `Could not fetch members for group ${group.name} (${group.id}). Status: ${memberResponse.status}`
+            );
+            break; // Stop trying for this group
+          }
+
+          const memberData = await memberResponse.json();
+          const members = memberData.values;
+
+          if (members && members.length > 0) {
+            allMembers.push(...members);
+          }
+
+          isLast = memberData.isLast;
+          startAt += 50; // Increment for the next page
+        } catch (e) {
+          console.error(
+            `An error occurred fetching members for group ${group.id}:`,
+            e
+          );
+          isLast = true; // Stop on error
+        }
+      }
+
+      if (allMembers.length > 0) {
+        await client.query("BEGIN");
+        await client.query(
+          "DELETE FROM atlassian_group_members WHERE group_id = $1",
+          [group.id]
+        );
+        for (const member of allMembers) {
+          await client.query(
+            "INSERT INTO atlassian_group_members (group_id, account_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
+            [group.id, member.accountId] // Use accountId from the new response
+          );
+        }
+        await client.query("COMMIT");
+      }
+    }
+    console.log("Successfully finished syncing Atlassian group members.");
+  } catch (error) {
+    await client.query("ROLLBACK");
+    console.error("Error during Atlassian group database sync:", error);
+    throw error;
+  } finally {
+    client.release();
+  }
+};
+
 module.exports = {
   getUserStatus,
   deactivateUser,
@@ -528,4 +672,5 @@ module.exports = {
   getAtlassianAccessByAccountId,
   syncUserData,
   syncAllAtlassianUsers,
+  syncAllAtlassianGroupsAndMembers,
 };
