@@ -3,6 +3,7 @@ const {
   syncAllAtlassianUsers,
   syncAllAtlassianGroupsAndMembers,
   syncAllJiraProjects,
+  syncJiraRolesAndPermissions, // Add this import
 } = require("../services/atlassianService");
 
 // --- MODIFICATION START ---
@@ -26,9 +27,7 @@ const syncAllAtlassianData = async () => {
   console.log("CRON JOB: Starting Atlassian data sync...");
 
   try {
-    await syncAllAtlassianUsers();
-    await syncAllAtlassianGroupsAndMembers();
-    await syncAllJiraProjects();
+    await syncJiraRolesAndPermissions();
     console.log("CRON JOB: Finished Atlassian data sync.");
   } catch (error) {
     console.error(

@@ -751,6 +751,111 @@ const syncAllJiraProjects = async () => {
   }
 };
 
+const syncJiraRolesAndPermissions = async () => {
+  console.log("Starting Jira roles and permissions sync...");
+  if (
+    !config.atlassian.domain ||
+    !config.atlassian.apiUser ||
+    !config.atlassian.apiToken
+  ) {
+    throw new Error("Jira API credentials are not fully configured.");
+  }
+
+  const client = await db.pool.connect();
+  try {
+    const projectsResult = await client.query(
+      "SELECT project_id FROM jira_projects"
+    );
+    const projects = projectsResult.rows;
+
+    if (projects.length === 0) {
+      console.log("No Jira projects found in the database to sync roles for.");
+      return;
+    }
+
+    const jiraHeaders = {
+      Authorization: `Basic ${Buffer.from(
+        `${config.atlassian.apiUser}:${config.atlassian.apiToken}`
+      ).toString("base64")}`,
+      Accept: "application/json",
+    };
+
+    for (const project of projects) {
+      const rolesUrl = `https://${config.atlassian.domain}/rest/api/3/project/${project.project_id}/role`;
+      const rolesResponse = await fetch(rolesUrl, { headers: jiraHeaders });
+
+      if (!rolesResponse.ok) {
+        console.warn(
+          `Could not fetch roles for project ${project.project_id}. Status: ${rolesResponse.status}`
+        );
+        continue;
+      }
+
+      const projectRoles = await rolesResponse.json();
+
+      if (projectRoles && Object.keys(projectRoles).length > 0) {
+        // Clear old permissions for this project before re-inserting
+        await client.query(
+          "DELETE FROM jira_project_permissions WHERE project_id = $1",
+          [project.project_id]
+        );
+
+        for (const roleName in projectRoles) {
+          const roleDetailsUrl = projectRoles[roleName];
+          const roleId = new URL(roleDetailsUrl).pathname.split("/").pop();
+
+          // Insert or update the role in the jira_roles table
+          await client.query(
+            `
+            INSERT INTO jira_roles (role_id, role_name, last_updated_at)
+            VALUES ($1, $2, NOW())
+            ON CONFLICT (role_id) DO UPDATE SET
+              role_name = EXCLUDED.role_name,
+              last_updated_at = NOW();
+          `,
+            [roleId, roleName]
+          );
+
+          // Fetch the details for this specific role to get its actors (users/groups)
+          const roleDetailResponse = await fetch(roleDetailsUrl, {
+            headers: jiraHeaders,
+          });
+          if (!roleDetailResponse.ok) {
+            console.warn(
+              `Could not fetch actors for role ${roleName} in project ${project.project_id}.`
+            );
+            continue;
+          }
+
+          const roleData = await roleDetailResponse.json();
+          if (roleData.actors && roleData.actors.length > 0) {
+            for (const actor of roleData.actors) {
+              await client.query(
+                `
+                INSERT INTO jira_project_permissions (project_id, role_id, actor_type, actor_id, last_updated_at)
+                VALUES ($1, $2, $3, $4, NOW())
+              `,
+                [
+                  project.project_id,
+                  roleId,
+                  actor.type,
+                  actor.actorUser?.accountId || actor.actorGroup?.groupId,
+                ]
+              );
+            }
+          }
+        }
+      }
+    }
+    console.log("Successfully finished syncing Jira roles and permissions.");
+  } catch (error) {
+    console.error("Error during Jira roles and permissions sync:", error);
+    throw error;
+  } finally {
+    client.release();
+  }
+};
+
 module.exports = {
   getUserStatus,
   deactivateUser,
@@ -763,4 +868,5 @@ module.exports = {
   syncAllAtlassianUsers,
   syncAllAtlassianGroupsAndMembers,
   syncAllJiraProjects,
+  syncJiraRolesAndPermissions,
 };
