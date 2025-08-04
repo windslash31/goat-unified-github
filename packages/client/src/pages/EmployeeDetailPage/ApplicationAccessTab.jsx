@@ -1,4 +1,10 @@
-import React, { useState, useMemo, useRef, useEffect } from "react";
+import React, {
+  useState,
+  useMemo,
+  useRef,
+  useEffect,
+  useLayoutEffect,
+} from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "react-router-dom";
 import {
@@ -15,6 +21,9 @@ import api from "../../api/api";
 import { EmployeeDetailSkeleton } from "../../components/ui/EmployeeDetailSkeleton";
 import { motion, AnimatePresence } from "framer-motion";
 import { CustomSelect } from "../../components/ui/CustomSelect";
+import { Portal } from "../../components/ui/Portal";
+import { useMediaQuery } from "../../hooks/useMediaQuery";
+import { Button } from "../../components/ui/Button";
 
 const fetchApplicationAccess = async (employeeId) => {
   const { data } = await api.get(
@@ -24,20 +33,21 @@ const fetchApplicationAccess = async (employeeId) => {
 };
 
 // HELPER HOOK
-const useOutsideClick = (ref, callback) => {
+const useOutsideClick = (refs, callback) => {
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (
-        ref.current &&
-        !ref.current.contains(event.target) &&
-        !event.target.closest('[data-role="custom-select-options"]')
-      ) {
+      // Check if the click was inside ANY of the referenced elements
+      const isInside = refs.some(
+        (ref) => ref.current && ref.current.contains(event.target)
+      );
+      // If the click was NOT inside any of them, call the callback to close the dropdown
+      if (!isInside) {
         callback();
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [ref, callback]);
+  }, [refs, callback]);
 };
 
 // UI COMPONENTS
@@ -61,25 +71,134 @@ const PermissionBadge = ({ level }) => {
   );
 };
 
-const FilterDropdown = ({ options, selected, onChange }) => {
+const FilterPopover = ({ options, selected, onChange }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const dropdownRef = useRef(null);
-  useOutsideClick(dropdownRef, () => setIsOpen(false));
-  const isActive = isOpen || selected.length > 0;
+  const [searchTerm, setSearchTerm] = useState("");
+  const [localSelection, setLocalSelection] = useState(selected);
+  const buttonRef = useRef(null);
+  const popoverRef = useRef(null);
+  const isMobile = useMediaQuery("(max-width: 768px)");
+  const [position, setPosition] = useState({});
 
-  const handleSelect = (option) => {
-    const newSelected = selected.includes(option)
-      ? selected.filter((item) => item !== option)
-      : [...selected, option];
-    onChange(newSelected);
+  // Sync local state when external state changes
+  useEffect(() => {
+    setLocalSelection(selected);
+  }, [selected]);
+
+  // Close when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (
+        isOpen &&
+        popoverRef.current &&
+        !popoverRef.current.contains(event.target) &&
+        buttonRef.current &&
+        !buttonRef.current.contains(event.target)
+      ) {
+        setIsOpen(false);
+        setLocalSelection(selected); // Reset changes if closed without applying
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [isOpen, selected]);
+
+  // *** FIX: Use useLayoutEffect to prevent flicker and calculate position ***
+  useLayoutEffect(() => {
+    if (isOpen && buttonRef.current && !isMobile) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      setPosition({
+        top: rect.bottom + window.scrollY + 4,
+        right: window.innerWidth - rect.right - window.scrollX,
+      });
+    }
+  }, [isOpen, isMobile]);
+
+  const filteredOptions = useMemo(
+    () =>
+      options.filter((opt) =>
+        opt.toLowerCase().includes(searchTerm.toLowerCase())
+      ),
+    [options, searchTerm]
+  );
+
+  const handleApply = () => {
+    onChange(localSelection);
+    setIsOpen(false);
   };
 
+  const handleClear = () => {
+    setLocalSelection([]);
+  };
+
+  const handleToggleOption = (option) => {
+    setLocalSelection((prev) =>
+      prev.includes(option)
+        ? prev.filter((item) => item !== option)
+        : [...prev, option]
+    );
+  };
+
+  const popoverContent = (
+    <div className="flex flex-col h-full">
+      <div className="p-2 border-b border-gray-200 dark:border-gray-700">
+        <div className="relative">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Search options..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-8 pr-3 py-1.5 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-md text-sm"
+          />
+        </div>
+      </div>
+      <div className="flex-1 overflow-y-auto p-2">
+        {filteredOptions.length > 0 ? (
+          filteredOptions.map((option) => (
+            <label
+              key={option}
+              className="flex items-center gap-3 p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md cursor-pointer"
+            >
+              <input
+                type="checkbox"
+                checked={localSelection.includes(option)}
+                onChange={() => handleToggleOption(option)}
+                className="h-4 w-4 rounded border-gray-300 text-kredivo-primary focus:ring-kredivo-primary accent-kredivo-primary"
+              />
+              <span className="text-sm text-gray-700 dark:text-gray-300">
+                {option}
+              </span>
+            </label>
+          ))
+        ) : (
+          <p className="text-center text-xs text-gray-500 p-4">
+            No options found.
+          </p>
+        )}
+      </div>
+      <div className="p-2 flex justify-between items-center border-t border-gray-200 dark:border-gray-700">
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={handleClear}
+          className="text-xs"
+        >
+          Clear
+        </Button>
+        <Button size="sm" onClick={handleApply} className="text-xs">
+          Apply Filters
+        </Button>
+      </div>
+    </div>
+  );
+
   return (
-    <div className="relative" ref={dropdownRef}>
+    <div className="relative" ref={buttonRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
         className={`flex h-full w-full items-center justify-center gap-2 px-4 py-2 border rounded-md text-sm font-medium focus:outline-none transition-colors ${
-          isActive
+          isOpen || selected.length > 0
             ? "bg-kredivo-light text-kredivo-dark-text border-transparent"
             : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700"
         }`}
@@ -94,31 +213,44 @@ const FilterDropdown = ({ options, selected, onChange }) => {
       </button>
       <AnimatePresence>
         {isOpen && (
-          <motion.div
-            initial={{ opacity: 0, y: -5 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -5 }}
-            className="origin-top-right absolute right-0 mt-2 w-56 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg z-20"
-          >
-            <div className="p-2">
-              {options.map((option) => (
-                <label
-                  key={option}
-                  className="flex items-center gap-3 p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md cursor-pointer"
+          <Portal>
+            {isMobile ? (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50"
+                onClick={() => setIsOpen(false)}
+              >
+                <motion.div
+                  ref={popoverRef}
+                  initial={{ scale: 0.95, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  exit={{ scale: 0.95, opacity: 0 }}
+                  onClick={(e) => e.stopPropagation()}
+                  className="w-full max-w-sm h-[60vh] max-h-[400px] bg-white dark:bg-gray-800 rounded-lg shadow-xl flex flex-col"
                 >
-                  <input
-                    type="checkbox"
-                    checked={selected.includes(option)}
-                    onChange={() => handleSelect(option)}
-                    className="h-4 w-4 rounded border-gray-300 text-kredivo-primary focus:ring-kredivo-primary"
-                  />
-                  <span className="text-sm text-gray-700 dark:text-gray-300">
-                    {option}
-                  </span>
-                </label>
-              ))}
-            </div>
-          </motion.div>
+                  {popoverContent}
+                </motion.div>
+              </motion.div>
+            ) : (
+              // *** FIX: Desktop view is now also in a Portal and uses the calculated position ***
+              <motion.div
+                ref={popoverRef}
+                initial={{ opacity: 0, y: -5, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -5, scale: 0.98 }}
+                style={{
+                  position: "absolute",
+                  top: position.top,
+                  right: position.right,
+                }}
+                className="origin-top-right w-64 h-[300px] bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg z-50 flex flex-col"
+              >
+                {popoverContent}
+              </motion.div>
+            )}
+          </Portal>
         )}
       </AnimatePresence>
     </div>
@@ -279,7 +411,7 @@ const AccessSection = ({
                           onChange={setSortOption}
                         />
                       </div>
-                      <FilterDropdown
+                      <FilterPopover
                         options={permissionOptions}
                         selected={selectedPermissions}
                         onChange={setSelectedPermissions}
