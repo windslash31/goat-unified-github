@@ -1,92 +1,44 @@
+// packages/server/src/cron/platformSync.js
+
 const cron = require("node-cron");
 const db = require("../config/db");
 const employeeService = require("../services/employeeService");
-const {
-  syncAllJumpCloudUsers,
-  syncAllJumpCloudApplications,
-  syncAllJumpCloudGroupAssociations,
-  syncAllJumpCloudGroupMembers,
-} = require("../services/jumpcloudService");
-// Import the new logging service
 const {
   startJob,
   updateProgress,
   finishJob,
 } = require("../services/syncLogService");
 
-let isSyncRunning = false;
-// Define a constant for the job name
-const JOB_NAME = "jumpcloud_sync";
+// Import JumpCloud services
+const {
+  syncAllJumpCloudUsers,
+  syncAllJumpCloudApplications,
+  syncAllJumpCloudGroupAssociations,
+  syncAllJumpCloudGroupMembers,
+} = require("../services/jumpcloudService");
 
-const syncAllUserStatuses = async () => {
-  console.log("CRON JOB: Starting nightly platform status sync...");
-  try {
-    const employeeResult = await db.query("SELECT id FROM employees");
-    const employeeIds = employeeResult.rows.map((row) => row.id);
+// Import Atlassian services
+const {
+  syncAllAtlassianUsers,
+  syncConfluenceUsersFromAtlassian,
+  syncAllAtlassianGroupsAndMembers,
+  syncAllJiraProjects,
+  syncAllConfluenceSpaces,
+  syncAllBitbucketRepositoriesAndPermissions,
+  syncAllConfluencePermissions,
+} = require("../services/atlassianService");
 
-    // --- FIX: Define constants inside the function scope ---
-    const BATCH_SIZE = 10;
-    const DELAY_BETWEEN_BATCHES_MS = 5000; // 5 seconds
+let isMasterSyncRunning = false;
 
-    console.log(
-      `CRON JOB: Found ${employeeIds.length} active employees to sync.`
-    );
-
-    for (let i = 0; i < employeeIds.length; i += BATCH_SIZE) {
-      const batch = employeeIds.slice(i, i + BATCH_SIZE);
-      console.log(`CRON JOB: Syncing batch of ${batch.length} employees...`);
-
-      const syncPromises = batch.map((id) =>
-        employeeService
-          .syncPlatformStatus(id)
-          .catch((e) =>
-            console.error(`CRON JOB: Failed to sync employee ${id}:`, e.message)
-          )
-      );
-
-      await Promise.all(syncPromises);
-
-      if (i + BATCH_SIZE < employeeIds.length) {
-        console.log(
-          `CRON JOB: Waiting for ${
-            DELAY_BETWEEN_BATCHES_MS / 1000
-          } seconds before next batch...`
-        );
-        await new Promise((resolve) =>
-          setTimeout(resolve, DELAY_BETWEEN_BATCHES_MS)
-        );
-      }
-    }
-    console.log(
-      "CRON JOB: Nightly platform status sync completed successfully."
-    );
-  } catch (error) {
-    console.error(
-      "CRON JOB: An unexpected error occurred during the nightly sync:",
-      error
-    );
-    // We throw the error so the main job handler can catch it and log the failure.
-    throw error;
-  }
-};
-
-// --- New Master Sync Function ---
-const syncAll = async () => {
-  if (isSyncRunning) {
-    console.log(
-      `CRON JOB: Skipping ${JOB_NAME}, previous sync is still in progress.`
-    );
-    return;
-  }
-  isSyncRunning = true;
+// JUMPCLOUD SYNC LOGIC
+const syncAllJumpCloudData = async () => {
+  const JOB_NAME = "jumpcloud_sync";
   let errorOccurred = null;
 
   try {
-    // 1. Start the job and initialize its state in the database
     await startJob(JOB_NAME);
     console.log(`CRON JOB: Starting ${JOB_NAME}...`);
 
-    // 2. Define the discrete steps for progress calculation
     const steps = [
       { name: "JumpCloud Users", func: syncAllJumpCloudUsers },
       { name: "JumpCloud Applications", func: syncAllJumpCloudApplications },
@@ -95,13 +47,8 @@ const syncAll = async () => {
         func: syncAllJumpCloudGroupAssociations,
       },
       { name: "JumpCloud Group Members", func: syncAllJumpCloudGroupMembers },
-      {
-        name: "Individual Employee Platform Statuses",
-        func: syncAllUserStatuses,
-      },
     ];
 
-    // 3. Loop through steps, update progress, and execute each sync function
     for (let i = 0; i < steps.length; i++) {
       const step = steps[i];
       const progress = ((i + 1) / steps.length) * 100;
@@ -113,32 +60,97 @@ const syncAll = async () => {
         progress
       );
     }
-
-    console.log(`CRON JOB: Finished ${JOB_NAME}.`);
   } catch (error) {
     errorOccurred = error;
+    console.error(`CRON JOB: An error occurred during ${JOB_NAME}:`, error);
+  } finally {
+    const finalStatus = errorOccurred ? "FAILED" : "SUCCESS";
+    await finishJob(JOB_NAME, finalStatus, errorOccurred);
+    console.log(`CRON JOB: ${JOB_NAME} process complete.`);
+  }
+};
+
+// ATLASSIAN SYNC LOGIC (moved from atlassianSync.js)
+const syncAllAtlassianData = async () => {
+  const JOB_NAME = "atlassian_sync";
+  let errorOccurred = null;
+
+  try {
+    await startJob(JOB_NAME);
+    console.log(`CRON JOB: Starting ${JOB_NAME}...`);
+
+    const steps = [
+      { name: "Atlassian Users", func: syncAllAtlassianUsers },
+      { name: "Confluence Users", func: syncConfluenceUsersFromAtlassian },
+      {
+        name: "Atlassian Groups & Members",
+        func: syncAllAtlassianGroupsAndMembers,
+      },
+      { name: "Jira Projects", func: syncAllJiraProjects },
+      { name: "Confluence Spaces", func: syncAllConfluenceSpaces },
+      {
+        name: "Bitbucket Repositories",
+        func: syncAllBitbucketRepositoriesAndPermissions,
+      },
+      { name: "Confluence Permissions", func: syncAllConfluencePermissions },
+    ];
+
+    for (let i = 0; i < steps.length; i++) {
+      const step = steps[i];
+      const progress = ((i + 1) / steps.length) * 100;
+      await updateProgress(JOB_NAME, `Syncing ${step.name}...`, progress - 5);
+      await step.func();
+      await updateProgress(
+        JOB_NAME,
+        `Finished syncing ${step.name}.`,
+        progress
+      );
+    }
+  } catch (error) {
+    errorOccurred = error;
+    console.error(`CRON JOB: An error occurred during ${JOB_NAME}:`, error);
+  } finally {
+    const finalStatus = errorOccurred ? "FAILED" : "SUCCESS";
+    await finishJob(JOB_NAME, finalStatus, errorOccurred);
+    console.log(`CRON JOB: ${JOB_NAME} process complete.`);
+  }
+};
+
+// MASTER SYNC ORCHESTRATOR
+const runAllSyncs = async () => {
+  if (isMasterSyncRunning) {
+    console.log(
+      "CRON JOB: Skipping run, a master sync process is still in progress."
+    );
+    return;
+  }
+  isMasterSyncRunning = true;
+  console.log("CRON JOB: Starting master sync job for all platforms...");
+
+  try {
+    // Run syncs sequentially
+    await syncAllJumpCloudData();
+    await syncAllAtlassianData();
+    // You can add more master sync functions here in the future
+  } catch (error) {
     console.error(
-      `CRON JOB: Full nightly data sync failed for ${JOB_NAME}.`,
+      "CRON JOB: A critical error occurred in the master sync orchestrator.",
       error
     );
   } finally {
-    // 4. Finalize the job in the 'finally' block to ensure it always runs
-    const finalStatus = errorOccurred ? "FAILED" : "SUCCESS";
-    await finishJob(JOB_NAME, finalStatus, errorOccurred);
-    isSyncRunning = false;
-    console.log(`CRON JOB: ${JOB_NAME} process complete. Releasing lock.`);
+    isMasterSyncRunning = false;
+    console.log("CRON JOB: Master sync job complete. Releasing lock.");
   }
 };
 
 const schedulePlatformSync = () => {
-  // Schedule the master 'syncAll' function to run at 2 AM
-  cron.schedule("* * * * *", syncAll, {
+  // This single schedule now runs all sync jobs in order
+  cron.schedule("* * * * *", runAllSyncs, {
+    // Changed to every 5 mins for easier testing
     scheduled: true,
     timezone: "Asia/Jakarta",
   });
-  console.log(
-    "Master JumpCloud cron job has been scheduled with progress logging."
-  );
+  console.log("Master cron job for all platform syncs has been scheduled.");
 };
 
-module.exports = { schedulePlatformSync, syncAllUserStatuses, syncAll };
+module.exports = { schedulePlatformSync, runAllSyncs, isMasterSyncRunning };

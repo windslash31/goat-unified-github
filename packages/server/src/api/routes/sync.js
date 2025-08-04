@@ -9,8 +9,15 @@ const {
 router.get(
   "/status",
   authenticateToken,
-  authorize("dashboard:view"), //placeholder
+  authorize("log:read:platform"),
   syncController.getSyncStatuses
+);
+
+router.post(
+  "/trigger",
+  authenticateToken,
+  authorize("log:read:platform"),
+  syncController.triggerMasterSync
 );
 
 module.exports = router;

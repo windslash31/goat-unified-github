@@ -13,7 +13,6 @@ const jiraRoutes = require("./api/routes/jira");
 const userRoutes = require("./api/routes/users");
 const managedAccountRoutes = require("./api/routes/managedAccount");
 const { schedulePlatformSync } = require("./cron/platformSync");
-const { scheduleAtlassianSync } = require("./cron/atlassianSync");
 const syncRoutes = require("./api/routes/sync");
 
 const app = express();
@@ -64,8 +63,7 @@ app.listen(PORT, () => {
   console.log(`Backend server running at http://localhost:${PORT}`);
 
   //if (config.nodeEnv === "production") {
-  //schedulePlatformSync();
-  scheduleAtlassianSync();
+  schedulePlatformSync();
   //}
 });
 

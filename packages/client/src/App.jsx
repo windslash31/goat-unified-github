@@ -82,6 +82,8 @@ const fetchMe = async () => {
   return data;
 };
 
+const SyncManagementPage = lazy(() => import("./pages/SyncManagementPage"));
+
 const AppContent = () => {
   const { isAuthenticated, user, logout, fetchUser } = useAuthStore();
   const { modal, data: modalData, closeModal } = useModalStore();
@@ -302,6 +304,7 @@ const AppContent = () => {
 
           <Route path="/access-denied" element={<AccessDeniedPage />} />
 
+          {/* --- SETTINGS ROUTES SECTION --- */}
           <Route
             path="/settings"
             element={
@@ -334,7 +337,17 @@ const AppContent = () => {
                 </Suspense>
               }
             />
+            {/* The new sync route, correctly closed */}
+            <Route
+              path="sync"
+              element={
+                <Suspense fallback={<SettingsSkeleton />}>
+                  <SyncManagementPage />
+                </Suspense>
+              }
+            />
           </Route>
+          {/* --- END SETTINGS ROUTES --- */}
 
           <Route
             path="/"
