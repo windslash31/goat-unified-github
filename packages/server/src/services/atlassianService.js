@@ -857,12 +857,14 @@ const syncJiraRolesAndPermissions = async () => {
 };
 
 const syncAllBitbucketRepositoriesAndPermissions = async () => {
-  console.log("Starting Bitbucket repository and permissions sync...");
+  console.log(
+    "CRON JOB: Starting Bitbucket repository and permissions sync..."
+  );
   if (
     !config.atlassian.bitbucketWorkspace ||
-    !config.atlassian.bitbucketToken || // For fetching repos
-    !config.atlassian.apiUser || // For fetching permissions
-    !config.atlassian.bitbucketUserToken // For fetching permissions
+    !config.atlassian.bitbucketToken ||
+    !config.atlassian.apiUser ||
+    !config.atlassian.bitbucketUserToken
   ) {
     throw new Error("Bitbucket API credentials are not fully configured.");
   }
@@ -871,7 +873,6 @@ const syncAllBitbucketRepositoriesAndPermissions = async () => {
     Authorization: `Bearer ${config.atlassian.bitbucketToken}`,
     Accept: "application/json",
   };
-
   const bitbucketPermsHeaders = {
     Authorization: `Basic ${Buffer.from(
       `${config.atlassian.apiUser}:${config.atlassian.bitbucketUserToken}`
@@ -879,31 +880,28 @@ const syncAllBitbucketRepositoriesAndPermissions = async () => {
     Accept: "application/json",
   };
 
+  // Stage 1: Fetch all repository metadata
   let allRepositories = [];
-
   const lastYear = new Date().getFullYear() - 1;
   const startDate = `${lastYear}-01-01`;
   const encodedQuery = encodeURIComponent(`updated_on > "${startDate}"`);
-
   let nextPageUrl = `https://api.bitbucket.org/2.0/repositories/${config.atlassian.bitbucketWorkspace}?q=${encodedQuery}&sort=-updated_on`;
 
-  // Fetch all repositories
   while (nextPageUrl) {
     try {
       const response = await fetch(nextPageUrl, {
         headers: bitbucketRepoHeaders,
       });
       if (!response.ok) {
-        const errorBody = await response.text();
         throw new Error(
-          `Bitbucket API Error fetching repositories: ${response.status} - ${errorBody}`
+          `Bitbucket API Error fetching repositories: ${
+            response.status
+          } - ${await response.text()}`
         );
       }
       const page = await response.json();
-      const repos = page.values;
-
-      if (repos && repos.length > 0) {
-        allRepositories.push(...repos);
+      if (page.values && page.values.length > 0) {
+        allRepositories.push(...page.values);
       }
       nextPageUrl = page.next;
     } catch (error) {
@@ -913,21 +911,21 @@ const syncAllBitbucketRepositoriesAndPermissions = async () => {
   }
 
   if (allRepositories.length === 0) {
-    console.log("No Bitbucket repositories found to sync.");
+    console.log("CRON JOB: No Bitbucket repositories found to sync.");
     return;
   }
 
   const client = await db.pool.connect();
   try {
-    // Save repositories to the database
+    // Stage 2: Save repository metadata to DB
     await client.query("BEGIN");
     await client.query(
-      "TRUNCATE TABLE bitbucket_repositories RESTART IDENTITY;"
+      "TRUNCATE TABLE bitbucket_repositories RESTART IDENTITY CASCADE;"
     );
     for (const repo of allRepositories) {
       await client.query(
         `INSERT INTO bitbucket_repositories (repo_uuid, full_name, name, created_on, updated_on, description, project_name)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+             VALUES ($1, $2, $3, $4, $5, $6, $7)`,
         [
           repo.uuid.replace(/[{}]/g, ""),
           repo.full_name,
@@ -941,56 +939,96 @@ const syncAllBitbucketRepositoriesAndPermissions = async () => {
     }
     await client.query("COMMIT");
     console.log(
-      `Successfully synced ${allRepositories.length} Bitbucket repositories.`
+      `CRON JOB: Successfully synced ${allRepositories.length} Bitbucket repositories.`
     );
 
-    console.log("Starting Bitbucket repository permissions sync...");
+    // Stage 3: Fetch permissions in parallel batches
+    console.log(
+      "CRON JOB: Starting Bitbucket repository permissions sync in parallel batches..."
+    );
     await client.query(
       "TRUNCATE TABLE bitbucket_repository_permissions RESTART IDENTITY;"
     );
 
-    for (const repo of allRepositories) {
-      // Construct the URL exactly as you specified.
-      let permissionsUrl = `https://api.bitbucket.org/2.0/workspaces/${config.atlassian.bitbucketWorkspace}/permissions/repositories/${repo.name}`;
+    const BATCH_SIZE = 20;
+    const DELAY_BETWEEN_BATCHES_MS = 1000;
+    let allPermissionsToInsert = [];
 
-      while (permissionsUrl) {
-        const permissionsResponse = await fetch(permissionsUrl, {
-          headers: bitbucketPermsHeaders,
-        });
+    for (let i = 0; i < allRepositories.length; i += BATCH_SIZE) {
+      const batch = allRepositories.slice(i, i + BATCH_SIZE);
+      console.log(
+        `CRON JOB: Processing permissions for batch ${
+          Math.floor(i / BATCH_SIZE) + 1
+        }...`
+      );
 
-        if (!permissionsResponse.ok) {
-          console.warn(
-            `Could not fetch permissions for repo ${repo.full_name}. Status: ${permissionsResponse.status}`
-          );
-          break; // Stop trying for this repository on failure
-        }
-
-        const permissionsData = await permissionsResponse.json();
-        const permissions = permissionsData.values; // Access the 'values' array
-
-        if (permissions && permissions.length > 0) {
-          await client.query("BEGIN");
-          for (const perm of permissions) {
-            // Check for user permissions and save to DB
-            if (perm.user && perm.user.account_id) {
-              await client.query(
-                `INSERT INTO bitbucket_repository_permissions (repo_uuid, user_account_id, permission_level)
-                 VALUES ($1, $2, $3)`,
-                [
-                  repo.uuid.replace(/[{}]/g, ""),
-                  perm.user.account_id,
-                  perm.permission,
-                ]
-              );
-            }
+      const permissionPromises = batch.map(async (repo) => {
+        let permissionsUrl = `https://api.bitbucket.org/2.0/workspaces/${config.atlassian.bitbucketWorkspace}/permissions/repositories/${repo.name}`;
+        const repoPermissions = [];
+        while (permissionsUrl) {
+          const response = await fetch(permissionsUrl, {
+            headers: bitbucketPermsHeaders,
+          });
+          if (!response.ok) {
+            console.warn(
+              `Could not fetch permissions for repo ${repo.full_name}. Status: ${response.status}`
+            );
+            return [];
           }
-          await client.query("COMMIT");
+          const data = await response.json();
+          if (data.values) {
+            data.values.forEach((perm) => {
+              if (perm.user && perm.user.account_id) {
+                repoPermissions.push({
+                  repo_uuid: repo.uuid.replace(/[{}]/g, ""),
+                  user_account_id: perm.user.account_id,
+                  permission_level: perm.permission,
+                });
+              }
+            });
+          }
+          permissionsUrl = data.next;
         }
-        // Handle pagination
-        permissionsUrl = permissionsData.next;
+        return repoPermissions;
+      });
+
+      const results = await Promise.allSettled(permissionPromises);
+      results.forEach((result) => {
+        if (result.status === "fulfilled" && result.value.length > 0) {
+          allPermissionsToInsert.push(...result.value);
+        } else if (result.status === "rejected") {
+          console.error("A permission fetch failed:", result.reason);
+        }
+      });
+
+      if (i + BATCH_SIZE < allRepositories.length) {
+        await new Promise((resolve) =>
+          setTimeout(resolve, DELAY_BETWEEN_BATCHES_MS)
+        );
       }
     }
-    console.log("Successfully finished syncing Bitbucket permissions.");
+
+    // Stage 4: Perform a single bulk insert for all collected permissions
+    if (allPermissionsToInsert.length > 0) {
+      await client.query("BEGIN");
+      const repoUuids = allPermissionsToInsert.map((p) => p.repo_uuid);
+      const userAccountIds = allPermissionsToInsert.map(
+        (p) => p.user_account_id
+      );
+      const permissionLevels = allPermissionsToInsert.map(
+        (p) => p.permission_level
+      );
+
+      const query = `
+            INSERT INTO bitbucket_repository_permissions (repo_uuid, user_account_id, permission_level)
+            SELECT * FROM unnest($1::text[], $2::text[], $3::text[])
+        `;
+      await client.query(query, [repoUuids, userAccountIds, permissionLevels]);
+      await client.query("COMMIT");
+      console.log(
+        `CRON JOB: Successfully synced ${allPermissionsToInsert.length} Bitbucket permissions.`
+      );
+    }
   } catch (error) {
     await client.query("ROLLBACK");
     console.error("Error during Bitbucket database sync:", error);
@@ -1001,7 +1039,10 @@ const syncAllBitbucketRepositoriesAndPermissions = async () => {
 };
 
 const syncAllConfluenceSpaces = async () => {
-  console.log("CRON JOB: Starting Confluence space sync...");
+  console.log(
+    "CRON JOB: Starting Confluence space sync for global, collaboration, and knowledge_base types..."
+  );
+
   const jiraHeaders = {
     Authorization: `Basic ${Buffer.from(
       `${config.atlassian.apiUser}:${config.atlassian.apiToken}`
@@ -1009,36 +1050,42 @@ const syncAllConfluenceSpaces = async () => {
     Accept: "application/json",
   };
 
-  let allSpaces = [];
-  let start = 0;
-  let isLast = false;
-  const limit = 50;
+  const fetchSpacesByType = async (spaceType) => {
+    let spaces = [];
+    let nextUrl = `https://${config.atlassian.domain}/wiki/api/v2/spaces?limit=250&type=${spaceType}`;
 
-  while (!isLast) {
-    const url = `https://${config.atlassian.domain}/wiki/rest/api/space?limit=${limit}&start=${start}&expand=description.plain,status`;
-    try {
-      const response = await fetch(url, { headers: jiraHeaders });
-      if (!response.ok) {
-        throw new Error(
-          `Confluence API Error fetching spaces: ${
-            response.status
-          } - ${await response.text()}`
-        );
+    while (nextUrl) {
+      try {
+        const response = await fetch(nextUrl, { headers: jiraHeaders });
+        if (!response.ok) {
+          throw new Error(
+            `Confluence API Error fetching '${spaceType}' spaces: ${
+              response.status
+            } - ${await response.text()}`
+          );
+        }
+        const page = await response.json();
+        // The spaces API returns a single object with a results array
+        const results = page.results;
+
+        if (results && results.length > 0) {
+          spaces.push(...results);
+        }
+
+        nextUrl = page._links?.next;
+      } catch (error) {
+        console.error(`Failed to fetch a page of ${spaceType} spaces:`, error);
+        nextUrl = null;
       }
-      const page = await response.json();
-      if (page.results && page.results.length > 0) {
-        allSpaces.push(...page.results);
-      }
-      if (page.size < limit) {
-        isLast = true;
-      } else {
-        start += limit;
-      }
-    } catch (error) {
-      console.error("Failed to fetch a page of Confluence spaces:", error);
-      isLast = true; // Stop on error
     }
-  }
+    return spaces;
+  };
+
+  const spaceTypesToFetch = ["global", "collaboration", "knowledge_base"];
+  const allSpacesArrays = await Promise.all(
+    spaceTypesToFetch.map((type) => fetchSpacesByType(type))
+  );
+  const allSpaces = allSpacesArrays.flat();
 
   if (allSpaces.length === 0) {
     console.log("CRON JOB: No Confluence spaces found to sync.");
@@ -1048,6 +1095,7 @@ const syncAllConfluenceSpaces = async () => {
   const client = await db.pool.connect();
   try {
     await client.query("BEGIN");
+
     const spaceIds = allSpaces.map((s) => s.id);
     const spaceKeys = allSpaces.map((s) => s.key);
     const spaceNames = allSpaces.map((s) => s.name);
@@ -1056,16 +1104,19 @@ const syncAllConfluenceSpaces = async () => {
     const spaceDescriptions = allSpaces.map(
       (s) => s.description?.plain?.value || null
     );
+    const ownerAccountIds = allSpaces.map((s) => s.spaceOwnerId || null);
+    const createdAtDates = allSpaces.map((s) => s.createdAt || null);
 
     const query = `
-      INSERT INTO confluence_space (id, key, name, type, status, description, updated_at)
-      SELECT * FROM unnest($1::bigint[], $2::varchar[], $3::varchar[], $4::varchar[], $5::varchar[], $6::text[], array_fill(NOW(), ARRAY[array_length($1, 1)]))
+      INSERT INTO confluence_space (id, key, name, type, status, description, owner_account_id, created_at, updated_at)
+      SELECT * FROM unnest(
+          $1::bigint[], $2::varchar[], $3::varchar[], $4::varchar[], $5::varchar[],
+          $6::text[], $7::varchar[], $8::timestamptz[], array_fill(NOW(), ARRAY[array_length($1, 1)])
+      )
       ON CONFLICT (id) DO UPDATE SET
-        key = EXCLUDED.key,
-        name = EXCLUDED.name,
-        type = EXCLUDED.type,
-        status = EXCLUDED.status,
-        description = EXCLUDED.description,
+        key = EXCLUDED.key, name = EXCLUDED.name, type = EXCLUDED.type,
+        status = EXCLUDED.status, description = EXCLUDED.description,
+        owner_account_id = EXCLUDED.owner_account_id, created_at = EXCLUDED.created_at,
         updated_at = NOW();
     `;
 
@@ -1076,6 +1127,8 @@ const syncAllConfluenceSpaces = async () => {
       spaceTypes,
       spaceStatuses,
       spaceDescriptions,
+      ownerAccountIds,
+      createdAtDates,
     ]);
     await client.query("COMMIT");
     console.log(
@@ -1091,7 +1144,9 @@ const syncAllConfluenceSpaces = async () => {
 };
 
 const syncAllConfluencePermissions = async () => {
-  console.log("CRON JOB: Starting Confluence space permissions sync...");
+  console.log(
+    "CRON JOB: Starting Confluence space permissions sync using V2 API..."
+  );
   const jiraHeaders = {
     Authorization: `Basic ${Buffer.from(
       `${config.atlassian.apiUser}:${config.atlassian.apiToken}`
@@ -1101,73 +1156,115 @@ const syncAllConfluencePermissions = async () => {
 
   const client = await db.pool.connect();
   try {
-    const spacesResult = await client.query(
-      "SELECT id, key FROM confluence_space"
-    );
+    const spacesResult = await client.query("SELECT id FROM confluence_space");
     const spaces = spacesResult.rows;
     if (spaces.length === 0) {
       console.log("CRON JOB: No spaces in DB to sync permissions for.");
       return;
     }
 
-    // Fetch all permissions in parallel batches to avoid overwhelming the API
-    const BATCH_SIZE = 10;
-    let allPermissions = [];
+    const BATCH_SIZE = 250;
+    const DELAY_BETWEEN_BATCHES_MS = 1000;
+    let allPermissionsToInsert = [];
+
     for (let i = 0; i < spaces.length; i += BATCH_SIZE) {
       const batch = spaces.slice(i, i + BATCH_SIZE);
-      const permissionPromises = batch.map((space) =>
-        fetch(
-          `https://${config.atlassian.domain}/wiki/rest/api/space/${space.key}/permission`,
-          { headers: jiraHeaders }
-        )
-          .then((res) =>
-            res.ok
-              ? res.json()
-              : Promise.reject(new Error(`Failed for space ${space.key}`))
-          )
-          .then((data) => ({ spaceId: space.id, permissions: data.results }))
+      console.log(
+        `CRON JOB: Processing permissions for batch ${
+          Math.floor(i / BATCH_SIZE) + 1
+        }...`
       );
+
+      const permissionPromises = batch.map(async (space) => {
+        let nextUrl = `https://${config.atlassian.domain}/wiki/api/v2/spaces/${space.id}/permissions?limit=250`;
+        const spacePermissions = [];
+
+        while (nextUrl) {
+          try {
+            const response = await fetch(nextUrl, { headers: jiraHeaders });
+            if (!response.ok) {
+              console.warn(
+                `Could not fetch permissions for space ${space.id}. Status: ${response.status}`
+              );
+              return [];
+            }
+
+            const rawPageData = await response.json();
+            // FIX: Normalize the response to always be an array to handle API inconsistency.
+            const pageArray = Array.isArray(rawPageData)
+              ? rawPageData
+              : [rawPageData];
+
+            let nextPath = null;
+
+            // Loop over the now-guaranteed-to-be-an-array page data
+            for (const page of pageArray) {
+              if (page && page.results) {
+                page.results.forEach((perm) => {
+                  const principalId = perm.principal.id;
+                  if (principalId) {
+                    spacePermissions.push({
+                      spaceId: space.id,
+                      principalId: principalId,
+                      operation: perm.operation.key,
+                      principalType: perm.principal.type,
+                    });
+                  }
+                });
+              }
+              // Capture the 'next' link from the last valid page in the response
+              if (page && page._links?.next) {
+                nextPath = page._links.next;
+              }
+            }
+
+            const baseUrl = `https://${config.atlassian.domain}`;
+            nextUrl = nextPath ? `${baseUrl}${nextPath}` : null;
+          } catch (error) {
+            console.error(
+              `Error processing permissions for space ${space.id}:`,
+              error
+            );
+            nextUrl = null;
+          }
+        }
+        return spacePermissions;
+      });
 
       const results = await Promise.allSettled(permissionPromises);
       results.forEach((result) => {
-        if (result.status === "fulfilled") {
-          const { spaceId, permissions } = result.value;
-          permissions.forEach((perm) => {
-            const principalId =
-              perm.principal.user?.accountId || perm.principal.group?.id;
-            if (principalId) {
-              allPermissions.push({
-                spaceId: spaceId,
-                principalId: principalId,
-                operation: perm.operation.operation,
-                principalType: perm.principal.type,
-              });
-            }
-          });
+        if (result.status === "fulfilled" && result.value.length > 0) {
+          allPermissionsToInsert.push(...result.value);
+        } else if (result.status === "rejected") {
+          console.error("A permission fetch promise failed:", result.reason);
         }
       });
-      await new Promise((resolve) => setTimeout(resolve, 1000)); // 1 second delay between batches
+
+      if (i + BATCH_SIZE < spaces.length) {
+        await new Promise((resolve) =>
+          setTimeout(resolve, DELAY_BETWEEN_BATCHES_MS)
+        );
+      }
     }
 
-    if (allPermissions.length === 0) {
+    if (allPermissionsToInsert.length === 0) {
       console.log("CRON JOB: No Confluence permissions found to sync.");
       return;
     }
 
-    // Bulk insert permissions into the database
     await client.query("BEGIN");
     await client.query("TRUNCATE TABLE confluence_space_permission;");
 
-    const spaceIds = allPermissions.map((p) => p.spaceId);
-    const principalIds = allPermissions.map((p) => p.principalId);
-    const operations = allPermissions.map((p) => p.operation);
-    const principalTypes = allPermissions.map((p) => p.principalType);
+    const spaceIds = allPermissionsToInsert.map((p) => p.spaceId);
+    const principalIds = allPermissionsToInsert.map((p) => p.principalId);
+    const operations = allPermissionsToInsert.map((p) => p.operation);
+    const principalTypes = allPermissionsToInsert.map((p) => p.principalType);
 
     const query = `
-            INSERT INTO confluence_space_permission (space_id, principal_id, operation, principal_type, updated_at)
-            SELECT * FROM unnest($1::bigint[], $2::varchar[], $3::varchar[], $4::varchar[], array_fill(NOW(), ARRAY[array_length($1, 1)]))
-            ON CONFLICT (space_id, principal_id, operation) DO NOTHING;
-        `;
+          INSERT INTO confluence_space_permission (space_id, principal_id, operation, principal_type, updated_at)
+          SELECT * FROM unnest($1::bigint[], $2::varchar[], $3::varchar[], $4::varchar[], array_fill(NOW(), ARRAY[array_length($1, 1)]))
+          ON CONFLICT (space_id, principal_id, operation) DO NOTHING;
+      `;
 
     await client.query(query, [
       spaceIds,
@@ -1177,7 +1274,7 @@ const syncAllConfluencePermissions = async () => {
     ]);
     await client.query("COMMIT");
     console.log(
-      `CRON JOB: Successfully synced ${allPermissions.length} Confluence permissions.`
+      `CRON JOB: Successfully synced ${allPermissionsToInsert.length} Confluence permissions.`
     );
   } catch (error) {
     await client.query("ROLLBACK");

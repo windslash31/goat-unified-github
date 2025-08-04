@@ -13,7 +13,8 @@ const jiraRoutes = require("./api/routes/jira");
 const userRoutes = require("./api/routes/users");
 const managedAccountRoutes = require("./api/routes/managedAccount");
 const { schedulePlatformSync } = require("./cron/platformSync");
-const { scheduleAtlassianSync } = require("./cron/atlassianSync"); // to test atlassian sync
+const { scheduleAtlassianSync } = require("./cron/atlassianSync");
+const syncRoutes = require("./api/routes/sync");
 
 const app = express();
 app.set("trust proxy", 1);
@@ -50,6 +51,7 @@ app.use("/api/logs", logRoutes);
 app.use("/api/jira", jiraRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/managed-accounts", managedAccountRoutes);
+app.use("/api/sync", syncRoutes);
 
 // Global error handler
 app.use((err, req, res, next) => {
@@ -62,7 +64,7 @@ app.listen(PORT, () => {
   console.log(`Backend server running at http://localhost:${PORT}`);
 
   //if (config.nodeEnv === "production") {
-  schedulePlatformSync();
+  //schedulePlatformSync();
   scheduleAtlassianSync();
   //}
 });

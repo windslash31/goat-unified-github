@@ -1,25 +1,32 @@
 const cron = require("node-cron");
 const db = require("../config/db");
 const employeeService = require("../services/employeeService");
-
 const {
   syncAllJumpCloudUsers,
   syncAllJumpCloudApplications,
   syncAllJumpCloudGroupAssociations,
   syncAllJumpCloudGroupMembers,
 } = require("../services/jumpcloudService");
+// Import the new logging service
+const {
+  startJob,
+  updateProgress,
+  finishJob,
+} = require("../services/syncLogService");
 
 let isSyncRunning = false;
-
-// Define batching constants to avoid overwhelming APIs
-const BATCH_SIZE = 10;
-const DELAY_BETWEEN_BATCHES_MS = 5000; // 5 seconds
+// Define a constant for the job name
+const JOB_NAME = "jumpcloud_sync";
 
 const syncAllUserStatuses = async () => {
   console.log("CRON JOB: Starting nightly platform status sync...");
   try {
     const employeeResult = await db.query("SELECT id FROM employees");
     const employeeIds = employeeResult.rows.map((row) => row.id);
+
+    // --- FIX: Define constants inside the function scope ---
+    const BATCH_SIZE = 10;
+    const DELAY_BETWEEN_BATCHES_MS = 5000; // 5 seconds
 
     console.log(
       `CRON JOB: Found ${employeeIds.length} active employees to sync.`
@@ -58,25 +65,7 @@ const syncAllUserStatuses = async () => {
       "CRON JOB: An unexpected error occurred during the nightly sync:",
       error
     );
-  }
-};
-
-// --- New master function for all JumpCloud sync tasks ---
-const syncAllJumpCloudData = async () => {
-  console.log("CRON JOB: Starting full JumpCloud data sync...");
-  try {
-    // These functions will run in order
-    await syncAllJumpCloudUsers();
-    await syncAllJumpCloudApplications();
-    await syncAllJumpCloudGroupAssociations();
-    await syncAllJumpCloudGroupMembers(); // Add this line
-    console.log("CRON JOB: Successfully finished full JumpCloud data sync.");
-  } catch (error) {
-    console.error(
-      "CRON JOB: An error occurred during the JumpCloud data sync:",
-      error
-    );
-    // We throw the error so the main job knows something went wrong
+    // We throw the error so the main job handler can catch it and log the failure.
     throw error;
   }
 };
@@ -84,37 +73,71 @@ const syncAllJumpCloudData = async () => {
 // --- New Master Sync Function ---
 const syncAll = async () => {
   if (isSyncRunning) {
-    console.log("CRON JOB: Skipping run, previous sync is still in progress.");
+    console.log(
+      `CRON JOB: Skipping ${JOB_NAME}, previous sync is still in progress.`
+    );
     return;
   }
   isSyncRunning = true;
-  console.log("CRON JOB: Starting full nightly data sync job...");
+  let errorOccurred = null;
+
   try {
-    // Step 1: Sync all data from platforms like JumpCloud
-    await syncAllJumpCloudData();
+    // 1. Start the job and initialize its state in the database
+    await startJob(JOB_NAME);
+    console.log(`CRON JOB: Starting ${JOB_NAME}...`);
 
-    // Step 2: Sync individual employee statuses (your existing logic)
-    await syncAllUserStatuses();
+    // 2. Define the discrete steps for progress calculation
+    const steps = [
+      { name: "JumpCloud Users", func: syncAllJumpCloudUsers },
+      { name: "JumpCloud Applications", func: syncAllJumpCloudApplications },
+      {
+        name: "JumpCloud Group Associations",
+        func: syncAllJumpCloudGroupAssociations,
+      },
+      { name: "JumpCloud Group Members", func: syncAllJumpCloudGroupMembers },
+      {
+        name: "Individual Employee Platform Statuses",
+        func: syncAllUserStatuses,
+      },
+    ];
 
-    console.log("CRON JOB: Full nightly data sync finished successfully.");
+    // 3. Loop through steps, update progress, and execute each sync function
+    for (let i = 0; i < steps.length; i++) {
+      const step = steps[i];
+      const progress = ((i + 1) / steps.length) * 100;
+      await updateProgress(JOB_NAME, `Syncing ${step.name}...`, progress - 10);
+      await step.func();
+      await updateProgress(
+        JOB_NAME,
+        `Finished syncing ${step.name}.`,
+        progress
+      );
+    }
+
+    console.log(`CRON JOB: Finished ${JOB_NAME}.`);
   } catch (error) {
-    console.error("CRON JOB: Full nightly data sync failed.", error);
+    errorOccurred = error;
+    console.error(
+      `CRON JOB: Full nightly data sync failed for ${JOB_NAME}.`,
+      error
+    );
   } finally {
-    // IMPORTANT
+    // 4. Finalize the job in the 'finally' block to ensure it always runs
+    const finalStatus = errorOccurred ? "FAILED" : "SUCCESS";
+    await finishJob(JOB_NAME, finalStatus, errorOccurred);
     isSyncRunning = false;
-    console.log("CRON JOB: Sync process complete. Releasing lock.");
+    console.log(`CRON JOB: ${JOB_NAME} process complete. Releasing lock.`);
   }
 };
 
 const schedulePlatformSync = () => {
-  // Schedule the new master 'syncAll' function to run at 2 AM
+  // Schedule the master 'syncAll' function to run at 2 AM
   cron.schedule("* * * * *", syncAll, {
     scheduled: true,
     timezone: "Asia/Jakarta",
   });
-
   console.log(
-    "Master cron job for all platform syncs has been scheduled for 2:00 AM (Asia/Jakarta)."
+    "Master JumpCloud cron job has been scheduled with progress logging."
   );
 };
 

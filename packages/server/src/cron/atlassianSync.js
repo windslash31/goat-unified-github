@@ -3,60 +3,81 @@ const {
   syncAllAtlassianUsers,
   syncAllAtlassianGroupsAndMembers,
   syncAllJiraProjects,
-  //syncAllBitbucketRepositoriesAndPermissions,
+  syncAllBitbucketRepositoriesAndPermissions,
   syncAllConfluenceSpaces,
   syncAllConfluencePermissions,
   syncConfluenceUsersFromAtlassian,
 } = require("../services/atlassianService");
+const {
+  startJob,
+  updateProgress,
+  finishJob,
+} = require("../services/syncLogService");
 
 let isAtlassianSyncRunning = false;
+const JOB_NAME = "atlassian_sync";
 
-// This is the master function for all Atlassian sync tasks.
 const syncAllAtlassianData = async () => {
-  // Check if the sync is already running
   if (isAtlassianSyncRunning) {
     console.log(
-      "CRON JOB: Skipping Atlassian sync, previous job is still in progress."
+      `CRON JOB: Skipping ${JOB_NAME}, previous job is still in progress.`
     );
     return;
   }
-
-  // Set the flag to indicate the sync has started
   isAtlassianSyncRunning = true;
-  console.log("CRON JOB: Starting Atlassian data sync...");
+  let errorOccurred = null;
 
   try {
-    await syncAllAtlassianUsers();
-    await syncConfluenceUsersFromAtlassian(); // Syncs users with Confluence access
-    await syncAllAtlassianGroupsAndMembers();
-    await syncAllJiraProjects();
-    await syncAllConfluenceSpaces(); // Sync spaces before permissions
-    //await syncAllBitbucketRepositoriesAndPermissions();
-    await syncAllConfluencePermissions(); // Sync permissions last
+    await startJob(JOB_NAME);
+    console.log(`CRON JOB: Starting ${JOB_NAME}...`);
 
-    console.log("CRON JOB: Finished Atlassian data sync.");
+    const steps = [
+      //{ name: "Atlassian Users", func: syncAllAtlassianUsers },
+      { name: "Confluence Users", func: syncConfluenceUsersFromAtlassian },
+      //{
+      //name: "Atlassian Groups & Members",
+      //func: syncAllAtlassianGroupsAndMembers,
+      //},
+      //{ name: "Jira Projects", func: syncAllJiraProjects },
+      { name: "Confluence Spaces", func: syncAllConfluenceSpaces },
+      //{
+      //name: "Bitbucket Repositories",
+      //func: syncAllBitbucketRepositoriesAndPermissions,
+      //},
+      { name: "Confluence Permissions", func: syncAllConfluencePermissions },
+    ];
+
+    for (let i = 0; i < steps.length; i++) {
+      const step = steps[i];
+      const progress = ((i + 1) / steps.length) * 100;
+      await updateProgress(JOB_NAME, `Syncing ${step.name}...`, progress - 5); // Show progress before starting
+      await step.func();
+      await updateProgress(
+        JOB_NAME,
+        `Finished syncing ${step.name}.`,
+        progress
+      );
+    }
+
+    console.log(`CRON JOB: Finished ${JOB_NAME}.`);
   } catch (error) {
-    console.error(
-      "CRON JOB: An error occurred during the Atlassian data sync:",
-      error
-    );
+    errorOccurred = error;
+    console.error(`CRON JOB: An error occurred during the ${JOB_NAME}:`, error);
   } finally {
+    const finalStatus = errorOccurred ? "FAILED" : "SUCCESS";
+    await finishJob(JOB_NAME, finalStatus, errorOccurred);
     isAtlassianSyncRunning = false;
-    console.log("CRON JOB: Atlassian sync process complete. Releasing lock.");
+    console.log(`CRON JOB: ${JOB_NAME} process complete. Releasing lock.`);
   }
 };
 
-// This function sets up the schedule
 const scheduleAtlassianSync = () => {
-  // Use '* * * * *' to run every minute for testing
+  // Your cron schedule
   cron.schedule("* * * * *", syncAllAtlassianData, {
     scheduled: true,
     timezone: "Asia/Jakarta",
   });
-
-  console.log(
-    "Atlassian cron job has been scheduled to run every minute for testing."
-  );
+  console.log("Atlassian cron job has been scheduled with progress logging.");
 };
 
 module.exports = { scheduleAtlassianSync };
