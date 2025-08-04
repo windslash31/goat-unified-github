@@ -1,44 +1,14 @@
-const jwt = require("jsonwebtoken");
-const db = require("../../config/db");
-const bcrypt = require("bcrypt");
-const config = require("../../config/config");
-
-const authenticateToken = async (req, res, next) => {
-  const authHeader = req.headers["authorization"];
-  const token = authHeader && authHeader.split(" ")[1];
-
-  if (token == null) {
-    return res.status(401).json({ message: "No token provided." });
-  }
-
-  try {
-    const decodedForJti = jwt.decode(token);
-    if (decodedForJti && decodedForJti.jti) {
-      const result = await db.query(
-        "SELECT EXISTS(SELECT 1 FROM token_denylist WHERE jti = $1)",
-        [decodedForJti.jti]
-      );
-      if (result.rows[0].exists) {
-        return res.status(401).json({ message: "Token has been invalidated." });
-      }
-    }
-
-    const user = jwt.verify(token, config.jwt.secret);
-    req.user = user;
-    next();
-  } catch (err) {
-    if (err instanceof jwt.JsonWebTokenError) {
-      return res.status(401).json({ message: "Token is not valid." });
-    }
-    console.error("Authentication error:", err);
-    return res.status(500).send("Server error during authentication.");
-  }
-};
-
 const authenticateApiKey = async (req, res, next) => {
+  // --- START: DEBUG LOGGING ---
+  console.log("--- API Key Authentication Check ---");
+  console.log("Received headers:", req.headers);
   const apiKey = req.headers["x-api-key"];
+  console.log("Attempting to authenticate with key:", apiKey);
 
   if (!apiKey) {
+    console.log(
+      "Authentication failed: Header 'x-api-key' is missing or empty."
+    );
     return res.status(401).json({ message: "API Key is missing." });
   }
 
@@ -47,22 +17,34 @@ const authenticateApiKey = async (req, res, next) => {
       "SELECT key_hash, user_id, expires_at FROM api_keys"
     );
     const allKeys = result.rows;
+    console.log(
+      `Found ${allKeys.length} key(s) in the database to check against.`
+    );
 
     let matchedKey = null;
     for (const key of allKeys) {
+      console.log(
+        `Comparing provided key with stored hash for user_id: ${key.user_id}`
+      );
       const isMatch = await bcrypt.compare(apiKey, key.key_hash);
       if (isMatch) {
+        console.log(`SUCCESS: Match found for user_id: ${key.user_id}`);
         matchedKey = key;
         break;
       }
     }
 
     if (!matchedKey) {
+      console.log(
+        "Authentication failed: No matching key found in the database after checking all entries."
+      );
       return res.status(401).json({ message: "Invalid API Key." });
     }
 
-    // --- ADDED: CHECK FOR EXPIRATION ---
     if (matchedKey.expires_at && new Date() > new Date(matchedKey.expires_at)) {
+      console.log(
+        `Authentication failed: Key for user_id ${matchedKey.user_id} has expired.`
+      );
       return res.status(401).json({ message: "API Key has expired." });
     }
 
@@ -74,6 +56,9 @@ const authenticateApiKey = async (req, res, next) => {
         `;
     const userResult = await db.query(userQuery, [matchedKey.user_id]);
     if (userResult.rows.length === 0) {
+      console.log(
+        `Authentication failed: Key is valid, but associated user ${matchedKey.user_id} was not found.`
+      );
       return res.status(401).json({
         message: "API Key is valid, but the associated user was not found.",
       });
@@ -84,7 +69,6 @@ const authenticateApiKey = async (req, res, next) => {
       "SELECT p.name FROM permissions p JOIN role_permissions rp ON p.id = rp.permission_id WHERE rp.role_id = $1",
       [user.role_id]
     );
-
     req.user = {
       id: user.id,
       employeeId: user.employee_id,
@@ -94,75 +78,10 @@ const authenticateApiKey = async (req, res, next) => {
       permissions: permsResult.rows.map((p) => p.name),
     };
 
+    console.log("--- API Key Authentication Successful ---");
     next();
   } catch (err) {
     console.error("API Key Authentication error:", err);
     return res.status(500).send("Server error during authentication.");
   }
-};
-
-const authorize = (requiredPermission) => {
-  return (req, res, next) => {
-    if (!req.user) {
-      return res
-        .status(401)
-        .json({ message: "Authentication failed, user not found." });
-    }
-    const userPermissions = req.user.permissions || [];
-    if (userPermissions.includes(requiredPermission)) {
-      next();
-    } else {
-      res.status(403).json({
-        message: "Forbidden: You do not have the required permission.",
-      });
-    }
-  };
-};
-
-const authorizeAdminOrSelf = (req, res, next) => {
-  const userPermissions = req.user.permissions || [];
-  const requestedEmployeeId = parseInt(
-    req.params.id || req.params.employeeId,
-    10
-  );
-  const userEmployeeId = req.user.employeeId;
-
-  if (
-    userPermissions.includes("employee:read:all") ||
-    requestedEmployeeId === userEmployeeId
-  ) {
-    next();
-  } else {
-    res.status(403).json({
-      message: "Forbidden: You do not have permission to view this resource.",
-    });
-  }
-};
-
-const authorizeAdminOrSelfForLogs = (req, res, next) => {
-  const userPermissions = req.user.permissions || [];
-  const requestedEmployeeId = parseInt(
-    req.params.id || req.params.employeeId,
-    10
-  );
-  const userEmployeeId = req.user.employeeId;
-
-  if (
-    userPermissions.includes("log:read:platform") ||
-    requestedEmployeeId === userEmployeeId
-  ) {
-    next();
-  } else {
-    res.status(403).json({
-      message: "Forbidden: You do not have permission to view platform logs.",
-    });
-  }
-};
-
-module.exports = {
-  authenticateToken,
-  authenticateApiKey,
-  authorize,
-  authorizeAdminOrSelf,
-  authorizeAdminOrSelfForLogs,
 };

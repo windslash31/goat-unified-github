@@ -4,6 +4,7 @@ const syncController = require("../controllers/syncController");
 const {
   authenticateToken,
   authorize,
+  authenticateApiKey,
 } = require("../middleware/authMiddleware");
 
 router.get(
@@ -15,7 +16,7 @@ router.get(
 
 router.post(
   "/trigger",
-  authenticateToken,
+  authenticateApiKey,
   authorize("log:read:platform"),
   syncController.triggerMasterSync
 );

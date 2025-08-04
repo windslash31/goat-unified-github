@@ -85,9 +85,9 @@ app.listen(PORT, () => {
   console.log(`Backend server running at http://localhost:${PORT}`);
   resetStaleSyncJobs();
 
-  //if (config.nodeEnv === "production") {
-  schedulePlatformSync();
-  //}
+  if (config.nodeEnv === "production") {
+    schedulePlatformSync();
+  }
 });
 
 module.exports = app;
