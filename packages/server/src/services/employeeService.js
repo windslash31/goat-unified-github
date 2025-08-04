@@ -49,8 +49,8 @@ const getEmployeeStatus = (employee) => {
 
 const getEmployeeById = async (employeeId) => {
   const query = `
-        SELECT 
-            e.*,
+    SELECT
+      e.*,
             le.name as legal_entity,
             ol.name as office_location,
             et.name as employee_type,
@@ -58,10 +58,10 @@ const getEmployeeById = async (employeeId) => {
             CONCAT_WS(' ', manager.first_name, manager.middle_name, manager.last_name) as manager_name,
             manager.employee_email as manager_email,
             (SELECT json_agg(json_build_object(
-                'name', ia.name, 
-                'role', eaa.role, 
+                'name', ia.name,
+                'role', eaa.role,
                 'jira_ticket', eaa.jira_ticket
-            )) 
+            ))
             FROM employee_application_access eaa
             JOIN internal_applications ia ON eaa.application_id = ia.id
             WHERE eaa.employee_id = e.id) as applications,
@@ -70,17 +70,17 @@ const getEmployeeById = async (employeeId) => {
                 'status', pas.status,
                 'details', pas.details,
                 'last_synced_at', pas.last_synced_at
-            ) ORDER BY pas.platform_name) -- <<< THIS IS THE FIX
+            ) ORDER BY pas.platform_name)
             FROM platform_access_status pas
             WHERE pas.employee_id = e.id) as platform_statuses
-        FROM employees e
-        LEFT JOIN legal_entities le ON e.legal_entity_id = le.id
-        LEFT JOIN office_locations ol ON e.office_location_id = ol.id
-        LEFT JOIN employee_types et ON e.employee_type_id = et.id
-        LEFT JOIN employee_sub_types est ON e.employee_sub_type_id = est.id
+    FROM employees e
+    LEFT JOIN legal_entities le ON e.legal_entity_id = le.id
+    LEFT JOIN office_locations ol ON e.office_location_id = ol.id
+    LEFT JOIN employee_types et ON e.employee_type_id = et.id
+    LEFT JOIN employee_sub_types est ON e.employee_sub_type_id = est.id
         LEFT JOIN employees manager ON e.manager_id = manager.id
-        WHERE e.id = $1
-    `;
+    WHERE e.id = $1
+  `;
   const result = await db.query(query, [employeeId]);
   if (result.rows.length === 0) return null;
 
@@ -278,7 +278,7 @@ const getEmployeesForExport = (filters) => {
     whereClauses.length > 0 ? `WHERE ${whereClauses.join(" AND ")}` : "";
 
   const query = `
-        SELECT 
+        SELECT
             e.id,
             e.first_name,
             e.middle_name,
@@ -302,13 +302,11 @@ const getEmployeesForExport = (filters) => {
                 JOIN internal_applications ia ON eaa.application_id = ia.id
                 WHERE eaa.employee_id = e.id
             ) as application_access,
-            -- START: ADDED PLATFORM STATUS FOR EXPORT
             (
                 SELECT STRING_AGG(pas.platform_name || ': ' || pas.status, '; ')
                 FROM platform_access_status pas
                 WHERE pas.employee_id = e.id
             ) as platform_status_summary
-            -- END: ADDED PLATFORM STATUS FOR EXPORT
         FROM employees e
         LEFT JOIN employees manager ON e.manager_id = manager.id
         LEFT JOIN legal_entities le ON e.legal_entity_id = le.id
@@ -345,7 +343,7 @@ const streamEmployeesForExport = (filters) => {
     "access_cut_off_date_at_date",
     "created_at",
     "application_access",
-    "platform_status_summary", // Added to CSV export
+    "platform_status_summary",
   ];
 
   const asyncParser = new AsyncParser({ fields });
@@ -364,103 +362,6 @@ const streamEmployeesForExport = (filters) => {
   });
 
   return asyncParser.parse(queryStream);
-};
-
-const syncPlatformStatus = async (employeeId) => {
-  const employeeResult = await db.query(
-    "SELECT employee_email FROM employees WHERE id = $1",
-    [employeeId]
-  );
-  if (employeeResult.rows.length === 0) {
-    throw new Error("Employee not found.");
-  }
-  const email = employeeResult.rows[0].employee_email;
-
-  const platforms = [
-    { name: "Google", service: googleWorkspaceService },
-    { name: "JumpCloud", service: jumpcloudService },
-    { name: "Slack", service: slackService },
-    { name: "Atlassian", service: atlassianService },
-  ];
-
-  const statuses = [];
-
-  for (const platform of platforms) {
-    let status = "Not Found";
-    let details = {};
-
-    try {
-      const platformStatus = await platform.service.getUserStatus(email);
-      status = platformStatus.status;
-
-      details = platformStatus.details;
-      const rawDetails = platformStatus.details;
-      if (rawDetails) {
-        switch (platform.name) {
-          case "Google":
-            if (typeof rawDetails.isAdmin !== "undefined")
-              details.isAdmin = rawDetails.isAdmin;
-            if (typeof rawDetails.isDelegatedAdmin !== "undefined")
-              details.isDelegatedAdmin = rawDetails.isDelegatedAdmin;
-            if (rawDetails.aliases && rawDetails.aliases.length > 0)
-              details.aliases = rawDetails.aliases;
-            break;
-          case "JumpCloud":
-            if (rawDetails.username) details.username = rawDetails.username;
-            break;
-          case "Slack":
-            if (rawDetails.id) details.id = rawDetails.id;
-            if (typeof rawDetails.is_admin !== "undefined")
-              details.is_admin = rawDetails.is_admin;
-            if (typeof rawDetails.is_owner !== "undefined")
-              details.is_owner = rawDetails.is_owner;
-            break;
-          case "Atlassian":
-            if (Array.isArray(rawDetails) && rawDetails.length > 0) {
-              const atlassianUser = rawDetails[0];
-              if (atlassianUser.accountId)
-                details.accountId = atlassianUser.accountId;
-              if (atlassianUser.accountType)
-                details.accountType = atlassianUser.accountType;
-            }
-            break;
-        }
-      }
-    } catch (error) {
-      console.error(
-        `Failed to fetch status for ${email} from ${platform.name}:`,
-        error.message
-      );
-      status = "Error";
-      details = { error: error.message };
-    }
-
-    const last_synced_at = new Date();
-
-    const upsertQuery = `
-      INSERT INTO platform_access_status (employee_id, platform_name, status, details, last_synced_at)
-      VALUES ($1, $2, $3, $4, $5)
-      ON CONFLICT (employee_id, platform_name)
-      DO UPDATE SET
-        status = EXCLUDED.status,
-        details = EXCLUDED.details,
-        last_synced_at = EXCLUDED.last_synced_at
-      RETURNING *;
-    `;
-
-    const queryParams = [
-      employeeId,
-      platform.name,
-      status,
-      JSON.stringify(details),
-      last_synced_at,
-    ];
-
-    const result = await db.query(upsertQuery, queryParams);
-    statuses.push(result.rows[0]);
-  }
-
-  return statuses;
 };
 
 const updateEmployee = async (employeeId, updatedData, actorId, reqContext) => {
@@ -746,33 +647,6 @@ const updateOffboardingFromTicket = async (ticketData, actorId, reqContext) => {
   return await updateEmployee(employeeId, updatedData, actorId, reqContext);
 };
 
-const getPlatformStatuses = async (employeeId) => {
-  const employeeRes = await db.query(
-    "SELECT employee_email FROM employees WHERE id = $1",
-    [employeeId]
-  );
-  if (employeeRes.rows.length === 0) throw new Error("Employee not found.");
-  const email = employeeRes.rows[0].employee_email;
-
-  const platformPromises = [
-    googleWorkspaceService.getUserStatus(email),
-    slackService.getUserStatus(email),
-    jumpcloudService.getUserStatus(email),
-    atlassianService.getUserStatus(email),
-  ];
-
-  const results = await Promise.allSettled(platformPromises);
-  return results.map((result) => {
-    if (result.status === "fulfilled") return result.value;
-    console.error("Platform status check failed:", result.reason.message);
-    return {
-      platform: "Unknown",
-      status: "Error",
-      message: "Failed to fetch status.",
-    };
-  });
-};
-
 const getJumpCloudLogs = async (
   employeeId,
   startTime,
@@ -954,7 +828,6 @@ const bulkDeactivateOnPlatforms = async (
 };
 
 const getEmployeeOptions = async (tableName) => {
-  // --- MODIFICATION: Check cache first ---
   const now = Date.now();
   if (
     optionsCache.data[tableName] &&
@@ -973,7 +846,6 @@ const getEmployeeOptions = async (tableName) => {
     `SELECT id, name FROM ${tableName} ORDER BY name`
   );
 
-  // --- MODIFICATION: Store result in cache ---
   optionsCache.data[tableName] = result.rows;
   optionsCache.timestamp[tableName] = now;
 
@@ -1309,6 +1181,249 @@ const getEmployeeDevices = async (employeeId) => {
   return devices;
 };
 
+const syncPlatformStatus = async (employeeId) => {
+  const employee = await getEmployeeById(employeeId);
+  if (!employee) {
+    console.error(
+      `syncPlatformStatus: Employee with ID ${employeeId} not found.`
+    );
+    return;
+  }
+
+  console.log(`Orchestrating platform sync for: ${employee.employee_email}`);
+
+  const syncPromises = [
+    atlassianService.syncUserData(employeeId, employee.employee_email),
+    jumpcloudService.syncUserData(employeeId, employee.employee_email),
+    googleWorkspaceService.syncUserData(employeeId, employee.employee_email),
+    slackService.syncUserData(employeeId, employee.employee_email),
+  ];
+
+  await Promise.allSettled(syncPromises);
+
+  await db.query("UPDATE employees SET updated_at = NOW() WHERE id = $1", [
+    employeeId,
+  ]);
+};
+
+const getPlatformStatuses = async (employeeId) => {
+  const employee = await getEmployeeById(employeeId);
+  if (!employee) {
+    throw new Error(`Employee with ID ${employeeId} not found.`);
+  }
+
+  const email = employee.employee_email;
+  const platformStatuses = [];
+
+  const jumpcloudQuery = `SELECT * FROM jumpcloud_users WHERE email = $1`;
+  const atlassianQuery = `SELECT * FROM atlassian_users WHERE email_address = $1`;
+  const googleQuery = `SELECT * FROM google_users WHERE primary_email = $1`;
+  const slackQuery = `SELECT * FROM slack_users WHERE email = $1`;
+
+  const [jumpcloudRes, atlassianRes, googleRes, slackRes] = await Promise.all([
+    db.query(jumpcloudQuery, [email]),
+    db.query(atlassianQuery, [email]),
+    db.query(googleQuery, [email]),
+    db.query(slackQuery, [email]),
+  ]);
+
+  if (jumpcloudRes.rows.length > 0) {
+    const jc = jumpcloudRes.rows[0];
+    platformStatuses.push({
+      platform: "JumpCloud",
+      status: jc.suspended ? "Suspended" : "Active",
+      details: {
+        coreIdentity: { id: jc.id, email: jc.email, username: jc.username },
+        accountStatus: {
+          state: jc.activated ? "ACTIVATED" : "DEACTIVATED",
+          activated: jc.activated,
+          suspended: jc.suspended,
+          accountLocked: jc.account_locked,
+          passwordExpired: jc.password_expiration_date < new Date(),
+          mfaStatus: jc.totp_enabled ? "ENABLED" : "DISABLED",
+        },
+        userDetails: {
+          jobTitle: jc.job_title,
+          department: jc.department,
+          company: jc.company,
+          location: jc.location,
+        },
+        permissions: {
+          sudo: jc.sudo,
+        },
+        security: {
+          mfaEnrollment: jc.mfa_enrollment,
+        },
+        customAttributes: jc.attributes,
+        last_synced_at: jc.updated_at,
+      },
+    });
+  } else {
+    platformStatuses.push({
+      platform: "JumpCloud",
+      status: "Not Found",
+      details: {},
+    });
+  }
+
+  if (atlassianRes.rows.length > 0) {
+    const atlassian = atlassianRes.rows[0];
+    platformStatuses.push({
+      platform: "Atlassian",
+      status: atlassian.account_status,
+      details: {
+        accountId: atlassian.account_id,
+        emailAddress: atlassian.email_address,
+        displayName: atlassian.display_name,
+        accountType: atlassian.account_type,
+        last_synced_at: atlassian.last_updated_at,
+      },
+    });
+  } else {
+    platformStatuses.push({
+      platform: "Atlassian",
+      status: "Not Found",
+      details: {},
+    });
+  }
+
+  if (googleRes.rows.length > 0) {
+    const google = googleRes.rows[0];
+    platformStatuses.push({
+      platform: "Google",
+      status: google.suspended ? "Suspended" : "Active",
+      details: {
+        isAdmin: google.is_admin,
+        isDelegatedAdmin: google.is_delegated_admin,
+        orgUnitPath: google.org_unit_path,
+        isEnrolledIn2Sv: google.is_enrolled_in_2sv,
+        lastLoginTime: google.last_login_time,
+        last_synced_at: google.last_synced_at,
+      },
+    });
+  } else {
+    platformStatuses.push({
+      platform: "Google",
+      status: "Not Found",
+      details: {},
+    });
+  }
+
+  if (slackRes.rows.length > 0) {
+    const slack = slackRes.rows[0];
+    platformStatuses.push({
+      platform: "Slack",
+      status: slack.status,
+      details: {
+        id: slack.user_id,
+        is_admin: slack.is_admin,
+        is_owner: slack.is_owner,
+        is_guest: slack.is_restricted || slack.is_ultra_restricted,
+        last_synced_at: slack.last_synced_at,
+      },
+    });
+  } else {
+    platformStatuses.push({
+      platform: "Slack",
+      status: "Not Found",
+      details: {},
+    });
+  }
+
+  return platformStatuses;
+};
+
+const forceSyncPlatformStatus = async (employeeId) => {
+  console.log(`Force syncing platform status for employee ID: ${employeeId}`);
+  await syncPlatformStatus(employeeId);
+  return getPlatformStatuses(employeeId);
+};
+
+const getApplicationAccess = async (employeeId) => {
+  const employee = await getEmployeeById(employeeId);
+  if (!employee) {
+    throw new Error("Employee not found");
+  }
+  try {
+    const atlassianQuery = `
+      WITH user_info AS (
+        SELECT account_id FROM atlassian_users WHERE email_address = $1
+      ),
+      user_groups AS (
+        SELECT group_id FROM atlassian_group_members WHERE account_id = (SELECT account_id FROM user_info)
+      )
+      SELECT
+        (
+          SELECT json_agg(p) FROM (
+            SELECT DISTINCT jp.project_id, jp.project_key, jp.project_name, jp.project_type, jp.jira_url, jr.role_name
+            FROM jira_project_permissions jpp
+            JOIN jira_projects jp ON jpp.project_id = jp.project_id
+            LEFT JOIN jira_roles jr ON jpp.role_id = jr.role_id
+            WHERE (jpp.actor_type = 'atlassian-user-role-actor' AND jpp.actor_id = (SELECT account_id FROM user_info)) OR (jpp.actor_type = 'atlassian-group-role-actor' AND jpp.actor_id IN (SELECT group_id FROM user_groups))
+          ) p
+        ) as jira_projects,
+        (
+          SELECT json_agg(r) FROM (
+            SELECT DISTINCT br.repo_uuid, br.full_name, br.description, br.project_name, br.updated_on, brp.permission_level
+            FROM bitbucket_repository_permissions brp
+            JOIN bitbucket_repositories br ON brp.repo_uuid = br.repo_uuid
+            WHERE brp.user_account_id = (SELECT account_id FROM user_info)
+          ) r
+        ) as bitbucket_repositories,
+        (
+          SELECT json_agg(s) FROM (
+            SELECT cs.id, cs.key, cs.name, cs.description, json_agg(DISTINCT csp.operation) as permissions
+            FROM confluence_space_permission csp
+            JOIN confluence_space cs ON csp.space_id = cs.id
+            WHERE (csp.principal_type = 'user' AND csp.principal_id = (SELECT account_id FROM user_info)) OR (csp.principal_type = 'group' AND csp.principal_id IN (SELECT group_id FROM user_groups))
+            GROUP BY cs.id, cs.key, cs.name, cs.description
+          ) s
+        ) as confluence_spaces;
+    `;
+    const atlassianRes = await db.query(atlassianQuery, [
+      employee.employee_email,
+    ]);
+    const atlassianAccess = {
+      jiraProjects: atlassianRes.rows[0]?.jira_projects || [],
+      bitbucketRepositories: atlassianRes.rows[0]?.bitbucket_repositories || [],
+      confluenceSpaces: atlassianRes.rows[0]?.confluence_spaces || [],
+    };
+
+    const jumpcloudQuery = `
+      SELECT DISTINCT ja.*
+      FROM jumpcloud_applications ja
+      JOIN jumpcloud_application_bindings jab ON ja.id = jab.application_id
+      JOIN jumpcloud_user_group_members jugm ON jab.group_id = jugm.group_id
+      JOIN jumpcloud_users ju ON jugm.user_id = ju.id
+      WHERE ju.email = $1;
+    `;
+    const jumpcloudRes = await db.query(jumpcloudQuery, [
+      employee.employee_email,
+    ]);
+
+    // Fetch the sync job timestamps
+    const syncJobsQuery = `SELECT job_name, last_success_at FROM sync_jobs WHERE job_name IN ('atlassian_sync', 'jumpcloud_sync')`;
+    const syncJobsRes = await db.query(syncJobsQuery);
+
+    const syncTimestamps = syncJobsRes.rows.reduce((acc, row) => {
+      acc[row.job_name] = row.last_success_at;
+      return acc;
+    }, {});
+
+    // Restructure the return value to include both data and timestamps
+    return {
+      accessData: {
+        atlassian: atlassianAccess,
+        jumpcloud: jumpcloudRes.rows,
+      },
+      syncTimestamps: syncTimestamps,
+    };
+  } catch (error) {
+    console.error("Error fetching application access:", error);
+    throw error;
+  }
+};
+
 module.exports = {
   getEmployeeById,
   getEmployees,
@@ -1329,5 +1444,7 @@ module.exports = {
   getLicenseDetails,
   bulkImportEmployees,
   getEmployeeDevices,
-  syncPlatformStatus, // Added new function to exports
+  getApplicationAccess,
+  syncPlatformStatus,
+  forceSyncPlatformStatus,
 };

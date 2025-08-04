@@ -1,3 +1,5 @@
+// packages/server/src/api/routes/employees.js
+
 const express = require("express");
 const router = express.Router();
 const multer = require("multer");
@@ -83,6 +85,20 @@ router.put(
   authenticateToken,
   authorize("employee:update"),
   employeeController.updateEmployee
+);
+
+router.post(
+  "/:id/sync-status",
+  authenticateToken,
+  authorize("employee:update"),
+  employeeController.syncPlatformStatus
+);
+
+router.get(
+  "/:id/application-access",
+  authenticateToken,
+  authorizeAdminOrSelf,
+  employeeController.getEmployeeApplicationAccess
 );
 
 router.post(

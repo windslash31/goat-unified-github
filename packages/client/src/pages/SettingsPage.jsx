@@ -1,8 +1,6 @@
-// packages/client/src/pages/SettingsPage.js
-
 import React from "react";
 import { useNavigate, Outlet, useLocation } from "react-router-dom";
-import { User, Shield, ChevronRight, Briefcase } from "lucide-react";
+import { User, Shield, ChevronRight, Briefcase, RefreshCw } from "lucide-react";
 import { motion } from "framer-motion";
 import { useAuthStore } from "../stores/authStore";
 
@@ -86,6 +84,12 @@ export const SettingsPage = () => {
           description="Add or remove internal applications."
           icon={<Briefcase className="w-6 h-6" />}
           path="/settings/applications"
+        />
+        <SettingsCard
+          title="Data Synchronization"
+          description="Monitor and manage background sync jobs."
+          icon={<RefreshCw className="w-6 h-6" />}
+          path="/settings/sync"
         />
       </div>
     </motion.div>

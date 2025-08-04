@@ -36,6 +36,12 @@ module.exports = {
     apiUser: process.env.ATLASSIAN_API_USER,
     domain: process.env.ATLASSIAN_DOMAIN,
     workspaceId: process.env.ATLASSIAN_WORKSPACE_ID,
+    orgId: process.env.ATLASSIAN_ORG_ID,
+    orgToken: process.env.ATLASSIAN_ORG_TOKEN,
+    directoryId: process.env.ATLASSIAN_DIRECTORY_ID,
+    bitbucketToken: process.env.BITBUCKET_TOKEN,
+    bitbucketWorkspace: process.env.BITBUCKET_WORKSPACE,
+    bitbucketUserToken: process.env.BITBUCKET_USER_TOKEN,
   },
   nodeEnv: process.env.NODE_ENV || "development",
 };

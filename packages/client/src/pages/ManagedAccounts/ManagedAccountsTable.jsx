@@ -1,12 +1,12 @@
 import React from "react";
-import { Briefcase, Edit, Trash2 } from "lucide-react";
+import { UserCog, Edit, Trash2 } from "lucide-react";
 import { Button } from "../../components/ui/Button";
 
 const ManagedAccountsTable = ({ accounts, onEdit, onDelete }) => {
   if (!accounts || accounts.length === 0) {
     return (
       <div className="text-center py-16 text-gray-500 dark:text-gray-400 border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-lg">
-        <Briefcase className="mx-auto w-12 h-12 text-gray-400" />
+        <UserCog className="mx-auto w-12 h-12 text-gray-400" />
         <p className="font-semibold mt-4">No Managed Accounts Found</p>
         <p className="text-sm mt-1">Click "Add Account" to get started.</p>
       </div>

@@ -13,6 +13,8 @@ const jiraRoutes = require("./api/routes/jira");
 const userRoutes = require("./api/routes/users");
 const managedAccountRoutes = require("./api/routes/managedAccount");
 const { schedulePlatformSync } = require("./cron/platformSync");
+const syncRoutes = require("./api/routes/sync");
+const db = require("./config/db");
 
 const app = express();
 app.set("trust proxy", 1);
@@ -33,6 +35,27 @@ const corsOptions = {
   credentials: true,
 };
 
+const resetStaleSyncJobs = async () => {
+  try {
+    const query = `
+      UPDATE sync_jobs 
+      SET 
+        status = 'FAILED', 
+        details = '{"error": "Job failed due to an unexpected server shutdown."}',
+        last_failure_at = NOW()
+      WHERE status = 'RUNNING';
+    `;
+    const result = await db.query(query);
+    if (result.rowCount > 0) {
+      console.log(
+        `Reset ${result.rowCount} stale 'RUNNING' sync jobs to 'FAILED'.`
+      );
+    }
+  } catch (error) {
+    console.error("Failed to reset stale sync jobs on startup:", error);
+  }
+};
+
 app.use(helmet());
 app.use(cookieParser(config.cookie.secret));
 app.use(cors(corsOptions));
@@ -49,6 +72,7 @@ app.use("/api/logs", logRoutes);
 app.use("/api/jira", jiraRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/managed-accounts", managedAccountRoutes);
+app.use("/api/sync", syncRoutes);
 
 // Global error handler
 app.use((err, req, res, next) => {
@@ -59,10 +83,11 @@ app.use((err, req, res, next) => {
 const PORT = config.port;
 app.listen(PORT, () => {
   console.log(`Backend server running at http://localhost:${PORT}`);
+  resetStaleSyncJobs();
 
-  if (config.nodeEnv === "production") {
-    schedulePlatformSync();
-  }
+  //if (config.nodeEnv === "production") {
+  schedulePlatformSync();
+  //}
 });
 
 module.exports = app;

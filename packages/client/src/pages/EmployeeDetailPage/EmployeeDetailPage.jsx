@@ -10,6 +10,7 @@ import {
   BookLock,
   Laptop,
   MoreVertical,
+  Briefcase,
 } from "lucide-react";
 import { useBreadcrumb } from "../../context/BreadcrumbContext";
 import { EmployeeDetailHeader } from "./EmployeeDetailHeader";
@@ -26,6 +27,8 @@ import { useMediaQuery } from "../../hooks/useMediaQuery";
 import api from "../../api/api";
 import { EmployeeDetailSkeleton } from "../../components/ui/EmployeeDetailSkeleton";
 import { useModalStore } from "../../stores/modalStore";
+// --- CHANGE 1: Import the new component ---
+import ApplicationAccessTab from "./ApplicationAccessTab";
 
 const fetchEmployeeById = async (employeeId) => {
   const { data } = await api.get(`/api/employees/${employeeId}`);
@@ -78,6 +81,7 @@ export const EmployeeDetailPage = ({ permissions, onLogout }) => {
     enabled: !!employeeId && activeTab === "timeline",
   });
 
+  // --- CHANGE 2: Update the allTabs array ---
   const allTabs = [
     {
       id: "details",
@@ -96,6 +100,13 @@ export const EmployeeDetailPage = ({ permissions, onLogout }) => {
       label: "Apps & Platforms",
       shortLabel: "Access",
       icon: <LayoutGrid size={16} />,
+      permission: true,
+    },
+    {
+      id: "application-access",
+      label: "Application Access",
+      shortLabel: "App Access",
+      icon: <Briefcase size={16} />,
       permission: true,
     },
     {
@@ -202,40 +213,49 @@ export const EmployeeDetailPage = ({ permissions, onLogout }) => {
     </button>
   );
 
-  const TabContent = (
-    <div className="mt-6">
-      {activeTab === "details" && (
-        <EmployeeDetailsTab
-          employee={employee}
-          navigate={navigate}
-          permissions={permissions}
-          onTicketClick={handleTicketClick}
-          onAssetClick={handleAssetClick}
-        />
-      )}
-      {activeTab === "devices" && <DevicesTab employeeId={employeeId} />}
-      {activeTab === "platforms" && (
-        <EmployeeApplicationsTab
-          employeeId={employeeId}
-          applications={employee.applications || []}
-          platformStatuses={employee.platform_statuses || []}
-          isLoading={isEmployeeLoading}
-          onTicketClick={handleTicketClick}
-        />
-      )}
-      {activeTab === "licenses" && <LicensesTab employeeId={employeeId} />}
-      {activeTab === "platform-logs" && (
-        <PlatformLogPage employeeId={employeeId} onLogout={onLogout} />
-      )}
-      {activeTab === "timeline" && (
-        <UnifiedTimelinePage
-          events={timelineData}
-          loading={isTimelineLoading}
-          error={timelineError}
-        />
-      )}
-    </div>
-  );
+  // --- CHANGE 3: Update the render logic ---
+  const renderContent = () => {
+    switch (activeTab) {
+      case "details":
+        return (
+          <EmployeeDetailsTab
+            employee={employee}
+            navigate={navigate}
+            permissions={permissions}
+            onTicketClick={handleTicketClick}
+            onAssetClick={handleAssetClick}
+          />
+        );
+      case "devices":
+        return <DevicesTab employeeId={employeeId} />;
+      case "platforms":
+        return (
+          <EmployeeApplicationsTab
+            employeeId={employeeId}
+            applications={employee.applications || []}
+            platformStatuses={employee.platform_statuses || []}
+            isLoading={isEmployeeLoading}
+            onTicketClick={handleTicketClick}
+          />
+        );
+      case "application-access":
+        return <ApplicationAccessTab />;
+      case "licenses":
+        return <LicensesTab employeeId={employeeId} />;
+      case "platform-logs":
+        return <PlatformLogPage employeeId={employeeId} onLogout={onLogout} />;
+      case "timeline":
+        return (
+          <UnifiedTimelinePage
+            events={timelineData}
+            loading={isTimelineLoading}
+            error={timelineError}
+          />
+        );
+      default:
+        return null;
+    }
+  };
 
   if (isEmployeeLoading) return <EmployeeDetailSkeleton />;
 
@@ -314,7 +334,7 @@ export const EmployeeDetailPage = ({ permissions, onLogout }) => {
             )}
           </div>
         </div>
-        {TabContent}
+        <div className="mt-6">{renderContent()}</div>
       </div>
       {isJiraModalOpen && (
         <JiraTicketModal

@@ -1,5 +1,6 @@
 const { google } = require("googleapis");
 const { OAuth2 } = google.auth;
+const db = require("../config/db");
 
 let oauth2Client;
 
@@ -175,9 +176,66 @@ const getUserLicense = async (email) => {
   }
 };
 
+const syncUserData = async (employeeId, email) => {
+  console.log(`SYNC: Starting Google Workspace sync for ${email}`);
+  try {
+    const statusResult = await getUserStatus(email);
+
+    if (
+      statusResult.status === "Error" ||
+      statusResult.status === "Not Found"
+    ) {
+      await db.query("DELETE FROM google_users WHERE primary_email = $1", [
+        email,
+      ]);
+      console.log(
+        `SYNC: User ${email} not found or error in Google. Removed from local DB.`
+      );
+      return;
+    }
+
+    const userDetails = statusResult.details;
+    const query = `
+      INSERT INTO google_users (
+        primary_email, suspended, is_admin, is_delegated_admin, last_login_time, 
+        is_enrolled_in_2sv, org_unit_path, aliases, last_synced_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
+      ON CONFLICT (primary_email) DO UPDATE SET
+        suspended = EXCLUDED.suspended,
+        is_admin = EXCLUDED.is_admin,
+        is_delegated_admin = EXCLUDED.is_delegated_admin,
+        last_login_time = EXCLUDED.last_login_time,
+        is_enrolled_in_2sv = EXCLUDED.is_enrolled_in_2sv,
+        org_unit_path = EXCLUDED.org_unit_path,
+        aliases = EXCLUDED.aliases,
+        last_synced_at = NOW();
+    `;
+
+    const values = [
+      email,
+      statusResult.status === "Suspended",
+      userDetails.isAdmin,
+      userDetails.isDelegatedAdmin,
+      userDetails.lastLoginTime,
+      userDetails.isEnrolledIn2Sv,
+      userDetails.orgUnitPath,
+      JSON.stringify(userDetails.aliases || []),
+    ];
+
+    await db.query(query, values);
+    console.log(`SYNC: Successfully synced Google Workspace user ${email}`);
+  } catch (error) {
+    console.error(
+      `SYNC: Error during Google Workspace sync for ${email}:`,
+      error
+    );
+  }
+};
+
 module.exports = {
   getUserStatus,
   suspendUser,
   getLoginEvents,
   getUserLicense,
+  syncUserData,
 };
