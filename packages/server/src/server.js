@@ -34,6 +34,27 @@ const corsOptions = {
   credentials: true,
 };
 
+const resetStaleSyncJobs = async () => {
+  try {
+    const query = `
+      UPDATE sync_jobs 
+      SET 
+        status = 'FAILED', 
+        details = '{"error": "Job failed due to an unexpected server shutdown."}',
+        last_failure_at = NOW()
+      WHERE status = 'RUNNING';
+    `;
+    const result = await db.query(query);
+    if (result.rowCount > 0) {
+      console.log(
+        `Reset ${result.rowCount} stale 'RUNNING' sync jobs to 'FAILED'.`
+      );
+    }
+  } catch (error) {
+    console.error("Failed to reset stale sync jobs on startup:", error);
+  }
+};
+
 app.use(helmet());
 app.use(cookieParser(config.cookie.secret));
 app.use(cors(corsOptions));
@@ -61,6 +82,7 @@ app.use((err, req, res, next) => {
 const PORT = config.port;
 app.listen(PORT, () => {
   console.log(`Backend server running at http://localhost:${PORT}`);
+  resetStaleSyncJobs();
 
   //if (config.nodeEnv === "production") {
   schedulePlatformSync();

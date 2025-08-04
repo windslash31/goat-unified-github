@@ -145,7 +145,7 @@ const runAllSyncs = async () => {
 
 const schedulePlatformSync = () => {
   // This single schedule now runs all sync jobs in order
-  cron.schedule("* * * * *", runAllSyncs, {
+  cron.schedule("* 2 * * *", runAllSyncs, {
     // Changed to every 5 mins for easier testing
     scheduled: true,
     timezone: "Asia/Jakarta",
