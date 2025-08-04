@@ -14,6 +14,7 @@ const userRoutes = require("./api/routes/users");
 const managedAccountRoutes = require("./api/routes/managedAccount");
 const { schedulePlatformSync } = require("./cron/platformSync");
 const syncRoutes = require("./api/routes/sync");
+const db = require("./config/db");
 
 const app = express();
 app.set("trust proxy", 1);

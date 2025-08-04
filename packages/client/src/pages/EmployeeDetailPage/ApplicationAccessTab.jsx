@@ -16,6 +16,7 @@ import {
   Filter,
   KeyRound,
   ExternalLink,
+  Clock,
 } from "lucide-react";
 import api from "../../api/api";
 import { EmployeeDetailSkeleton } from "../../components/ui/EmployeeDetailSkeleton";
@@ -24,6 +25,7 @@ import { CustomSelect } from "../../components/ui/CustomSelect";
 import { Portal } from "../../components/ui/Portal";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
 import { Button } from "../../components/ui/Button";
+import { formatTimeAgo } from "../../utils/formatters";
 
 const fetchApplicationAccess = async (employeeId) => {
   const { data } = await api.get(
@@ -68,6 +70,16 @@ const PermissionBadge = ({ level }) => {
     >
       {level.replace(/_/g, " ")}
     </span>
+  );
+};
+
+const SyncTimestamp = ({ time }) => {
+  if (!time) return null;
+  return (
+    <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400 mb-4">
+      <Clock size={12} />
+      <span>Data last synced: {formatTimeAgo(time)}</span>
+    </div>
   );
 };
 
@@ -456,6 +468,9 @@ const ApplicationAccessTab = () => {
     queryFn: () => fetchApplicationAccess(employeeId),
   });
 
+  const accessData = data?.accessData;
+  const syncTimestamps = data?.syncTimestamps;
+
   if (isLoading) return <EmployeeDetailSkeleton />;
   if (isError)
     return (
@@ -465,14 +480,15 @@ const ApplicationAccessTab = () => {
   return (
     <div className="p-4 sm:p-0">
       <div className="mb-6">
-        <h2 className="text-xl font-bold mb-4 text-gray-800 dark:text-gray-200">
+        <h2 className="text-xl font-bold mb-1 text-gray-800 dark:text-gray-200">
           Atlassian
         </h2>
-        {/* JIRA PROJECTS SECTION */}
+        <SyncTimestamp time={syncTimestamps?.atlassian_sync} />
+
         <AccessSection
           title="Jira Projects"
           icon={<Code size={20} />}
-          items={data.atlassian?.jiraProjects || []}
+          items={accessData?.atlassian?.jiraProjects || []}
           itemKeyFn={(project) => `${project.project_id}-${project.role_name}`}
           nameKey="project_name"
           permissionKey="role_name"
@@ -480,12 +496,12 @@ const ApplicationAccessTab = () => {
             <div className="flex justify-between items-start w-full">
               <div className="flex-grow truncate">
                 <a
-                  href={`https://kredivo.atlassian.net/browse/${project.project_key}`} // Assuming your Atlassian domain
+                  href={project.jira_url}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="font-medium text-gray-800 dark:text-gray-200 hover:underline flex items-center gap-1.5"
                 >
-                  {project.project_name} ({project.project_key})
+                  {project.project_name} ({project.project_key}){" "}
                   <ExternalLink size={14} />
                 </a>
                 <div className="text-xs text-gray-500 capitalize mt-1">
@@ -498,11 +514,10 @@ const ApplicationAccessTab = () => {
             </div>
           )}
         />
-        {/* BITBUCKET REPOSITORIES SECTION */}
         <AccessSection
           title="Bitbucket Repositories"
           icon={<GitBranch size={20} />}
-          items={data.atlassian?.bitbucketRepositories || []}
+          items={accessData?.atlassian?.bitbucketRepositories || []}
           itemKeyFn={(repo) => `${repo.repo_uuid}-${repo.permission_level}`}
           nameKey="full_name"
           permissionKey="permission_level"
@@ -510,13 +525,12 @@ const ApplicationAccessTab = () => {
             <div className="flex justify-between items-start w-full">
               <div className="flex-grow truncate">
                 <a
-                  href={`https://bitbucket.org/${repo.full_name}`} // Standard Bitbucket URL
+                  href={`https://bitbucket.org/${repo.full_name}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="font-medium text-gray-800 dark:text-gray-200 hover:underline flex items-center gap-1.5"
                 >
-                  {repo.full_name}
-                  <ExternalLink size={14} />
+                  {repo.full_name} <ExternalLink size={14} />
                 </a>
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 italic truncate">
                   {repo.description || "No description."}
@@ -532,53 +546,59 @@ const ApplicationAccessTab = () => {
             </div>
           )}
         />
-        {/* CONFLUENCE SPACES SECTION */}
         <AccessSection
           title="Confluence Spaces"
           icon={<Book size={20} />}
-          items={data.atlassian?.confluenceSpaces || []}
+          items={accessData?.atlassian?.confluenceSpaces || []}
           itemKeyFn={(space) => space.id}
           nameKey="name"
           permissionKey="permissions"
-          renderItem={(space) => (
-            <div className="flex justify-between items-start w-full">
-              <div className="flex-grow truncate">
-                <a
-                  href={`https://kredivo.atlassian.net/wiki/spaces/${space.key}`} // Assuming your Atlassian domain
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="font-medium text-gray-800 dark:text-gray-200 hover:underline flex items-center gap-1.5"
-                >
-                  {space.name} ({space.key})
-                  <ExternalLink size={14} />
-                </a>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 italic truncate">
-                  {space.description || "No description."}
-                </p>
+          renderItem={(space) => {
+            // FIX: Construct the URL using the frontend environment variable
+            const confluenceBaseUrl = new URL(
+              import.meta.env.VITE_JIRA_BASE_URL
+            ).origin;
+            const spaceUrl = `${confluenceBaseUrl}/wiki/spaces/${space.key}`;
+
+            return (
+              <div className="flex justify-between items-start w-full">
+                <div className="flex-grow truncate">
+                  <a
+                    href={spaceUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-medium text-gray-800 dark:text-gray-200 hover:underline flex items-center gap-1.5"
+                  >
+                    {space.name} ({space.key}) <ExternalLink size={14} />
+                  </a>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 italic truncate">
+                    {space.description || "No description."}
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center justify-end gap-1.5 ml-4">
+                  {Array.isArray(space.permissions) &&
+                    space.permissions.map((p) => (
+                      <PermissionBadge key={p} level={p} />
+                    ))}
+                </div>
               </div>
-              <div className="flex flex-wrap items-center justify-end gap-1.5 ml-4">
-                {Array.isArray(space.permissions) &&
-                  space.permissions.map((p) => (
-                    <PermissionBadge key={p} level={p} />
-                  ))}
-              </div>
-            </div>
-          )}
+            );
+          }}
         />
       </div>
 
-      {/* JUMPCLOUD SECTION */}
       <div>
-        <h2 className="text-xl font-bold mb-4 text-gray-800 dark:text-gray-200">
+        <h2 className="text-xl font-bold mb-1 text-gray-800 dark:text-gray-200">
           JumpCloud SSO
         </h2>
+        <SyncTimestamp time={syncTimestamps?.jumpcloud_sync} />
         <AccessSection
           title="Applications"
           icon={<KeyRound size={20} />}
-          items={data.jumpcloud || []}
+          items={accessData?.jumpcloud || []}
           itemKeyFn={(app) => app.id}
           nameKey="display_label"
-          permissionKey="display_name" // Using this key for filtering options
+          permissionKey="display_name"
           renderItem={(app) => <JumpCloudAppDetails app={app} />}
         />
       </div>
