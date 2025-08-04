@@ -1,5 +1,3 @@
-// packages/server/src/cron/platformSync.js
-
 const cron = require("node-cron");
 const db = require("../config/db");
 const {
@@ -76,6 +74,12 @@ const syncAllAtlassianData = async () => {
         func: atlassianService.syncAllAtlassianGroupsAndMembers,
       },
       { name: "Jira Projects", func: atlassianService.syncAllJiraProjects },
+
+      {
+        name: "Jira Roles & Permissions",
+        func: atlassianService.syncJiraRolesAndPermissions,
+      },
+
       {
         name: "Confluence Spaces",
         func: atlassianService.syncAllConfluenceSpaces,

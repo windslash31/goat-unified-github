@@ -950,7 +950,7 @@ const syncAllBitbucketRepositoriesAndPermissions = async () => {
       "TRUNCATE TABLE bitbucket_repository_permissions RESTART IDENTITY;"
     );
 
-    const BATCH_SIZE = 20;
+    const BATCH_SIZE = 50;
     const DELAY_BETWEEN_BATCHES_MS = 1000;
     let allPermissionsToInsert = [];
 
