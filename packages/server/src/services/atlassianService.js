@@ -887,7 +887,7 @@ const syncAllBitbucketRepositoriesAndPermissions = async () => {
 
   let nextPageUrl = `https://api.bitbucket.org/2.0/repositories/${config.atlassian.bitbucketWorkspace}?q=${encodedQuery}&sort=-updated_on`;
 
-  // Part 1: Fetch all repositories (This part is correct and unchanged)
+  // Fetch all repositories
   while (nextPageUrl) {
     try {
       const response = await fetch(nextPageUrl, {
@@ -919,7 +919,7 @@ const syncAllBitbucketRepositoriesAndPermissions = async () => {
 
   const client = await db.pool.connect();
   try {
-    // Part 2: Save repositories to the database (This part is correct and unchanged)
+    // Save repositories to the database
     await client.query("BEGIN");
     await client.query(
       "TRUNCATE TABLE bitbucket_repositories RESTART IDENTITY;"
@@ -1000,6 +1000,235 @@ const syncAllBitbucketRepositoriesAndPermissions = async () => {
   }
 };
 
+const syncAllConfluenceSpaces = async () => {
+  console.log("CRON JOB: Starting Confluence space sync...");
+  const jiraHeaders = {
+    Authorization: `Basic ${Buffer.from(
+      `${config.atlassian.apiUser}:${config.atlassian.apiToken}`
+    ).toString("base64")}`,
+    Accept: "application/json",
+  };
+
+  let allSpaces = [];
+  let start = 0;
+  let isLast = false;
+  const limit = 50;
+
+  while (!isLast) {
+    const url = `https://${config.atlassian.domain}/wiki/rest/api/space?limit=${limit}&start=${start}&expand=description.plain,status`;
+    try {
+      const response = await fetch(url, { headers: jiraHeaders });
+      if (!response.ok) {
+        throw new Error(
+          `Confluence API Error fetching spaces: ${
+            response.status
+          } - ${await response.text()}`
+        );
+      }
+      const page = await response.json();
+      if (page.results && page.results.length > 0) {
+        allSpaces.push(...page.results);
+      }
+      if (page.size < limit) {
+        isLast = true;
+      } else {
+        start += limit;
+      }
+    } catch (error) {
+      console.error("Failed to fetch a page of Confluence spaces:", error);
+      isLast = true; // Stop on error
+    }
+  }
+
+  if (allSpaces.length === 0) {
+    console.log("CRON JOB: No Confluence spaces found to sync.");
+    return;
+  }
+
+  const client = await db.pool.connect();
+  try {
+    await client.query("BEGIN");
+    const spaceIds = allSpaces.map((s) => s.id);
+    const spaceKeys = allSpaces.map((s) => s.key);
+    const spaceNames = allSpaces.map((s) => s.name);
+    const spaceTypes = allSpaces.map((s) => s.type);
+    const spaceStatuses = allSpaces.map((s) => s.status);
+    const spaceDescriptions = allSpaces.map(
+      (s) => s.description?.plain?.value || null
+    );
+
+    const query = `
+      INSERT INTO confluence_space (id, key, name, type, status, description, updated_at)
+      SELECT * FROM unnest($1::bigint[], $2::varchar[], $3::varchar[], $4::varchar[], $5::varchar[], $6::text[], array_fill(NOW(), ARRAY[array_length($1, 1)]))
+      ON CONFLICT (id) DO UPDATE SET
+        key = EXCLUDED.key,
+        name = EXCLUDED.name,
+        type = EXCLUDED.type,
+        status = EXCLUDED.status,
+        description = EXCLUDED.description,
+        updated_at = NOW();
+    `;
+
+    await client.query(query, [
+      spaceIds,
+      spaceKeys,
+      spaceNames,
+      spaceTypes,
+      spaceStatuses,
+      spaceDescriptions,
+    ]);
+    await client.query("COMMIT");
+    console.log(
+      `CRON JOB: Successfully synced ${allSpaces.length} Confluence spaces.`
+    );
+  } catch (error) {
+    await client.query("ROLLBACK");
+    console.error("Error during Confluence space database sync:", error);
+    throw error;
+  } finally {
+    client.release();
+  }
+};
+
+const syncAllConfluencePermissions = async () => {
+  console.log("CRON JOB: Starting Confluence space permissions sync...");
+  const jiraHeaders = {
+    Authorization: `Basic ${Buffer.from(
+      `${config.atlassian.apiUser}:${config.atlassian.apiToken}`
+    ).toString("base64")}`,
+    Accept: "application/json",
+  };
+
+  const client = await db.pool.connect();
+  try {
+    const spacesResult = await client.query(
+      "SELECT id, key FROM confluence_space"
+    );
+    const spaces = spacesResult.rows;
+    if (spaces.length === 0) {
+      console.log("CRON JOB: No spaces in DB to sync permissions for.");
+      return;
+    }
+
+    // Fetch all permissions in parallel batches to avoid overwhelming the API
+    const BATCH_SIZE = 10;
+    let allPermissions = [];
+    for (let i = 0; i < spaces.length; i += BATCH_SIZE) {
+      const batch = spaces.slice(i, i + BATCH_SIZE);
+      const permissionPromises = batch.map((space) =>
+        fetch(
+          `https://${config.atlassian.domain}/wiki/rest/api/space/${space.key}/permission`,
+          { headers: jiraHeaders }
+        )
+          .then((res) =>
+            res.ok
+              ? res.json()
+              : Promise.reject(new Error(`Failed for space ${space.key}`))
+          )
+          .then((data) => ({ spaceId: space.id, permissions: data.results }))
+      );
+
+      const results = await Promise.allSettled(permissionPromises);
+      results.forEach((result) => {
+        if (result.status === "fulfilled") {
+          const { spaceId, permissions } = result.value;
+          permissions.forEach((perm) => {
+            const principalId =
+              perm.principal.user?.accountId || perm.principal.group?.id;
+            if (principalId) {
+              allPermissions.push({
+                spaceId: spaceId,
+                principalId: principalId,
+                operation: perm.operation.operation,
+                principalType: perm.principal.type,
+              });
+            }
+          });
+        }
+      });
+      await new Promise((resolve) => setTimeout(resolve, 1000)); // 1 second delay between batches
+    }
+
+    if (allPermissions.length === 0) {
+      console.log("CRON JOB: No Confluence permissions found to sync.");
+      return;
+    }
+
+    // Bulk insert permissions into the database
+    await client.query("BEGIN");
+    await client.query("TRUNCATE TABLE confluence_space_permission;");
+
+    const spaceIds = allPermissions.map((p) => p.spaceId);
+    const principalIds = allPermissions.map((p) => p.principalId);
+    const operations = allPermissions.map((p) => p.operation);
+    const principalTypes = allPermissions.map((p) => p.principalType);
+
+    const query = `
+            INSERT INTO confluence_space_permission (space_id, principal_id, operation, principal_type, updated_at)
+            SELECT * FROM unnest($1::bigint[], $2::varchar[], $3::varchar[], $4::varchar[], array_fill(NOW(), ARRAY[array_length($1, 1)]))
+            ON CONFLICT (space_id, principal_id, operation) DO NOTHING;
+        `;
+
+    await client.query(query, [
+      spaceIds,
+      principalIds,
+      operations,
+      principalTypes,
+    ]);
+    await client.query("COMMIT");
+    console.log(
+      `CRON JOB: Successfully synced ${allPermissions.length} Confluence permissions.`
+    );
+  } catch (error) {
+    await client.query("ROLLBACK");
+    console.error("Error during Confluence permissions sync:", error);
+    throw error;
+  } finally {
+    client.release();
+  }
+};
+
+const syncConfluenceUsersFromAtlassian = async () => {
+  console.log(
+    "CRON JOB: Syncing Confluence users from master Atlassian user list..."
+  );
+  const client = await db.pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    const query = `
+          INSERT INTO confluence_users (account_id, display_name, email, account_status, account_type, updated_at)
+          SELECT 
+              account_id, 
+              display_name, 
+              email_address, 
+              account_status,
+              'atlassian' as account_type,
+              last_updated_at
+          FROM atlassian_users
+          -- FIX: Changed "confluence.ondemand" to "confluence" to match the actual data
+          WHERE product_access @> '[{"key": "confluence"}]'
+          ON CONFLICT (account_id) DO UPDATE SET
+              display_name = EXCLUDED.display_name,
+              email = EXCLUDED.email,
+              account_status = EXCLUDED.account_status,
+              account_type = EXCLUDED.account_type,
+              updated_at = NOW();
+      `;
+    const result = await client.query(query);
+    await client.query("COMMIT");
+    console.log(
+      `CRON JOB: Successfully synced ${result.rowCount} Confluence users.`
+    );
+  } catch (error) {
+    await client.query("ROLLBACK");
+    console.error("Error syncing Confluence users:", error);
+    throw error;
+  } finally {
+    client.release();
+  }
+};
+
 module.exports = {
   getUserStatus,
   deactivateUser,
@@ -1014,4 +1243,7 @@ module.exports = {
   syncAllJiraProjects,
   syncJiraRolesAndPermissions,
   syncAllBitbucketRepositoriesAndPermissions,
+  syncAllConfluenceSpaces,
+  syncAllConfluencePermissions,
+  syncConfluenceUsersFromAtlassian,
 };

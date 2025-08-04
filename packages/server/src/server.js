@@ -61,10 +61,10 @@ const PORT = config.port;
 app.listen(PORT, () => {
   console.log(`Backend server running at http://localhost:${PORT}`);
 
-  if (config.nodeEnv === "production") {
-    schedulePlatformSync();
-    scheduleAtlassianSync();
-  }
+  //if (config.nodeEnv === "production") {
+  schedulePlatformSync();
+  scheduleAtlassianSync();
+  //}
 });
 
 module.exports = app;

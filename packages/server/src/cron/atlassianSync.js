@@ -3,17 +3,16 @@ const {
   syncAllAtlassianUsers,
   syncAllAtlassianGroupsAndMembers,
   syncAllJiraProjects,
-  syncAllBitbucketRepositoriesAndPermissions,
+  //syncAllBitbucketRepositoriesAndPermissions,
+  syncAllConfluenceSpaces,
+  syncAllConfluencePermissions,
+  syncConfluenceUsersFromAtlassian,
 } = require("../services/atlassianService");
 
-// --- MODIFICATION START ---
-// A flag to prevent overlapping runs for the Atlassian sync
 let isAtlassianSyncRunning = false;
-// --- MODIFICATION END ---
 
 // This is the master function for all Atlassian sync tasks.
 const syncAllAtlassianData = async () => {
-  // --- MODIFICATION START ---
   // Check if the sync is already running
   if (isAtlassianSyncRunning) {
     console.log(
@@ -27,7 +26,14 @@ const syncAllAtlassianData = async () => {
   console.log("CRON JOB: Starting Atlassian data sync...");
 
   try {
-    await syncAllBitbucketRepositoriesAndPermissions();
+    await syncAllAtlassianUsers();
+    await syncConfluenceUsersFromAtlassian(); // Syncs users with Confluence access
+    await syncAllAtlassianGroupsAndMembers();
+    await syncAllJiraProjects();
+    await syncAllConfluenceSpaces(); // Sync spaces before permissions
+    //await syncAllBitbucketRepositoriesAndPermissions();
+    await syncAllConfluencePermissions(); // Sync permissions last
+
     console.log("CRON JOB: Finished Atlassian data sync.");
   } catch (error) {
     console.error(
@@ -35,11 +41,9 @@ const syncAllAtlassianData = async () => {
       error
     );
   } finally {
-    // IMPORTANT: Release the flag, allowing the next run to start
     isAtlassianSyncRunning = false;
     console.log("CRON JOB: Atlassian sync process complete. Releasing lock.");
   }
-  // --- MODIFICATION END ---
 };
 
 // This function sets up the schedule
