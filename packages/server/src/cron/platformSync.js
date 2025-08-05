@@ -184,7 +184,7 @@ const runAllSyncs = async () => {
 };
 
 const schedulePlatformSync = () => {
-  cron.schedule("*/5 * * * *", runAllSyncs, {
+  cron.schedule("* 2 * * *", runAllSyncs, {
     scheduled: true,
     timezone: "Asia/Jakarta",
   });

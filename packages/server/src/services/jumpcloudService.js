@@ -11,7 +11,6 @@ const fetchAllJumpCloudUsers = async () => {
   let allUsers = [];
   let keepFetching = true; // Use a flag to control the loop
 
-  // --- MODIFICATION START: Improved pagination logic ---
   while (keepFetching) {
     const url = `${BASE_URL}/systemusers?limit=${limit}&skip=${skip}`;
     const response = await fetch(url, {
@@ -109,15 +108,36 @@ const syncAllJumpCloudUsers = async () => {
 
 const fetchAllJumpCloudApplications = async () => {
   if (!API_KEY) throw new Error("JumpCloud API key is not configured.");
-  const url = `https://console.jumpcloud.com/api/v2/applications`;
-  const response = await fetch(url, {
-    headers: { "x-api-key": API_KEY, Accept: "application/json" },
-  });
-  if (!response.ok)
-    throw new Error(
-      `JumpCloud API Error: ${response.status} ${response.statusText}`
-    );
-  return response.json();
+
+  const limit = 100;
+  let skip = 0;
+  let allApplications = [];
+  let keepFetching = true;
+
+  while (keepFetching) {
+    const url = `https://console.jumpcloud.com/api/v2/applications?limit=${limit}&skip=${skip}`;
+    const response = await fetch(url, {
+      headers: { "x-api-key": API_KEY, Accept: "application/json" },
+    });
+    if (!response.ok) {
+      throw new Error(
+        `JumpCloud API Error: ${response.status} ${response.statusText}`
+      );
+    }
+
+    const applications = await response.json();
+
+    if (applications && applications.length > 0) {
+      allApplications = allApplications.concat(applications);
+      skip += limit;
+    }
+
+    if (!applications || applications.length < limit) {
+      keepFetching = false;
+    }
+  }
+
+  return allApplications;
 };
 
 const syncAllJumpCloudApplications = async () => {
