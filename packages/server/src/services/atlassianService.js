@@ -1436,4 +1436,5 @@ module.exports = {
   syncAllConfluenceSpaces,
   syncAllConfluencePermissions,
   syncConfluenceUsersFromAtlassian,
+  syncAllAtlassianData,
 };
