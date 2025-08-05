@@ -2,6 +2,7 @@ const fetch = require("node-fetch");
 const axios = require("axios");
 const config = require("../config/config");
 const db = require("../config/db");
+const { startJob, updateProgress, finishJob } = require("./syncLogService");
 
 const getUserStatus = async (email) => {
   if (
