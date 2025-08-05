@@ -230,6 +230,44 @@ const deactivateUser = async (email) => {
   };
 };
 
+const fetchWithRetry = async (url, options, retries = 3, delay = 1000) => {
+  for (let i = 0; i < retries; i++) {
+    try {
+      const response = await fetch(url, options);
+      if (!response.ok) {
+        // For non-network errors (like 4xx, 5xx), don't retry immediately unless it's a server error
+        if (response.status >= 500) {
+          console.warn(
+            `Attempt ${i + 1} failed with status ${
+              response.status
+            }. Retrying in ${delay / 1000}s...`
+          );
+          await new Promise((res) => setTimeout(res, delay * Math.pow(2, i)));
+          continue; // Retry on server errors
+        }
+      }
+      return response; // Success
+    } catch (error) {
+      if (error.code === "ECONNRESET" || error.type === "system") {
+        console.warn(
+          `Attempt ${i + 1} failed with network error: ${
+            error.code
+          }. Retrying in ${delay / 1000}s...`
+        );
+        if (i < retries - 1) {
+          // Wait longer for each retry (exponential backoff)
+          await new Promise((res) => setTimeout(res, delay * Math.pow(2, i)));
+        } else {
+          throw error; // If it's the last attempt, re-throw the error
+        }
+      } else {
+        // For other errors, fail immediately
+        throw error;
+      }
+    }
+  }
+};
+
 const findAssetByName = async (assetName) => {
   const workspaceId = config.atlassian.workspaceId;
   if (!workspaceId) {
@@ -889,9 +927,11 @@ const syncAllBitbucketRepositoriesAndPermissions = async () => {
 
   while (nextPageUrl) {
     try {
-      const response = await fetch(nextPageUrl, {
+      // --- STEP 2: USE THE NEW HELPER FUNCTION FOR THE FETCH CALL ---
+      const response = await fetchWithRetry(nextPageUrl, {
         headers: bitbucketRepoHeaders,
       });
+
       if (!response.ok) {
         throw new Error(
           `Bitbucket API Error fetching repositories: ${
@@ -966,7 +1006,7 @@ const syncAllBitbucketRepositoriesAndPermissions = async () => {
         let permissionsUrl = `https://api.bitbucket.org/2.0/workspaces/${config.atlassian.bitbucketWorkspace}/permissions/repositories/${repo.name}`;
         const repoPermissions = [];
         while (permissionsUrl) {
-          const response = await fetch(permissionsUrl, {
+          const response = await fetchWithRetry(permissionsUrl, {
             headers: bitbucketPermsHeaders,
           });
           if (!response.ok) {
@@ -1323,6 +1363,59 @@ const syncConfluenceUsersFromAtlassian = async () => {
     throw error;
   } finally {
     client.release();
+  }
+};
+
+const syncAllAtlassianData = async () => {
+  const JOB_NAME = "atlassian_sync";
+  try {
+    await startJob(JOB_NAME);
+    console.log(`CRON JOB: Starting ${JOB_NAME}...`);
+
+    // --- STEP 1: Run User & Group syncs sequentially first ---
+    await updateProgress(JOB_NAME, "Syncing Atlassian Users...", 5);
+    await syncAllAtlassianUsers();
+    await updateProgress(JOB_NAME, "Syncing Confluence Users...", 10);
+    await syncConfluenceUsersFromAtlassian();
+    await updateProgress(JOB_NAME, "Syncing Atlassian Groups & Members...", 15);
+    await syncAllAtlassianGroupsAndMembers();
+
+    // --- STEP 2: Define parallel task groups ---
+    await updateProgress(
+      JOB_NAME,
+      "Syncing Jira, Confluence, and Bitbucket...",
+      20
+    );
+
+    const syncJira = async () => {
+      console.log("CRON JOB: Starting parallel Jira sync...");
+      await syncAllJiraProjects();
+      await syncJiraRolesAndPermissions();
+      console.log("CRON JOB: Finished parallel Jira sync.");
+    };
+
+    const syncConfluence = async () => {
+      console.log("CRON JOB: Starting parallel Confluence sync...");
+      await syncAllConfluenceSpaces();
+      await syncAllConfluencePermissions();
+      console.log("CRON JOB: Finished parallel Confluence sync.");
+    };
+
+    const syncBitbucket = async () => {
+      console.log("CRON JOB: Starting parallel Bitbucket sync...");
+      await syncAllBitbucketRepositoriesAndPermissions();
+      console.log("CRON JOB: Finished parallel Bitbucket sync.");
+    };
+
+    // --- STEP 3: Run the tasks in parallel ---
+    await Promise.all([syncJira(), syncConfluence(), syncBitbucket()]);
+
+    await finishJob(JOB_NAME, "SUCCESS");
+    console.log(`CRON JOB: ${JOB_NAME} finished successfully.`);
+  } catch (error) {
+    console.error(`CRON JOB: An error occurred during ${JOB_NAME}:`, error);
+    await finishJob(JOB_NAME, "FAILED", error);
+    throw error; // Propagate error
   }
 };
 

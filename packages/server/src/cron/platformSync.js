@@ -57,62 +57,6 @@ const syncAllJumpCloudData = async () => {
   }
 };
 
-// --- ATLASSIAN SYNC LOGIC ---
-const syncAllAtlassianData = async () => {
-  const JOB_NAME = "atlassian_sync";
-  try {
-    await startJob(JOB_NAME);
-    console.log(`CRON JOB: Starting ${JOB_NAME}...`);
-    const steps = [
-      { name: "Atlassian Users", func: atlassianService.syncAllAtlassianUsers },
-      {
-        name: "Confluence Users",
-        func: atlassianService.syncConfluenceUsersFromAtlassian,
-      },
-      {
-        name: "Atlassian Groups & Members",
-        func: atlassianService.syncAllAtlassianGroupsAndMembers,
-      },
-      { name: "Jira Projects", func: atlassianService.syncAllJiraProjects },
-
-      {
-        name: "Jira Roles & Permissions",
-        func: atlassianService.syncJiraRolesAndPermissions,
-      },
-
-      {
-        name: "Confluence Spaces",
-        func: atlassianService.syncAllConfluenceSpaces,
-      },
-      {
-        name: "Bitbucket Repositories",
-        func: atlassianService.syncAllBitbucketRepositoriesAndPermissions,
-      },
-      {
-        name: "Confluence Permissions",
-        func: atlassianService.syncAllConfluencePermissions,
-      },
-    ];
-    for (let i = 0; i < steps.length; i++) {
-      const step = steps[i];
-      const progress = ((i + 1) / steps.length) * 100;
-      await updateProgress(JOB_NAME, `Syncing ${step.name}...`, progress - 5);
-      await step.func();
-      await updateProgress(
-        JOB_NAME,
-        `Finished syncing ${step.name}.`,
-        progress
-      );
-    }
-    await finishJob(JOB_NAME, "SUCCESS");
-    console.log(`CRON JOB: ${JOB_NAME} finished successfully.`);
-  } catch (error) {
-    console.error(`CRON JOB: An error occurred during ${JOB_NAME}:`, error);
-    await finishJob(JOB_NAME, "FAILED", error);
-    throw error; // Propagate error
-  }
-};
-
 const runIndividualUserSync = async (jobName, serviceSyncFunction) => {
   try {
     await startJob(jobName);
@@ -170,7 +114,7 @@ const runAllSyncs = async () => {
   try {
     // Run all syncs sequentially
     await syncAllJumpCloudData();
-    await syncAllAtlassianData();
+    await atlassianService.syncAllAtlassianData();
     await runIndividualUserSync("google_sync", googleService.syncUserData);
     await runIndividualUserSync("slack_sync", slackService.syncUserData);
   } catch (error) {
