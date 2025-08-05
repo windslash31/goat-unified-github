@@ -119,7 +119,8 @@ const runAllSyncs = async () => {
     await runIndividualUserSync("slack_sync", slackService.syncUserData);
   } catch (error) {
     console.error(
-      "CRON JOB: Master sync stopped due to a failure in a sub-process."
+      "CRON JOB: Master sync stopped due to a failure in a sub-process.",
+      error // We are adding the error object here
     );
   } finally {
     isMasterSyncRunning = false;
