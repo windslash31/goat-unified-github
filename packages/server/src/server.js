@@ -73,6 +73,7 @@ app.use("/api/jira", jiraRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/managed-accounts", managedAccountRoutes);
 app.use("/api/sync", syncRoutes);
+app.use("/api/data-export", dataExportRoutes);
 
 // Global error handler
 app.use((err, req, res, next) => {
