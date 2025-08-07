@@ -10,6 +10,7 @@ const applicationRoutes = require("./api/routes/applications");
 const dashboardRoutes = require("./api/routes/dashboard");
 const logRoutes = require("./api/routes/logs");
 const jiraRoutes = require("./api/routes/jira");
+const dataExportRoutes = require("./api/routes/dataExport");
 const userRoutes = require("./api/routes/users");
 const managedAccountRoutes = require("./api/routes/managedAccount");
 const { schedulePlatformSync } = require("./cron/platformSync");
