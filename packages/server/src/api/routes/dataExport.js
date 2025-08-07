@@ -1,16 +1,39 @@
 const express = require("express");
 const router = express.Router();
-const dataExportController = require("../controllers/dataExportController");
+const {
+  getAtlassianData,
+  getBitbucketData,
+  getConfluenceData,
+  getJiraData,
+} = require("../controllers/dataExportController");
 const {
   authenticateApiKey,
   authorize,
 } = require("../middleware/authMiddleware");
 
 router.get(
-  "/atlassian-sync",
+  "/atlassian",
   authenticateApiKey,
   authorize("log:read:platform"),
-  dataExportController.getAtlassianSyncData
+  getAtlassianData
+);
+router.get(
+  "/bitbucket",
+  authenticateApiKey,
+  authorize("log:read:platform"),
+  getBitbucketData
+);
+router.get(
+  "/confluence",
+  authenticateApiKey,
+  authorize("log:read:platform"),
+  getConfluenceData
+);
+router.get(
+  "/jira",
+  authenticateApiKey,
+  authorize("log:read:platform"),
+  getJiraData
 );
 
 module.exports = router;
