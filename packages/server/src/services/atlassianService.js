@@ -541,7 +541,7 @@ const syncAllAtlassianUsers = async () => {
         user.email,
         user.name,
         user.account_status,
-        user.is_billable,
+        user.access_billable,
         user.product_access ? JSON.stringify(user.product_access) : null,
       ];
       await client.query(query, values);

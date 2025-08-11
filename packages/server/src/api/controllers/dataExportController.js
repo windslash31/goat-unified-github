@@ -17,11 +17,25 @@ const fetchData = async (queries) => {
 
 const getAtlassianData = async (req, res, next) => {
   try {
+    const atlassianUsersQuery = `
+        SELECT 
+          account_id, 
+          email_address, 
+          display_name, 
+          account_status, 
+          billable, 
+          product_access, 
+          last_updated_at, 
+          last_active_date 
+        FROM atlassian_users;
+      `;
+
     const queries = {
-      atlassian_users: "SELECT * FROM atlassian_users;",
+      atlassian_users: atlassianUsersQuery,
       atlassian_groups: "SELECT * FROM atlassian_groups;",
       atlassian_group_members: "SELECT * FROM atlassian_group_members;",
     };
+
     const data = await fetchData(queries);
     res.json(data);
   } catch (error) {
