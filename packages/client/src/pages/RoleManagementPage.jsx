@@ -93,6 +93,11 @@ const permissionGroups = [
         description:
           "Allows creating, updating, and deleting internal applications.",
       },
+      {
+        name: "license:manage",
+        description:
+          "Allows user to view and update application license costs.",
+      },
     ],
   },
   {

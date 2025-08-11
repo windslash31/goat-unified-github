@@ -11,6 +11,7 @@ import {
   UserCircle,
   UsersRound,
   UserCog,
+  DollarSign,
 } from "lucide-react";
 import { createContext, useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
@@ -55,6 +56,13 @@ export function Sidebar({ onLogout, isMobileOpen, setMobileOpen }) {
       label: "Employees",
       icon: <Users size={20} />,
       visible: permissions.includes("employee:read:all"),
+    },
+    {
+      id: "licenses",
+      path: "/licenses",
+      label: "Licenses",
+      icon: <DollarSign size={20} />,
+      visible: permissions.includes("license:manage"),
     },
     {
       id: "managed-accounts",

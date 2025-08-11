@@ -16,6 +16,7 @@ const managedAccountRoutes = require("./api/routes/managedAccount");
 const { schedulePlatformSync } = require("./cron/platformSync");
 const syncRoutes = require("./api/routes/sync");
 const db = require("./config/db");
+const licenseRoutes = require("./api/routes/licenses");
 
 const app = express();
 app.set("trust proxy", 1);
@@ -75,6 +76,7 @@ app.use("/api/users", userRoutes);
 app.use("/api/managed-accounts", managedAccountRoutes);
 app.use("/api/sync", syncRoutes);
 app.use("/api/data-export", dataExportRoutes);
+app.use("/api/licenses", licenseRoutes);
 
 // Global error handler
 app.use((err, req, res, next) => {

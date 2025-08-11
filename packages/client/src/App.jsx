@@ -76,6 +76,11 @@ const SettingsPage = lazy(() =>
 const ManagedAccountsPage = lazy(() =>
   import("./pages/ManagedAccounts/ManagedAccountsPage")
 );
+const LicensesPage = lazy(() =>
+  import("./pages/LicensesPage").then((module) => ({
+    default: module.LicensesPage,
+  }))
+);
 
 const fetchMe = async () => {
   const { data } = await api.get("/api/auth/me");
@@ -244,7 +249,16 @@ const AppContent = () => {
               }
             />
           </Route>
-
+          <Route element={<ProtectedRoute permission="license:manage" />}>
+            <Route
+              path="/licenses"
+              element={
+                <Suspense fallback={<EmployeeListSkeleton count={8} />}>
+                  <LicensesPage />
+                </Suspense>
+              }
+            />
+          </Route>
           <Route
             path="/profile"
             element={
