@@ -12,7 +12,8 @@ const getLicenses = async (req, res, next) => {
 const updateCost = async (req, res, next) => {
   try {
     const { applicationId } = req.params;
-    const { cost, tier } = req.body;
+    // FIX 1: Correctly read `total_seats` from the request body.
+    const { cost, total_seats, tier } = req.body;
     const actorId = req.user.id;
     const reqContext = { ip: req.ip, userAgent: req.headers["user-agent"] };
 
@@ -20,10 +21,12 @@ const updateCost = async (req, res, next) => {
       return res.status(400).json({ message: "A valid cost is required." });
     }
 
+    // FIX 2: Pass all arguments in the correct order to the service.
     const updatedLicense = await licenseService.updateLicenseCost(
       parseInt(applicationId, 10),
       parseFloat(cost),
-      tier,
+      total_seats !== undefined ? parseInt(total_seats, 10) : null, // Pass total_seats
+      tier, // Pass the tier
       actorId,
       reqContext
     );

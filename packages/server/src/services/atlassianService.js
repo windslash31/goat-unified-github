@@ -3,6 +3,7 @@ const axios = require("axios");
 const config = require("../config/config");
 const db = require("../config/db");
 const { startJob, updateProgress, finishJob } = require("./syncLogService");
+const { reconcileLicenseAssignments } = require("./licenseService"); // Import our helper
 
 const getUserStatus = async (email) => {
   if (
@@ -1420,6 +1421,132 @@ const syncAllAtlassianData = async () => {
   }
 };
 
+const syncAtlassianLicenses = async (client) => {
+  console.log(
+    "SYNC: Starting Atlassian license reconciliation from local DB..."
+  );
+
+  const productsToSync = {
+    "Jira Software": "jira-software",
+    "Jira Service Management": "jira-service-desk",
+    Confluence: "confluence",
+  };
+
+  for (const [appName, productKey] of Object.entries(productsToSync)) {
+    const appResult = await client.query(
+      "SELECT id FROM managed_applications WHERE name = $1",
+      [appName]
+    );
+    if (appResult.rows.length === 0) {
+      console.warn(
+        `SYNC: '${appName}' not found in managed_applications table. Skipping.`
+      );
+      continue;
+    }
+    const appId = appResult.rows[0].id;
+
+    // --- THIS IS THE FIX ---
+    // This new query correctly expands the JSON array and checks the 'key' property of each element.
+    const licensedUsersResult = await client.query(
+      `SELECT DISTINCT u.email_address
+           FROM atlassian_users u,
+                jsonb_array_elements(u.product_access) AS product
+           WHERE product->>'key' = $1`,
+      [productKey]
+    );
+    // --- END OF FIX ---
+
+    const licensedEmails = licensedUsersResult.rows.map(
+      (user) => user.email_address
+    );
+
+    await reconcileLicenseAssignments(appId, licensedEmails, client);
+  }
+
+  console.log("SYNC: Atlassian license reconciliation complete.");
+};
+
+const syncAtlassianLicenseCounts = async (client) => {
+  console.log("SYNC: Starting Atlassian license count sync...");
+  const jiraHeaders = {
+    Authorization: `Basic ${Buffer.from(
+      `${config.atlassian.apiUser}:${config.atlassian.apiToken}`
+    ).toString("base64")}`,
+    Accept: "application/json",
+  };
+
+  try {
+    // --- Sync Jira Products (JSM & Jira Software) ---
+    const jiraUrl = `https://${config.atlassian.domain}/rest/api/2/applicationrole`;
+    const jiraResponse = await fetch(jiraUrl, { headers: jiraHeaders });
+    if (jiraResponse.ok) {
+      const jiraLicenseData = await jiraResponse.json();
+      for (const product of jiraLicenseData) {
+        let appName = null;
+        if (product.key === "jira-software") appName = "Jira Software";
+        if (product.key === "jira-servicedesk")
+          appName = "Jira Service Management";
+
+        if (appName && product.numberOfSeats) {
+          const appResult = await client.query(
+            "SELECT id FROM managed_applications WHERE name = $1",
+            [appName]
+          );
+          if (appResult.rows.length > 0) {
+            await client.query(
+              `INSERT INTO license_costs (application_id, license_tier, monthly_cost_decimal, total_seats)
+                          VALUES ($1, 'STANDARD', 0, $2)
+                          ON CONFLICT (application_id, license_tier) DO UPDATE SET
+                             total_seats = EXCLUDED.total_seats,
+                             updated_at = NOW()`,
+              [appResult.rows[0].id, product.numberOfSeats]
+            );
+            console.log(
+              `SYNC: Updated ${appName} total seats to ${product.numberOfSeats}.`
+            );
+          }
+        }
+      }
+    } else {
+      console.error(
+        `SYNC: Failed to fetch Jira license data. Status: ${jiraResponse.status}`
+      );
+    }
+
+    // --- Sync Confluence ---
+    const confluenceUrl = `https://${config.atlassian.domain}/wiki/rest/license/1.0/license/maxUsers`;
+    const confluenceResponse = await fetch(confluenceUrl, {
+      headers: jiraHeaders,
+    });
+    if (confluenceResponse.ok) {
+      // FIX IS HERE: We now parse the JSON and then access the .count property
+      const licenseInfo = await confluenceResponse.json();
+      const maxUsers = licenseInfo.count;
+
+      const appResult = await client.query(
+        "SELECT id FROM managed_applications WHERE name = 'Confluence'"
+      );
+      if (appResult.rows.length > 0) {
+        await client.query(
+          `INSERT INTO license_costs (application_id, total_seats, monthly_cost_decimal) VALUES ($1, $2, 0)
+                   ON CONFLICT (application_id, license_tier) DO UPDATE SET total_seats = EXCLUDED.total_seats, updated_at = NOW()`,
+          [appResult.rows[0].id, maxUsers] // Use the extracted number
+        );
+        console.log(`SYNC: Updated Confluence total seats to ${maxUsers}.`);
+      }
+    } else {
+      console.error(
+        `SYNC: Failed to fetch Confluence license data. Status: ${confluenceResponse.status}`
+      );
+    }
+  } catch (error) {
+    console.error(
+      "SYNC: An error occurred during Atlassian license count sync:",
+      error
+    );
+  }
+};
+
 module.exports = {
   getUserStatus,
   deactivateUser,
@@ -1438,4 +1565,6 @@ module.exports = {
   syncAllConfluencePermissions,
   syncConfluenceUsersFromAtlassian,
   syncAllAtlassianData,
+  syncAtlassianLicenses,
+  syncAtlassianLicenseCounts,
 };

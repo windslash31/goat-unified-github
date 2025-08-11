@@ -24,9 +24,11 @@ module.exports = {
     clientSecret: process.env.GOOGLE_CLIENT_SECRET,
     refreshToken: process.env.GOOGLE_REFRESH_TOKEN,
     customerId: process.env.GOOGLE_CUSTOMER_ID,
+    domain: process.env.GOOGLE_DOMAIN,
   },
   slack: {
     botToken: process.env.SLACK_BOT_TOKEN,
+    teamId: process.env.SLACK_TEAM_ID,
   },
   jumpcloud: {
     apiKey: process.env.JUMPCLOUD_API_KEY,

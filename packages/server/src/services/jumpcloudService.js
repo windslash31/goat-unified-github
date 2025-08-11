@@ -3,6 +3,7 @@ const db = require("../config/db");
 
 const BASE_URL = "https://console.jumpcloud.com/api";
 const API_KEY = process.env.JUMPCLOUD_API_KEY;
+const { reconcileLicenseAssignments } = require("./licenseService");
 
 const fetchAllJumpCloudUsers = async () => {
   if (!API_KEY) throw new Error("JumpCloud API key is not configured.");
@@ -553,6 +554,35 @@ const syncAllJumpCloudGroupMembers = async () => {
   }
 };
 
+const syncJumpCloudLicenses = async (client) => {
+  console.log("SYNC: Starting JumpCloud license reconciliation...");
+  const jcAppResult = await client.query(
+    "SELECT id FROM managed_applications WHERE name = 'JumpCloud'"
+  );
+  if (jcAppResult.rows.length === 0) {
+    console.warn(
+      "SYNC: 'JumpCloud' not found in managed_applications table. Skipping license sync."
+    );
+    return;
+  }
+  const jumpcloudApplicationId = jcAppResult.rows[0].id;
+
+  // We can reuse the existing function that fetches all users
+  const allUsers = await fetchAllJumpCloudUsers();
+
+  // Per your rule, all non-deleted (active or suspended) users are licensed.
+  // The `fetchAllJumpCloudUsers` function already returns only non-deleted users.
+  const licensedEmails = allUsers.map((user) => user.email).filter(Boolean);
+
+  // Call the central reconciliation function
+  await reconcileLicenseAssignments(
+    jumpcloudApplicationId,
+    licensedEmails,
+    client
+  );
+  console.log("SYNC: JumpCloud license reconciliation complete.");
+};
+
 module.exports = {
   suspendUser,
   getUserStatus,
@@ -564,4 +594,5 @@ module.exports = {
   syncAllJumpCloudGroupAssociations,
   syncAllJumpCloudGroupMembers,
   syncUserData,
+  syncJumpCloudLicenses,
 };

@@ -1,5 +1,7 @@
 const { WebClient } = require("@slack/web-api");
 const db = require("../config/db");
+const config = require("../config/config");
+const { reconcileLicenseAssignments } = require("./licenseService");
 
 let web;
 const getWebClient = () => {
@@ -183,9 +185,118 @@ const syncUserData = async (employeeId, email) => {
   }
 };
 
+const syncSlackLicenses = async (client) => {
+  console.log("SYNC: Starting Slack license reconciliation...");
+  const slackAppResult = await client.query(
+    "SELECT id FROM managed_applications WHERE name = 'Slack'"
+  );
+  if (slackAppResult.rows.length === 0) {
+    console.warn(
+      "SYNC: 'Slack' not found in managed_applications table. Skipping license sync."
+    );
+    return;
+  }
+  const slackApplicationId = slackAppResult.rows[0].id;
+
+  const webClient = getWebClient();
+  let allUsers = [];
+  let cursor;
+
+  // Paginate through all users in the Slack workspace
+  do {
+    const page = await webClient.users.list({ cursor, limit: 200 });
+    allUsers.push(...page.members);
+    cursor = page.response_metadata?.next_cursor;
+  } while (cursor);
+
+  // Filter for licensed users based on your rule
+  const licensedUsers = allUsers.filter(
+    (user) => !user.is_bot && !user.deleted && !user.is_ultra_restricted
+  );
+  const licensedEmails = licensedUsers
+    .map((user) => user.profile.email)
+    .filter(Boolean);
+
+  // Call the central reconciliation function
+  await reconcileLicenseAssignments(slackApplicationId, licensedEmails, client);
+  console.log("SYNC: Slack license reconciliation complete.");
+};
+
+const syncAllSlackData = async (client) => {
+  console.log("SYNC: Starting full Slack user and license sync...");
+  const slackAppResult = await client.query(
+    "SELECT id FROM managed_applications WHERE name = 'Slack'"
+  );
+  if (slackAppResult.rows.length === 0) {
+    console.warn(
+      "SYNC: 'Slack' not found in managed_applications. Skipping sync."
+    );
+    return;
+  }
+  const slackApplicationId = slackAppResult.rows[0].id;
+
+  const webClient = getWebClient();
+  let allUsers = [];
+  let cursor;
+
+  do {
+    const page = await webClient.users.list({
+      cursor,
+      limit: 200,
+      team_id: config.slack.teamId,
+    });
+    if (page.members) {
+      allUsers.push(...page.members);
+    }
+    cursor = page.response_metadata?.next_cursor;
+  } while (cursor);
+
+  const activeUsers = allUsers.filter((user) => !user.is_bot && !user.deleted);
+
+  if (activeUsers.length === 0) {
+    console.log("SYNC: No active users found in Slack to sync.");
+    return;
+  }
+
+  for (const user of activeUsers) {
+    // This is the same logic as syncUserData, but performed in a loop
+    const query = `
+        INSERT INTO slack_users (
+          user_id, email, status, is_admin, is_owner, 
+          is_restricted, is_ultra_restricted, last_synced_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+        ON CONFLICT (user_id) DO UPDATE SET
+          email = EXCLUDED.email, status = EXCLUDED.status,
+          is_admin = EXCLUDED.is_admin, is_owner = EXCLUDED.is_owner,
+          is_restricted = EXCLUDED.is_restricted, is_ultra_restricted = EXCLUDED.is_ultra_restricted,
+          last_synced_at = NOW();
+      `;
+    const values = [
+      user.id,
+      user.profile.email,
+      user.deleted ? "Suspended" : "Active",
+      user.is_admin,
+      user.is_owner,
+      user.is_restricted,
+      user.is_ultra_restricted,
+    ];
+    await client.query(query, values);
+  }
+  console.log(`SYNC: Synced details for ${activeUsers.length} Slack users.`);
+
+  const licensedUsers = activeUsers.filter((user) => !user.is_ultra_restricted);
+  const licensedEmails = licensedUsers
+    .map((user) => user.profile.email)
+    .filter(Boolean);
+  await reconcileLicenseAssignments(slackApplicationId, licensedEmails, client);
+  console.log("SYNC: Slack license reconciliation complete.");
+};
+
 module.exports = {
   getUserStatus,
   deactivateUser,
   getAuditLogs,
   syncUserData,
+  syncSlackLicenses,
+  syncAllSlackData,
 };

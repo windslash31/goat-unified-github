@@ -110,26 +110,43 @@ const runAllSyncs = async () => {
   }
   isMasterSyncRunning = true;
   console.log("CRON JOB: Starting master sync job for all platforms...");
-
+  const client = await db.pool.connect();
   try {
-    // Run all syncs sequentially
-    await syncAllJumpCloudData();
-    await atlassianService.syncAllAtlassianData();
-    await runIndividualUserSync("google_sync", googleService.syncUserData);
-    await runIndividualUserSync("slack_sync", slackService.syncUserData);
+    await client.query("BEGIN");
+
+    // STEP 1: Sync core user data and licenses from all platforms
+    console.log(
+      "CRON JOB: Starting core data sync and license reconciliation phase..."
+    );
+    // These functions now handle both user data and license assignments
+    await googleService.syncAllGoogleData(client);
+    await slackService.syncAllSlackData(client);
+    // The Atlassian and JumpCloud syncs are already doing a full user sync, so we just add the license part
+    await atlassianService.syncAllAtlassianData(); // This already syncs users
+    await atlassianService.syncAtlassianLicenses(client); // This reconciles licenses
+    await syncAllJumpCloudData(); // This already syncs users
+    await jumpcloudService.syncJumpCloudLicenses(client); // This reconciles licenses
+
+    // STEP 2: Sync special data like total license counts
+    console.log("CRON JOB: Starting special data sync phase...");
+    await atlassianService.syncAtlassianLicenseCounts(client);
+
+    await client.query("COMMIT");
   } catch (error) {
+    await client.query("ROLLBACK");
     console.error(
-      "CRON JOB: Master sync stopped due to a failure in a sub-process.",
-      error // We are adding the error object here
+      "CRON JOB: Master sync stopped due to a failure. Transaction rolled back.",
+      error
     );
   } finally {
     isMasterSyncRunning = false;
+    client.release();
     console.log("CRON JOB: Master sync job complete. Releasing lock.");
   }
 };
 
 const schedulePlatformSync = () => {
-  cron.schedule("* 2 * * *", runAllSyncs, {
+  cron.schedule("* * * * *", runAllSyncs, {
     scheduled: true,
     timezone: "Asia/Jakarta",
   });
