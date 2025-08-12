@@ -11,11 +11,18 @@ const listAllApplications = async (req, res, next) => {
 
 const createApplication = async (req, res, next) => {
   try {
-    const { name } = req.body;
-    if (!name) {
-      return res.status(400).json({ message: "Application name is required." });
+    if (!req.body.name || !req.body.type) {
+      return res
+        .status(400)
+        .json({ message: "Application name and type are required." });
     }
-    const newApplication = await applicationService.createApplication(name);
+    const actorId = req.user.id;
+    const reqContext = { ip: req.ip, userAgent: req.headers["user-agent"] };
+    const newApplication = await applicationService.createApplication(
+      req.body,
+      actorId,
+      reqContext
+    );
     res.status(201).json(newApplication);
   } catch (error) {
     next(error);
@@ -25,13 +32,18 @@ const createApplication = async (req, res, next) => {
 const updateApplication = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { name } = req.body;
-    if (!name) {
-      return res.status(400).json({ message: "Application name is required." });
+    if (!req.body.name || !req.body.type) {
+      return res
+        .status(400)
+        .json({ message: "Application name and type are required." });
     }
+    const actorId = req.user.id;
+    const reqContext = { ip: req.ip, userAgent: req.headers["user-agent"] };
     const updatedApplication = await applicationService.updateApplication(
       id,
-      name
+      req.body,
+      actorId,
+      reqContext
     );
     res.json(updatedApplication);
   } catch (error) {
@@ -42,8 +54,10 @@ const updateApplication = async (req, res, next) => {
 const deleteApplication = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const result = await applicationService.deleteApplication(id);
-    res.json(result);
+    const actorId = req.user.id;
+    const reqContext = { ip: req.ip, userAgent: req.headers["user-agent"] };
+    await applicationService.deleteApplication(id, actorId, reqContext);
+    res.status(204).send();
   } catch (error) {
     next(error);
   }

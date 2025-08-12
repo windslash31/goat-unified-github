@@ -4,14 +4,11 @@ const { logActivity } = require("./logService");
 /**
  * Gets a list of all managed applications with their license costs and user counts.
  */
+// packages/server/src/services/licenseService.js
 const getLicenseData = async () => {
   const query = `
       SELECT
-          ma.id,
-          ma.name,
-          ma.description,
-          ma.category,
-          ma.type, -- THIS LINE WAS MISSING
+          ma.id, ma.name, ma.description, ma.category, ma.type,
           COALESCE(lc.license_tier, 'STANDARD') as license_tier,
           COALESCE(lc.monthly_cost_decimal, 0.00) as cost_per_seat_monthly,
           COALESCE(lc.currency, 'USD') as currency,
@@ -19,14 +16,12 @@ const getLicenseData = async () => {
           COUNT(la.id) as assigned_seats
       FROM
           managed_applications ma
-      LEFT JOIN
-          license_costs lc ON ma.id = lc.application_id
-      LEFT JOIN
-          license_assignments la ON ma.id = la.application_id
+      LEFT JOIN license_costs lc ON ma.id = lc.application_id
+      LEFT JOIN license_assignments la ON ma.id = la.application_id
+      WHERE ma.is_licensable = TRUE -- ADD THIS LINE TO FILTER
       GROUP BY
-          ma.id, ma.name, ma.description, ma.category, ma.type, lc.license_tier, lc.monthly_cost_decimal, lc.currency, lc.total_seats -- THE 'ma.type' WAS MISSING HERE TOO
-      ORDER BY
-          ma.name;
+          ma.id, ma.name, ma.description, ma.category, ma.type, lc.license_tier, lc.monthly_cost_decimal, lc.currency, lc.total_seats
+      ORDER BY ma.name;
     `;
   const result = await db.query(query);
   return result.rows;

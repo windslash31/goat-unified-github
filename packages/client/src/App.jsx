@@ -1,6 +1,7 @@
 import React, { Suspense, lazy, useCallback, useEffect } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query"; // Added useMutation
 import { Routes, Route, useLocation, Navigate } from "react-router-dom";
+import toast from "react-hot-toast"; // Added for mutation feedback
 import { BreadcrumbProvider, useBreadcrumb } from "./context/BreadcrumbContext";
 import { ThemeProvider } from "./context/ThemeContext";
 import { MainLayout } from "./components/layout/MainLayout";
@@ -11,6 +12,10 @@ import { useAuthStore } from "./stores/authStore";
 import { useModalStore } from "./stores/modalStore";
 import { ProtectedRoute } from "./components/auth/ProtectedRoute";
 import api from "./api/api";
+
+// --- ADDED: Imports for the new modals ---
+import { ApplicationFormModal } from "./components/ui/ApplicationFormModal";
+import { ConfirmationModal } from "./components/ui/ConfirmationModal";
 
 import { DashboardSkeleton } from "./components/ui/DashboardSkeleton";
 import { EmployeeDetailSkeleton } from "./components/ui/EmployeeDetailSkeleton";
@@ -40,13 +45,11 @@ const EmployeeDetailPage = lazy(() =>
     default: module.EmployeeDetailPage,
   }))
 );
-
 const ApplicationManagementPage = lazy(() =>
   import("./pages/ApplicationManagementPage").then((module) => ({
     default: module.ApplicationManagementPage,
   }))
 );
-
 const ProfilePage = lazy(() =>
   import("./pages/ProfilePage").then((module) => ({
     default: module.ProfilePage,
@@ -72,16 +75,15 @@ const SettingsPage = lazy(() =>
     default: module.SettingsPage,
   }))
 );
-
 const ManagedAccountsPage = lazy(() =>
   import("./pages/ManagedAccounts/ManagedAccountsPage")
 );
+
 const LicensesPage = lazy(() =>
   import("./pages/LicensesPage").then((module) => ({
     default: module.LicensesPage,
   }))
 );
-
 const fetchMe = async () => {
   const { data } = await api.get("/api/auth/me");
   return data;
@@ -96,6 +98,40 @@ const AppContent = () => {
 
   const location = useLocation();
   const queryClient = useQueryClient();
+
+  // --- ADDED: Mutation handlers for the new modals ---
+  const saveApplicationMutation = useMutation({
+    mutationFn: (appData) => {
+      if (appData.id) {
+        return api.put(`/api/applications/${appData.id}`, appData);
+      } else {
+        return api.post("/api/applications", appData);
+      }
+    },
+    onSuccess: () => {
+      toast.success(`Application successfully saved!`);
+      queryClient.invalidateQueries({ queryKey: ["applications"] });
+      closeModal();
+    },
+    onError: (err) =>
+      toast.error(err.response?.data?.message || "An error occurred."),
+  });
+
+  const deleteApplicationMutation = useMutation({
+    mutationFn: (appId) => api.delete(`/api/applications/${appId}`),
+    onSuccess: () => {
+      toast.success("Application deleted!");
+      queryClient.invalidateQueries({ queryKey: ["applications"] });
+      closeModal();
+    },
+    onError: (err) =>
+      toast.error(err.response?.data?.message || "Failed to delete."),
+  });
+
+  const handleSaveApplication = (appData) =>
+    saveApplicationMutation.mutate(appData);
+  const handleDeleteApplication = () =>
+    deleteApplicationMutation.mutate(modalData.id);
 
   useEffect(() => {
     fetchUser();
@@ -184,7 +220,6 @@ const AppContent = () => {
         path: "/managed-accounts",
       },
     };
-
     const crumbs = pathParts.reduce((acc, part) => {
       const mappedCrumb = pageTitleMap[part];
       if (mappedCrumb && mappedCrumb.path) {
@@ -192,7 +227,6 @@ const AppContent = () => {
       }
       return acc;
     }, []);
-
     const finalCrumbs =
       dynamicCrumbs.length > 0
         ? [homeCrumb, ...dynamicCrumbs]
@@ -249,16 +283,7 @@ const AppContent = () => {
               }
             />
           </Route>
-          <Route element={<ProtectedRoute permission="license:manage" />}>
-            <Route
-              path="/licenses"
-              element={
-                <Suspense fallback={<EmployeeListSkeleton count={8} />}>
-                  <LicensesPage />
-                </Suspense>
-              }
-            />
-          </Route>
+
           <Route
             path="/profile"
             element={
@@ -300,6 +325,17 @@ const AppContent = () => {
               element={
                 <Suspense fallback={<EmployeeListSkeleton count={5} />}>
                   <ManagedAccountsPage />
+                </Suspense>
+              }
+            />
+          </Route>
+
+          <Route element={<ProtectedRoute permission="license:manage" />}>
+            <Route
+              path="/licenses"
+              element={
+                <Suspense fallback={<EmployeeListSkeleton count={8} />}>
+                  <LicensesPage />
                 </Suspense>
               }
             />
@@ -388,6 +424,26 @@ const AppContent = () => {
           employee={modalData}
           onClose={closeModal}
           onDeactivateSuccess={handleDeactivateSuccess}
+        />
+      )}
+
+      {/* --- ADDED: Conditional rendering for the new modals --- */}
+      {modal === "applicationForm" && (
+        <ApplicationFormModal
+          app={modalData}
+          onClose={closeModal}
+          onSave={handleSaveApplication}
+          isSaving={saveApplicationMutation.isPending}
+        />
+      )}
+      {modal === "deleteApplication" && (
+        <ConfirmationModal
+          isOpen={true}
+          onClose={closeModal}
+          onConfirm={handleDeleteApplication}
+          title="Delete Application"
+          message={`Are you sure you want to delete "${modalData.name}"? This cannot be undone.`}
+          confirmationText={modalData.name}
         />
       )}
     </>
