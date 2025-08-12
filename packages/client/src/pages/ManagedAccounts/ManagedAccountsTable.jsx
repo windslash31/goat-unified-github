@@ -1,8 +1,13 @@
 import React from "react";
-import { UserCog, Edit, Trash2 } from "lucide-react";
+import { UserCog, Edit, Trash2, KeyRound } from "lucide-react";
 import { Button } from "../../components/ui/Button";
 
-const ManagedAccountsTable = ({ accounts, onEdit, onDelete }) => {
+const ManagedAccountsTable = ({
+  accounts,
+  onEdit,
+  onDelete,
+  onViewLicenses,
+}) => {
   if (!accounts || accounts.length === 0) {
     return (
       <div className="text-center py-16 text-gray-500 dark:text-gray-400 border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-lg">
@@ -81,6 +86,14 @@ const ManagedAccountsTable = ({ accounts, onEdit, onDelete }) => {
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                   <div className="flex items-center justify-end gap-x-2">
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => onViewLicenses(acc)}
+                      title="View Licenses"
+                    >
+                      <KeyRound size={14} />
+                    </Button>
                     <Button
                       variant="secondary"
                       size="sm"

@@ -128,4 +128,63 @@ const removeAssignment = async (assignmentId, actorId, reqContext) => {
   }
 };
 
-module.exports = { getUnassignedPrincipals, addAssignment, removeAssignment };
+const addAssignmentByName = async (assignmentData, actorId, reqContext) => {
+  const { applicationName, principalIdentifier, principalType } =
+    assignmentData;
+
+  // 1. Find the application ID from its name
+  const appRes = await db.query(
+    "SELECT id FROM managed_applications WHERE name ILIKE $1",
+    [applicationName]
+  );
+  if (appRes.rows.length === 0) {
+    throw new Error(`Application with name "${applicationName}" not found.`);
+  }
+  const applicationId = appRes.rows[0].id;
+
+  // 2. Find the principal ID from its identifier and type
+  let principalId;
+  if (principalType === "EMPLOYEE") {
+    const empRes = await db.query(
+      "SELECT id FROM employees WHERE employee_email ILIKE $1",
+      [principalIdentifier]
+    );
+    if (empRes.rows.length === 0) {
+      throw new Error(
+        `Employee with email "${principalIdentifier}" not found.`
+      );
+    }
+    principalId = empRes.rows[0].id;
+  } else if (principalType === "MANAGED_ACCOUNT") {
+    const accRes = await db.query(
+      "SELECT id FROM managed_accounts WHERE account_identifier ILIKE $1",
+      [principalIdentifier]
+    );
+    if (accRes.rows.length === 0) {
+      throw new Error(
+        `Managed Account with identifier "${principalIdentifier}" not found.`
+      );
+    }
+    principalId = accRes.rows[0].id;
+  } else {
+    throw new Error(
+      `Invalid principalType: "${principalType}". Must be EMPLOYEE or MANAGED_ACCOUNT.`
+    );
+  }
+
+  // 3. Call the existing ID-based function to create the assignment
+  return addAssignment(
+    applicationId,
+    principalId,
+    principalType,
+    actorId,
+    reqContext
+  );
+};
+
+module.exports = {
+  getUnassignedPrincipals,
+  addAssignment,
+  removeAssignment,
+  addAssignmentByName, // Export the new function
+};

@@ -180,6 +180,20 @@ router.get(
   employeeController.getEmployeeDevices
 );
 
+router.get(
+  "/:id/licenses",
+  authenticateToken,
+  authorizeAdminOrSelf,
+  employeeController.getLicenseDetails
+);
+
+router.get(
+  "/:id/assignments",
+  authenticateToken,
+  authorizeAdminOrSelf,
+  employeeController.getEmployeeAssignments
+);
+
 router.post(
   "/trigger-sync",
   // We will secure this in the Cloud Run settings, so no specific middleware is needed here.

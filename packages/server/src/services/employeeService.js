@@ -1424,6 +1424,22 @@ const getApplicationAccess = async (employeeId) => {
   }
 };
 
+const getAssignmentsForEmployee = async (employeeId) => {
+  const query = `
+    SELECT
+        la.id as assignment_id,
+        ma.name as application_name,
+        ma.category as application_category,
+        la.source
+    FROM license_assignments la
+    JOIN managed_applications ma ON la.application_id = ma.id
+    WHERE la.principal_id = $1 AND la.principal_type = 'EMPLOYEE'
+    ORDER BY ma.name;
+  `;
+  const result = await db.query(query, [employeeId]);
+  return result.rows;
+};
+
 module.exports = {
   getEmployeeById,
   getEmployees,
@@ -1447,4 +1463,5 @@ module.exports = {
   getApplicationAccess,
   syncPlatformStatus,
   forceSyncPlatformStatus,
+  getAssignmentsForEmployee,
 };

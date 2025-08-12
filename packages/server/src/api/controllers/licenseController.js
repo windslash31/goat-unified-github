@@ -44,8 +44,29 @@ const getApplicationAssignments = async (req, res, next) => {
   }
 };
 
+const createAssignmentByName = async (req, res, next) => {
+  try {
+    const { applicationName, principalIdentifier, principalType } = req.body;
+    const actorId = req.user.id;
+    const reqContext = { ip: req.ip, userAgent: req.headers["user-agent"] };
+
+    const newAssignment = await assignmentService.addAssignmentByName(
+      { applicationName, principalIdentifier, principalType },
+      actorId,
+      reqContext
+    );
+    res.status(201).json(newAssignment);
+  } catch (error) {
+    if (error.message.includes("not found")) {
+      return res.status(404).json({ message: error.message });
+    }
+    next(error);
+  }
+};
+
 module.exports = {
   getLicenses,
   updateCost,
   getApplicationAssignments,
+  createAssignmentByName,
 };

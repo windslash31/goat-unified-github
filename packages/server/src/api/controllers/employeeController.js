@@ -407,6 +407,18 @@ const getEmployeeApplicationAccess = async (req, res, next) => {
   }
 };
 
+const getEmployeeAssignments = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const assignments = await employeeService.getAssignmentsForEmployee(
+      parseInt(id, 10)
+    );
+    res.json(assignments);
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   listEmployees,
   getEmployee,
@@ -432,4 +444,5 @@ module.exports = {
   triggerPlatformSync,
   getEmployeeAtlassianAccess,
   getEmployeeApplicationAccess,
+  getEmployeeAssignments,
 };

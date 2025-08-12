@@ -4,6 +4,7 @@ const licenseController = require("../controllers/licenseController");
 const {
   authenticateToken,
   authorize,
+  authenticateApiKey,
 } = require("../middleware/authMiddleware");
 
 router.get(
@@ -25,6 +26,13 @@ router.put(
   authenticateToken,
   authorize("license:manage"),
   licenseController.updateCost
+);
+
+router.post(
+  "/assignments",
+  authenticateApiKey,
+  authorize("license:manage"),
+  licenseController.createAssignmentByName
 );
 
 module.exports = router;

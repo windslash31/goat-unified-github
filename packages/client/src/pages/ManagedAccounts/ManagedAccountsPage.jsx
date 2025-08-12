@@ -11,6 +11,7 @@ import { Button } from "../../components/ui/Button";
 import { EmployeeListSkeleton } from "../../components/ui/EmployeeListSkeleton";
 import { ConfirmationModal } from "../../components/ui/ConfirmationModal";
 import ManagedAccountFormModal from "./ManagedAccountFormModal";
+import ManagedAccountLicensesModal from "./ManagedAccountLicenseModal";
 
 const fetchManagedAccounts = async () => {
   const { data } = await api.get("/api/managed-accounts");
@@ -94,6 +95,9 @@ const ManagedAccountsPage = () => {
             accounts={accountsData?.data || []}
             onEdit={(account) => openModal("managedAccountForm", account)}
             onDelete={(account) => openModal("deleteManagedAccount", account)}
+            onViewLicenses={(account) =>
+              openModal("viewManagedAccountLicenses", account)
+            }
           />
         )}
       </motion.div>
@@ -119,6 +123,9 @@ const ManagedAccountsPage = () => {
           message={`Are you sure you want to delete the account "${modalData?.name}"? This action cannot be undone.`}
           confirmationText={modalData?.name}
         />
+      )}
+      {modal === "viewManagedAccountLicenses" && (
+        <ManagedAccountLicensesModal account={modalData} onClose={closeModal} />
       )}
     </>
   );

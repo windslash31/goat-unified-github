@@ -47,4 +47,8 @@ const deleteAssignment = async (req, res, next) => {
   }
 };
 
-module.exports = { getUnassigned, createAssignment, deleteAssignment };
+module.exports = {
+  getUnassigned,
+  createAssignment,
+  deleteAssignment,
+};

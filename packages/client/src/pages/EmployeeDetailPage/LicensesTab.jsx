@@ -1,87 +1,26 @@
-// packages/client/src/pages/EmployeeDetailPage/LicensesTab.js
 import React from "react";
 import { useQuery } from "@tanstack/react-query";
 import api from "../../api/api";
-import { CheckCircle, XCircle, AlertTriangle, HelpCircle } from "lucide-react";
+import { Info, Briefcase } from "lucide-react";
+import { EmployeeListSkeleton } from "../../components/ui/EmployeeListSkeleton";
 
-const fetchLicenseDetails = async (employeeId) => {
-  const { data } = await api.get(`/api/employees/${employeeId}/licenses`);
+const fetchEmployeeAssignments = async (employeeId) => {
+  const { data } = await api.get(`/api/employees/${employeeId}/assignments`);
   return data;
-};
-
-const platformDisplayNames = {
-  google: "Google Workspace",
-  jumpcloud: "JumpCloud",
-  slack: "Slack",
-  atlassian: "Atlassian (Jira/Confluence)",
-};
-
-const LicenseStatusIndicator = ({ status }) => {
-  switch (status) {
-    case "Licensed":
-    case "Active":
-      return <CheckCircle className="w-5 h-5 text-green-500" />;
-    case "Not Licensed":
-    case "Suspended":
-    case "Deactivated":
-    case "Inactive":
-      return <XCircle className="w-5 h-5 text-red-500" />;
-    case "Error":
-      return <AlertTriangle className="w-5 h-5 text-yellow-500" />;
-    default:
-      return <HelpCircle className="w-5 h-5 text-gray-400" />;
-  }
-};
-
-const LicenseDetail = ({ platform, license }) => {
-  return (
-    <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-      <div className="flex items-center">
-        <LicenseStatusIndicator status={license.status} />
-        <div className="ml-3">
-          <p className="font-semibold text-gray-800 dark:text-gray-200">
-            {platformDisplayNames[platform]}
-          </p>
-          <p className="text-sm text-gray-600 dark:text-gray-400">
-            {license.status}
-          </p>
-        </div>
-      </div>
-      {license.details && Object.keys(license.details).length > 0 && (
-        <div className="text-right text-sm">
-          {license.details.is_guest && (
-            <span className="font-medium text-blue-500">Guest Account</span>
-          )}
-          {license.details.products &&
-            license.details.products.map((p) => (
-              <div key={p} className="text-gray-500">
-                {p}
-              </div>
-            ))}
-          {Array.isArray(license.details) &&
-            license.details.map((d) => (
-              <div key={d.sku} className="text-gray-500">
-                {d.plan}
-              </div>
-            ))}
-        </div>
-      )}
-    </div>
-  );
 };
 
 export const LicensesTab = ({ employeeId }) => {
   const {
-    data: licenses,
+    data: assignments,
     isLoading,
     error,
   } = useQuery({
-    queryKey: ["employeeLicenses", employeeId],
-    queryFn: () => fetchLicenseDetails(employeeId),
+    queryKey: ["employeeAssignments", employeeId],
+    queryFn: () => fetchEmployeeAssignments(employeeId),
   });
 
   if (isLoading) {
-    return <div className="text-center p-6">Loading license details...</div>;
+    return <EmployeeListSkeleton count={3} />;
   }
 
   if (error) {
@@ -92,15 +31,50 @@ export const LicensesTab = ({ employeeId }) => {
     );
   }
 
+  if (!assignments || assignments.length === 0) {
+    return (
+      <div className="text-center p-8 text-gray-500">
+        <Info className="mx-auto w-12 h-12 text-gray-400" />
+        <p className="mt-4 font-semibold">No Licensed Applications Found</p>
+        <p className="text-sm">
+          This employee has no paid licenses assigned from the central tracking
+          system.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-2xl mx-auto">
       <div className="space-y-4">
-        {licenses.map((license) => (
-          <LicenseDetail
-            key={license.platform}
-            platform={license.platform}
-            license={license}
-          />
+        {assignments.map((assignment) => (
+          <div
+            key={assignment.assignment_id}
+            className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg border dark:border-gray-700"
+          >
+            <div className="flex items-center gap-4">
+              <Briefcase className="w-5 h-5 text-gray-500" />
+              <div>
+                <p className="font-semibold text-gray-800 dark:text-gray-200">
+                  {assignment.application_name}
+                </p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  {assignment.application_category}
+                </p>
+              </div>
+            </div>
+            <span
+              className={`text-xs px-2 py-1 rounded-full font-medium ${
+                assignment.source === "MANUAL"
+                  ? "bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300"
+                  : "bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300"
+              }`}
+            >
+              {assignment.source === "MANUAL"
+                ? "Manual Assignment"
+                : "Automated Sync"}
+            </span>
+          </div>
         ))}
       </div>
     </div>
