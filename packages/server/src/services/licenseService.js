@@ -1,10 +1,6 @@
 const db = require("../config/db");
 const { logActivity } = require("./logService");
 
-/**
- * Gets a list of all managed applications with their license costs and user counts.
- */
-// packages/server/src/services/licenseService.js
 const getLicenseData = async () => {
   const query = `
       SELECT
@@ -13,59 +9,60 @@ const getLicenseData = async () => {
           COALESCE(lc.monthly_cost_decimal, 0.00) as cost_per_seat_monthly,
           COALESCE(lc.currency, 'USD') as currency,
           COALESCE(lc.total_seats, 0) as total_seats,
+          lc.purchase_date, -- ADD THIS
+          lc.renewal_date,   -- ADD THIS
           COUNT(la.id) as assigned_seats
-      FROM
-          managed_applications ma
+      FROM managed_applications ma
       LEFT JOIN license_costs lc ON ma.id = lc.application_id
       LEFT JOIN license_assignments la ON ma.id = la.application_id
-      WHERE ma.is_licensable = TRUE -- ADD THIS LINE TO FILTER
-      GROUP BY
-          ma.id, ma.name, ma.description, ma.category, ma.type, lc.license_tier, lc.monthly_cost_decimal, lc.currency, lc.total_seats
+      WHERE ma.is_licensable = TRUE
+      GROUP BY ma.id, lc.id -- Group by lc.id to get all fields
       ORDER BY ma.name;
     `;
   const result = await db.query(query);
   return result.rows;
 };
 
-/**
- * Updates the cost and total seats for a given application.
- */
-const updateLicenseCost = async (
-  applicationId,
-  cost,
-  total_seats,
-  tier = "STANDARD",
-  actorId,
-  reqContext
-) => {
+const updateLicenseCost = async (data, actorId, reqContext) => {
+  const {
+    applicationId,
+    cost,
+    total_seats,
+    purchase_date,
+    renewal_date,
+    tier = "STANDARD",
+  } = data;
   const client = await db.pool.connect();
   try {
     await client.query("BEGIN");
 
     const query = `
-        INSERT INTO license_costs (application_id, license_tier, monthly_cost_decimal, total_seats)
-        VALUES ($1, $2, $3, $4)
-        ON CONFLICT (application_id, license_tier) DO UPDATE SET
-            monthly_cost_decimal = EXCLUDED.monthly_cost_decimal,
-            total_seats = EXCLUDED.total_seats,
-            updated_at = NOW()
-        RETURNING *;
-    `;
+          INSERT INTO license_costs (application_id, license_tier, monthly_cost_decimal, total_seats, purchase_date, renewal_date)
+          VALUES ($1, $2, $3, $4, $5, $6)
+          ON CONFLICT (application_id, license_tier) DO UPDATE SET
+              monthly_cost_decimal = EXCLUDED.monthly_cost_decimal,
+              total_seats = EXCLUDED.total_seats,
+              purchase_date = EXCLUDED.purchase_date,
+              renewal_date = EXCLUDED.renewal_date,
+              updated_at = NOW()
+          RETURNING *;
+      `;
     const result = await client.query(query, [
       applicationId,
       tier,
       cost,
       total_seats,
+      purchase_date || null,
+      renewal_date || null,
     ]);
 
+    // This is the corrected, complete logActivity call
     await logActivity(
       actorId,
       "LICENSE_COST_UPDATE",
       {
         applicationId,
-        newCost: cost,
-        newTotalSeats: total_seats,
-        licenseTier: tier,
+        updatedCost: { cost, total_seats, purchase_date, renewal_date },
       },
       reqContext,
       client
@@ -75,7 +72,6 @@ const updateLicenseCost = async (
     return result.rows[0];
   } catch (error) {
     await client.query("ROLLBACK");
-    console.error("Error in updateLicenseCost:", error);
     throw error;
   } finally {
     client.release();

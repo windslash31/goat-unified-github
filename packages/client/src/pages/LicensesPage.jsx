@@ -3,13 +3,13 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import { motion } from "framer-motion";
 import { DollarSign, Edit3, Save, X, Search, Download } from "lucide-react";
-
 import api from "../api/api";
 import { useAuthStore } from "../stores/authStore";
 import { Button } from "../components/ui/Button";
 import { EmployeeListSkeleton } from "../components/ui/EmployeeListSkeleton";
 import { useDebounce } from "../hooks/useDebounce";
 import { AppAssignmentsModal } from "../components/ui/AppAssignmentsModal";
+import { formatDate } from "../utils/formatters";
 
 // --- Helper Functions ---
 const formatCurrency = (value) => {
@@ -40,13 +40,22 @@ const downloadCSV = (data, filename) => {
   URL.revokeObjectURL(link.href);
 };
 
-const fetchLicenseData = async () => {
-  const { data } = await api.get("/api/licenses");
-  return data.filter((app) => app.name !== "Atlassian");
+const formatDateForInput = (dateString) => {
+  if (!dateString) return "";
+  try {
+    return new Date(dateString).toISOString().split("T")[0];
+  } catch (e) {
+    return "";
+  }
 };
 
-const updateLicenseCost = ({ applicationId, cost, total_seats }) => {
-  return api.put(`/api/licenses/${applicationId}`, { cost, total_seats });
+const fetchLicenseData = async () => {
+  const { data } = await api.get("/api/licenses");
+  return data.filter((app) => app.type && app.name !== "Atlassian");
+};
+
+const updateLicenseCost = (data) => {
+  return api.put(`/api/licenses/${data.applicationId}`, data);
 };
 
 export const LicensesPage = () => {
@@ -55,7 +64,7 @@ export const LicensesPage = () => {
   const permissions = user?.permissions || [];
 
   const [editingRowId, setEditingRowId] = useState(null);
-  const [editingData, setEditingData] = useState({ cost: 0, seats: 0 });
+  const [editingData, setEditingData] = useState({});
   const [searchTerm, setSearchTerm] = useState("");
   const [typeFilter, setTypeFilter] = useState("ALL");
   const [selectedApp, setSelectedApp] = useState(null);
@@ -97,15 +106,18 @@ export const LicensesPage = () => {
     setEditingRowId(app.id);
     setEditingData({
       cost: app.cost_per_seat_monthly,
-      seats: app.total_seats,
+      total_seats: app.total_seats,
+      purchase_date: formatDateForInput(app.purchase_date),
+      renewal_date: formatDateForInput(app.renewal_date),
     });
   };
 
   const handleSaveClick = (applicationId) => {
     updateCostMutation({
       applicationId,
+      ...editingData,
       cost: parseFloat(editingData.cost),
-      total_seats: parseInt(editingData.seats, 10),
+      total_seats: parseInt(editingData.total_seats, 10),
     });
   };
 
@@ -191,7 +203,6 @@ export const LicensesPage = () => {
                   <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase">
                     Application
                   </th>
-                  {/* --- NEW COLUMN HEADER --- */}
                   <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase">
                     Type
                   </th>
@@ -208,19 +219,29 @@ export const LicensesPage = () => {
                     Cost/Seat (Mo)
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase">
+                    Purchase Date
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase">
+                    Renewal Date
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-bold text-gray-500 dark:text-gray-400 uppercase">
                     Est. Annual Cost
+                  </th>
+                  {/* --- NEW ACTIONS COLUMN HEADER --- */}
+                  <th className="relative px-6 py-3">
+                    <span className="sr-only">Actions</span>
                   </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                 {filteredData?.map((app) => {
                   const isEditing = editingRowId === app.id;
+                  const annualCost =
+                    app.assigned_seats * app.cost_per_seat_monthly * 12;
                   const utilization =
                     app.total_seats > 0
                       ? (app.assigned_seats / app.total_seats) * 100
                       : 0;
-                  const annualCost =
-                    app.assigned_seats * app.cost_per_seat_monthly * 12;
 
                   return (
                     <tr
@@ -235,7 +256,6 @@ export const LicensesPage = () => {
                           {app.name}
                         </button>
                       </td>
-                      {/* --- NEW TABLE CELL FOR THE TYPE --- */}
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span
                           className={`text-xs px-2 py-1 rounded-full ${
@@ -252,11 +272,11 @@ export const LicensesPage = () => {
                         {isEditing ? (
                           <input
                             type="number"
-                            value={editingData.seats}
+                            value={editingData.total_seats}
                             onChange={(e) =>
                               setEditingData({
                                 ...editingData,
-                                seats: e.target.value,
+                                total_seats: e.target.value,
                               })
                             }
                             className="w-24 px-2 py-1 border rounded-md dark:bg-gray-700 dark:border-gray-600"
@@ -311,37 +331,80 @@ export const LicensesPage = () => {
                         )}
                       </td>
                       <td className="px-6 py-4">
-                        <div className="grid grid-cols-[1fr_auto] items-center gap-4">
-                          <span className="font-semibold text-gray-700 dark:text-gray-300">
-                            {formatCurrency(annualCost)}
+                        {isEditing ? (
+                          <input
+                            type="date"
+                            value={editingData.purchase_date}
+                            onChange={(e) =>
+                              setEditingData({
+                                ...editingData,
+                                purchase_date: e.target.value,
+                              })
+                            }
+                            className="w-36 px-2 py-1 border rounded-md dark:bg-gray-700 dark:border-gray-600"
+                          />
+                        ) : (
+                          <span>
+                            {app.purchase_date
+                              ? formatDate(app.purchase_date)
+                              : "N/A"}
                           </span>
-                          {permissions.includes("license:manage") &&
-                            (isEditing ? (
-                              <div className="flex items-center gap-1">
-                                <Button
-                                  size="sm"
-                                  onClick={() => handleSaveClick(app.id)}
-                                  disabled={isUpdating}
-                                >
-                                  <Save size={14} />
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="secondary"
-                                  onClick={() => setEditingRowId(null)}
-                                >
-                                  <X size={14} />
-                                </Button>
-                              </div>
-                            ) : (
-                              <button
-                                onClick={() => handleEditClick(app)}
-                                className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-600"
+                        )}
+                      </td>
+                      <td className="px-6 py-4">
+                        {isEditing ? (
+                          <input
+                            type="date"
+                            value={editingData.renewal_date}
+                            onChange={(e) =>
+                              setEditingData({
+                                ...editingData,
+                                renewal_date: e.target.value,
+                              })
+                            }
+                            className="w-36 px-2 py-1 border rounded-md dark:bg-gray-700 dark:border-gray-600"
+                          />
+                        ) : (
+                          <span>
+                            {app.renewal_date
+                              ? formatDate(app.renewal_date)
+                              : "N/A"}
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <span className="font-semibold text-gray-700 dark:text-gray-300">
+                          {formatCurrency(annualCost)}
+                        </span>
+                      </td>
+                      {/* --- NEW ACTIONS CELL --- */}
+                      <td className="px-6 py-4 text-right">
+                        {permissions.includes("license:manage") &&
+                          (isEditing ? (
+                            <div className="flex items-center gap-1">
+                              <Button
+                                size="sm"
+                                onClick={() => handleSaveClick(app.id)}
+                                disabled={isUpdating}
                               >
-                                <Edit3 size={14} />
-                              </button>
-                            ))}
-                        </div>
+                                <Save size={14} />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="secondary"
+                                onClick={() => setEditingRowId(null)}
+                              >
+                                <X size={14} />
+                              </Button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => handleEditClick(app)}
+                              className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-600"
+                            >
+                              <Edit3 size={14} />
+                            </button>
+                          ))}
                       </td>
                     </tr>
                   );
