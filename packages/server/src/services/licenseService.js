@@ -164,6 +164,7 @@ const reconcileLicenseAssignments = async (
 const getAssignmentsForApplication = async (applicationId) => {
   const query = `
         SELECT
+            la.id as assignment_id, -- <<< THIS LINE IS THE FIX
             la.principal_type,
             COALESCE(e.first_name || ' ' || e.last_name, ma.name) as principal_name,
             COALESCE(e.employee_email, ma.account_identifier) as principal_identifier
