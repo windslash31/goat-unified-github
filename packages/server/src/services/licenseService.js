@@ -86,44 +86,86 @@ const updateLicenseCost = async (
   }
 };
 
-/**
- * Reconciles license assignments for a given application based on a list of licensed emails.
- * This is the core of the automation.
- * @param {number} applicationId The ID of the application from managed_applications.
- * @param {string[]} licensedUserEmails An array of emails that are currently licensed according to the platform's API.
- * @param {object} client The database client, to run inside a transaction.
- */
 const reconcileLicenseAssignments = async (
   applicationId,
   licensedUserEmails,
   client
 ) => {
-  // Step 1: Get the employee IDs for the licensed emails
+  if (!licensedUserEmails || licensedUserEmails.length === 0) {
+    await client.query(
+      "DELETE FROM license_assignments WHERE application_id = $1",
+      [applicationId]
+    );
+    console.log(
+      `No licensed users found for application ID ${applicationId}. Cleared all assignments.`
+    );
+    return;
+  }
+
+  // Step 1: Find all possible matching principals (both employees and managed accounts)
   const employeeRes = await client.query(
-    "SELECT id FROM employees WHERE employee_email = ANY($1::text[])",
+    "SELECT id, employee_email as email FROM employees WHERE employee_email = ANY($1::text[])",
     [licensedUserEmails]
   );
-  const licensedEmployeeIds = employeeRes.rows.map((emp) => emp.id);
-
-  // Step 2: Delete assignments for employees who are no longer licensed
-  await client.query(
-    `DELETE FROM license_assignments
-         WHERE application_id = $1
-         AND employee_id NOT IN (SELECT unnest($2::int[]))`,
-    [applicationId, licensedEmployeeIds]
+  const managedAccountRes = await client.query(
+    "SELECT id, account_identifier as email FROM managed_accounts WHERE account_identifier = ANY($1::text[])",
+    [licensedUserEmails]
   );
 
-  // Step 3: Insert new assignments for employees who are now licensed (ignoring conflicts for existing ones)
-  if (licensedEmployeeIds.length > 0) {
-    await client.query(
-      `INSERT INTO license_assignments (employee_id, application_id, source)
-             SELECT unnest($1::int[]), $2, 'AUTOMATED_SYNC'
-             ON CONFLICT (employee_id, application_id) DO NOTHING`,
-      [licensedEmployeeIds, applicationId]
-    );
+  // Step 2: Create a map of email -> { id, type } for easy lookup
+  const principalMap = new Map();
+  employeeRes.rows.forEach((e) =>
+    principalMap.set(e.email, { id: e.id, type: "EMPLOYEE" })
+  );
+  managedAccountRes.rows.forEach((m) =>
+    principalMap.set(m.email, { id: m.id, type: "MANAGED_ACCOUNT" })
+  );
+
+  // Step 3: Delete all old assignments for this application
+  await client.query(
+    "DELETE FROM license_assignments WHERE application_id = $1",
+    [applicationId]
+  );
+
+  // Step 4: Prepare the new assignments
+  const insertValues = licensedUserEmails
+    .map((email) => {
+      const principal = principalMap.get(email);
+      // Only create an assignment if we found a matching principal in our DB
+      if (principal) {
+        return {
+          application_id: applicationId,
+          principal_id: principal.id,
+          principal_type: principal.type,
+          source: "AUTOMATED_SYNC",
+        };
+      }
+      return null;
+    })
+    .filter(Boolean); // Filter out any nulls
+
+  if (insertValues.length > 0) {
+    const values = insertValues.map((v) => [
+      v.application_id,
+      v.principal_id,
+      v.principal_type,
+      v.source,
+    ]);
+    const query = `
+            INSERT INTO license_assignments (application_id, principal_id, principal_type, source)
+            SELECT * FROM unnest($1::int[], $2::int[], $3::varchar[], $4::text[])
+        `;
+    const columns = [
+      values.map((v) => v[0]),
+      values.map((v) => v[1]),
+      values.map((v) => v[2]),
+      values.map((v) => v[3]),
+    ];
+    await client.query(query, columns);
   }
+
   console.log(
-    `Reconciled ${licensedEmployeeIds.length} licenses for application ID ${applicationId}.`
+    `Reconciled ${insertValues.length} licenses for application ID ${applicationId}.`
   );
 };
 

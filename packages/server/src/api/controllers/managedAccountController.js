@@ -1,6 +1,6 @@
 const pool = require("../../config/db");
-// ✨ FIX: Import the logActivity service
 const { logActivity } = require("../../services/logService");
+const managedAccountService = require("../../services/managedAccountService");
 
 // ✨ FIX: Define action types for consistency
 const ACTION_TYPES = {
@@ -232,9 +232,22 @@ const deleteManagedAccount = async (req, res) => {
   }
 };
 
+const getAccountLicenses = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const licenses = await managedAccountService.getLicensesForAccount(
+      parseInt(id, 10)
+    );
+    res.json(licenses);
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getAllManagedAccounts,
   createManagedAccount,
   updateManagedAccount,
   deleteManagedAccount,
+  getAccountLicenses,
 };

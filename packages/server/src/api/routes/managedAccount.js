@@ -16,6 +16,13 @@ router.get(
   managedAccountController.getAllManagedAccounts
 );
 
+router.get(
+  "/:id/licenses",
+  authenticateToken,
+  authorize("managed_account:manage"), // Reuse existing permission
+  managedAccountController.getAccountLicenses
+);
+
 // @route   POST /api/managed-accounts
 // @desc    Create a new managed account
 // @access  Private (Requires 'managed_account:manage' permission)
