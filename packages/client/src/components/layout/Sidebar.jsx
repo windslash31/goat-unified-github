@@ -58,18 +58,18 @@ export function Sidebar({ onLogout, isMobileOpen, setMobileOpen }) {
       visible: permissions.includes("employee:read:all"),
     },
     {
-      id: "licenses",
-      path: "/licenses",
-      label: "Licenses",
-      icon: <DollarSign size={20} />,
-      visible: permissions.includes("license:manage"),
-    },
-    {
       id: "managed-accounts",
       path: "/managed-accounts",
       label: "Managed Accounts",
       icon: <UserCog size={20} />,
       visible: permissions.includes("managed_account:manage"),
+    },
+    {
+      id: "licenses",
+      path: "/licenses",
+      label: "Licenses",
+      icon: <DollarSign size={20} />,
+      visible: permissions.includes("license:manage"),
     },
     {
       id: "logs",

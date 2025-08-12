@@ -11,7 +11,7 @@ import { Button } from "../../components/ui/Button";
 import { EmployeeListSkeleton } from "../../components/ui/EmployeeListSkeleton";
 import { ConfirmationModal } from "../../components/ui/ConfirmationModal";
 import ManagedAccountFormModal from "./ManagedAccountFormModal";
-import ManagedAccountLicensesModal from "./ManagedAccountLicenseModal";
+import ManagedAccountDetailModal from "./ManagedAccountDetailModal";
 
 const fetchManagedAccounts = async () => {
   const { data } = await api.get("/api/managed-accounts");
@@ -35,7 +35,7 @@ const ManagedAccountsPage = () => {
     queryFn: fetchManagedAccounts,
   });
 
-  const { mutate: deleteAccountMutation, isPending: isDeleting } = useMutation({
+  const { mutate: deleteAccountMutation } = useMutation({
     mutationFn: deleteAccount,
     onSuccess: () => {
       toast.success("Account deleted successfully!");
@@ -95,14 +95,15 @@ const ManagedAccountsPage = () => {
             accounts={accountsData?.data || []}
             onEdit={(account) => openModal("managedAccountForm", account)}
             onDelete={(account) => openModal("deleteManagedAccount", account)}
-            onViewLicenses={(account) =>
-              openModal("viewManagedAccountLicenses", account)
+            // 👇 2. Pass the correct prop to the table to open the new detail modal
+            onViewDetails={(account) =>
+              openModal("managedAccountDetail", account)
             }
           />
         )}
       </motion.div>
 
-      {/* Modals are now handled here */}
+      {/* Form Modal */}
       {modal === "managedAccountForm" && (
         <ManagedAccountFormModal
           account={modalData}
@@ -114,6 +115,7 @@ const ManagedAccountsPage = () => {
         />
       )}
 
+      {/* Delete Confirmation Modal */}
       {modal === "deleteManagedAccount" && (
         <ConfirmationModal
           isOpen={true}
@@ -124,8 +126,10 @@ const ManagedAccountsPage = () => {
           confirmationText={modalData?.name}
         />
       )}
-      {modal === "viewManagedAccountLicenses" && (
-        <ManagedAccountLicensesModal account={modalData} onClose={closeModal} />
+
+      {/* 👇 3. Add the logic to render the new detail modal */}
+      {modal === "managedAccountDetail" && (
+        <ManagedAccountDetailModal account={modalData} onClose={closeModal} />
       )}
     </>
   );

@@ -1,4 +1,5 @@
 const licenseService = require("../../services/licenseService");
+const assignmentService = require("../../services/licenseAssignmentService");
 
 const getLicenses = async (req, res, next) => {
   try {
@@ -45,6 +46,12 @@ const getApplicationAssignments = async (req, res, next) => {
 };
 
 const createAssignmentByName = async (req, res, next) => {
+  console.log(
+    "✅ AUTOMATION ENDPOINT HIT:",
+    new Date().toISOString(),
+    req.body
+  );
+
   try {
     const { applicationName, principalIdentifier, principalType } = req.body;
     const actorId = req.user.id;
@@ -59,6 +66,9 @@ const createAssignmentByName = async (req, res, next) => {
   } catch (error) {
     if (error.message.includes("not found")) {
       return res.status(404).json({ message: error.message });
+    }
+    if (error.message.includes("already exists")) {
+      return res.status(409).json({ message: error.message }); // 409 Conflict
     }
     next(error);
   }

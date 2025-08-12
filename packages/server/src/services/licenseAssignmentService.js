@@ -23,19 +23,31 @@ const addAssignment = async (
   principalId,
   principalType,
   actorId,
-  reqContext
+  reqContext,
+  source = "MANUAL" // Default to 'MANUAL' for UI-driven actions
 ) => {
   const client = await db.pool.connect();
   try {
     await client.query("BEGIN");
 
-    const result = await client.query(
-      `INSERT INTO license_assignments (application_id, principal_id, principal_type, source)
-             VALUES ($1, $2, $3, 'MANUAL') RETURNING *`,
+    // 1. CHECK FOR DUPLICATES FIRST
+    const existingAssignment = await client.query(
+      `SELECT id FROM license_assignments WHERE application_id = $1 AND principal_id = $2 AND principal_type = $3`,
       [applicationId, principalId, principalType]
     );
 
-    // Get details for a rich log message
+    if (existingAssignment.rows.length > 0) {
+      // Throw a specific error that the controller can catch
+      throw new Error("This license assignment already exists.");
+    }
+
+    // 2. USE THE 'source' PARAMETER IN THE QUERY (THE FIX FOR THE 'MANUAL' BUG)
+    const result = await client.query(
+      `INSERT INTO license_assignments (application_id, principal_id, principal_type, source)
+               VALUES ($1, $2, $3, $4) RETURNING *`,
+      [applicationId, principalId, principalType, source] // Use the source parameter here
+    );
+
     const appRes = await client.query(
       "SELECT name FROM managed_applications WHERE id = $1",
       [applicationId]
@@ -178,7 +190,8 @@ const addAssignmentByName = async (assignmentData, actorId, reqContext) => {
     principalId,
     principalType,
     actorId,
-    reqContext
+    reqContext,
+    "API"
   );
 };
 

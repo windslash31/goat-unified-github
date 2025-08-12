@@ -1,12 +1,12 @@
 import React from "react";
-import { UserCog, Edit, Trash2, KeyRound } from "lucide-react";
+import { UserCog, Edit, Trash2 } from "lucide-react";
 import { Button } from "../../components/ui/Button";
 
 const ManagedAccountsTable = ({
   accounts,
   onEdit,
   onDelete,
-  onViewLicenses,
+  onViewDetails,
 }) => {
   if (!accounts || accounts.length === 0) {
     return (
@@ -63,7 +63,8 @@ const ManagedAccountsTable = ({
             {accounts.map((acc) => (
               <tr
                 key={acc.id}
-                className="hover:bg-gray-50 dark:hover:bg-gray-700/50"
+                onClick={() => onViewDetails(acc)}
+                className="hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer"
               >
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
                   {acc.name}
@@ -85,15 +86,10 @@ const ManagedAccountsTable = ({
                   {acc.status}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                  <div className="flex items-center justify-end gap-x-2">
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => onViewLicenses(acc)}
-                      title="View Licenses"
-                    >
-                      <KeyRound size={14} />
-                    </Button>
+                  <div
+                    className="flex items-center justify-end gap-x-2"
+                    onClick={(e) => e.stopPropagation()}
+                  >
                     <Button
                       variant="secondary"
                       size="sm"

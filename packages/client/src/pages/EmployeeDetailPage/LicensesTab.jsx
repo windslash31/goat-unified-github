@@ -63,15 +63,20 @@ export const LicensesTab = ({ employeeId }) => {
                 </p>
               </div>
             </div>
+            {/* --- THIS IS THE CORRECTED LOGIC FOR THE BADGE --- */}
             <span
               className={`text-xs px-2 py-1 rounded-full font-medium ${
                 assignment.source === "MANUAL"
                   ? "bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300"
+                  : assignment.source === "API"
+                  ? "bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-300"
                   : "bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300"
               }`}
             >
               {assignment.source === "MANUAL"
-                ? "Manual Assignment"
+                ? "Manual"
+                : assignment.source === "API"
+                ? "API"
                 : "Automated Sync"}
             </span>
           </div>
