@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
   UserSquare,
@@ -10,15 +10,12 @@ import {
   BookLock,
   Laptop,
   MoreVertical,
-  Briefcase,
 } from "lucide-react";
 import { useBreadcrumb } from "../../context/BreadcrumbContext";
 import { EmployeeDetailHeader } from "./EmployeeDetailHeader";
 import { EmployeeDetailsTab } from "./EmployeeDetailsTab";
-import { EmployeeApplicationsTab } from "./EmployeeApplicationsTab";
 import { JiraTicketModal } from "../../components/ui/JiraTicketModal";
 import { AssetDetailModal } from "../../components/ui/AssetDetailModal";
-import { LicensesTab } from "./LicensesTab";
 import { UnifiedTimelinePage } from "./UnifiedTimelinePage";
 import { PlatformLogPage } from "./PlatformLogPage";
 import { DevicesTab } from "./DevicesTab";
@@ -27,8 +24,10 @@ import { useMediaQuery } from "../../hooks/useMediaQuery";
 import api from "../../api/api";
 import { EmployeeDetailSkeleton } from "../../components/ui/EmployeeDetailSkeleton";
 import { useModalStore } from "../../stores/modalStore";
-// --- CHANGE 1: Import the new component ---
-import ApplicationAccessTab from "./ApplicationAccessTab";
+
+// --- CORRECTED IMPORTS ---
+import ApplicationsTab from "./ApplicationsTab"; // Import our new consolidated component
+import { LicensesTab } from "./LicensesTab";
 
 const fetchEmployeeById = async (employeeId) => {
   const { data } = await api.get(`/api/employees/${employeeId}`);
@@ -44,17 +43,14 @@ const fetchTimelineData = async (employeeId) => {
 
 export const EmployeeDetailPage = ({ permissions, onLogout }) => {
   const { employeeId } = useParams();
-  const navigate = useNavigate();
   const { setDynamicCrumbs } = useBreadcrumb();
   const { openModal } = useModalStore();
   const [activeTab, setActiveTab] = useState("details");
-  const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
   const moreMenuRef = useRef(null);
   const isDesktop = useMediaQuery("(min-width: 768px)");
-
+  const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
   const [isJiraModalOpen, setIsJiraModalOpen] = useState(false);
   const [selectedTicketId, setSelectedTicketId] = useState(null);
-
   const [isAssetModalOpen, setIsAssetModalOpen] = useState(false);
   const [selectedAsset, setSelectedAsset] = useState(null);
 
@@ -65,10 +61,6 @@ export const EmployeeDetailPage = ({ permissions, onLogout }) => {
   } = useQuery({
     queryKey: ["employee", employeeId],
     queryFn: () => fetchEmployeeById(employeeId),
-    enabled: !!employeeId,
-    onError: (err) => {
-      console.error("Failed to fetch employee:", err);
-    },
   });
 
   const {
@@ -81,7 +73,6 @@ export const EmployeeDetailPage = ({ permissions, onLogout }) => {
     enabled: !!employeeId && activeTab === "timeline",
   });
 
-  // --- CHANGE 2: Update the allTabs array ---
   const allTabs = [
     {
       id: "details",
@@ -90,29 +81,22 @@ export const EmployeeDetailPage = ({ permissions, onLogout }) => {
       permission: true,
     },
     {
-      id: "devices",
-      label: "Devices",
-      icon: <Laptop size={16} />,
-      permission: true,
-    },
-    {
-      id: "platforms",
-      label: "Apps & Platforms",
-      shortLabel: "Access",
+      id: "applications",
+      label: "Applications",
+      shortLabel: "Apps",
       icon: <LayoutGrid size={16} />,
-      permission: true,
-    },
-    {
-      id: "application-access",
-      label: "Application Access",
-      shortLabel: "App Access",
-      icon: <Briefcase size={16} />,
       permission: true,
     },
     {
       id: "licenses",
       label: "Licenses",
       icon: <BookLock size={16} />,
+      permission: true,
+    },
+    {
+      id: "devices",
+      label: "Devices",
+      icon: <Laptop size={16} />,
       permission: true,
     },
     {
@@ -131,7 +115,7 @@ export const EmployeeDetailPage = ({ permissions, onLogout }) => {
     },
   ].filter((tab) => tab.permission);
 
-  const VISIBLE_TABS_COUNT = 3;
+  const VISIBLE_TABS_COUNT = 4;
   const visibleTabs = isDesktop
     ? allTabs
     : allTabs.slice(0, VISIBLE_TABS_COUNT);
@@ -163,42 +147,20 @@ export const EmployeeDetailPage = ({ permissions, onLogout }) => {
         { name: "Employees", path: "/employees" },
         { name: fullName, path: `/employees/${employeeId}` },
       ]);
-
-      api
-        .post("/api/employees/logs/view", { targetEmployeeId: employeeId })
-        .catch((err) => console.error("Failed to log profile view:", err));
     }
-    return () => {
-      setDynamicCrumbs([]);
-    };
   }, [employee, employeeId, setDynamicCrumbs]);
 
-  const handleTabClick = (tabId) => {
-    setActiveTab(tabId);
-    setIsMoreMenuOpen(false);
-  };
-
+  const handleTabClick = (tabId) => setActiveTab(tabId);
   const handleTicketClick = (ticketId) => {
-    if (ticketId) {
-      setSelectedTicketId(ticketId);
-      setIsJiraModalOpen(true);
-    }
+    setSelectedTicketId(ticketId);
+    setIsJiraModalOpen(true);
   };
-
   const handleAssetClick = (asset) => {
-    if (asset) {
-      setSelectedAsset(asset);
-      setIsAssetModalOpen(true);
-    }
+    setSelectedAsset(asset);
+    setIsAssetModalOpen(true);
   };
-
-  const handleEdit = () => {
-    openModal("editEmployee", employee);
-  };
-
-  const handleDeactivate = () => {
-    openModal("deactivateEmployee", employee);
-  };
+  const handleEdit = () => openModal("editEmployee", employee);
+  const handleDeactivate = () => openModal("deactivateEmployee", employee);
 
   const TabButton = ({ id, label, shortLabel, icon }) => (
     <button
@@ -206,42 +168,35 @@ export const EmployeeDetailPage = ({ permissions, onLogout }) => {
       className={`flex-shrink-0 flex items-center gap-2 py-3 px-4 border-b-2 font-semibold text-sm transition-colors whitespace-nowrap ${
         activeTab === id
           ? "border-kredivo-primary text-kredivo-primary"
-          : "border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+          : "border-transparent text-gray-500 hover:text-gray-700"
       }`}
     >
       {icon} {isDesktop ? label : shortLabel || label}
     </button>
   );
 
-  // --- CHANGE 3: Update the render logic ---
   const renderContent = () => {
     switch (activeTab) {
       case "details":
         return (
           <EmployeeDetailsTab
             employee={employee}
-            navigate={navigate}
-            permissions={permissions}
             onTicketClick={handleTicketClick}
             onAssetClick={handleAssetClick}
+            permissions={permissions}
           />
         );
-      case "devices":
-        return <DevicesTab employeeId={employeeId} />;
-      case "platforms":
+      case "applications":
         return (
-          <EmployeeApplicationsTab
-            employeeId={employeeId}
-            applications={employee.applications || []}
-            platformStatuses={employee.platform_statuses || []}
-            isLoading={isEmployeeLoading}
+          <ApplicationsTab
+            employee={employee}
             onTicketClick={handleTicketClick}
           />
         );
-      case "application-access":
-        return <ApplicationAccessTab />;
       case "licenses":
         return <LicensesTab employeeId={employeeId} />;
+      case "devices":
+        return <DevicesTab employeeId={employeeId} />;
       case "platform-logs":
         return <PlatformLogPage employeeId={employeeId} onLogout={onLogout} />;
       case "timeline":
@@ -258,16 +213,14 @@ export const EmployeeDetailPage = ({ permissions, onLogout }) => {
   };
 
   if (isEmployeeLoading) return <EmployeeDetailSkeleton />;
-
   if (pageError)
     return (
       <div className="p-6 text-center text-red-500">
-        <AlertTriangle className="mx-auto w-12 h-12 mb-4" />
-        <h2 className="text-xl font-semibold">Could not load employee data</h2>
-        <p>{pageError.message || "An unexpected error occurred."}</p>
+        <AlertTriangle className="mx-auto w-12 h-12" />
+        <h2>Could not load employee</h2>
+        <p>{pageError.message}</p>
       </div>
     );
-
   if (!employee) return null;
 
   return (
@@ -280,26 +233,21 @@ export const EmployeeDetailPage = ({ permissions, onLogout }) => {
           permissions={permissions}
           isOwnProfile={false}
         />
-
         <div className="border-b border-gray-200 dark:border-gray-700">
           <div className="flex justify-between items-center">
-            <nav
-              className="-mb-px flex items-center overflow-x-auto"
-              aria-label="Tabs"
-            >
+            <nav className="-mb-px flex items-center overflow-x-auto">
               {visibleTabs.map((tab) => (
                 <TabButton key={tab.id} {...tab} />
               ))}
             </nav>
-
             {overflowTabs.length > 0 && (
               <div ref={moreMenuRef} className="relative ml-auto pl-2">
                 <button
-                  onClick={() => setIsMoreMenuOpen((prev) => !prev)}
-                  className={`flex-shrink-0 flex items-center gap-2 py-3 px-4 border-b-2 font-semibold text-sm transition-colors whitespace-nowrap ${
+                  onClick={() => setIsMoreMenuOpen((p) => !p)}
+                  className={`flex-shrink-0 flex items-center gap-2 py-3 px-4 border-b-2 font-semibold text-sm transition-colors ${
                     isActiveTabInMoreMenu
                       ? "border-kredivo-primary text-kredivo-primary"
-                      : "border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+                      : "border-transparent text-gray-500"
                   }`}
                 >
                   <MoreVertical size={16} /> More
@@ -310,20 +258,23 @@ export const EmployeeDetailPage = ({ permissions, onLogout }) => {
                       initial={{ opacity: 0, y: -10 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -10 }}
-                      className="origin-top-right absolute right-0 mt-2 w-56 rounded-md shadow-lg bg-white dark:bg-gray-800 ring-1 ring-black ring-opacity-5 focus:outline-none z-10"
+                      className="origin-top-right absolute right-0 mt-2 w-56 rounded-md shadow-lg bg-white dark:bg-gray-800 ring-1 ring-black ring-opacity-5 z-10"
                     >
                       <div className="py-1">
                         {overflowTabs.map((tab) => (
                           <button
                             key={tab.id}
-                            onClick={() => handleTabClick(tab.id)}
+                            onClick={() => {
+                              handleTabClick(tab.id);
+                              setIsMoreMenuOpen(false);
+                            }}
                             className={`w-full text-left flex items-center gap-3 px-4 py-2 text-sm ${
                               activeTab === tab.id
-                                ? "bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white"
-                                : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                                ? "bg-gray-100 dark:bg-gray-700"
+                                : "text-gray-700 dark:text-gray-300"
                             }`}
                           >
-                            {tab.icon} {tab.shortLabel || tab.label}
+                            {tab.icon} {tab.label}
                           </button>
                         ))}
                       </div>
@@ -336,19 +287,14 @@ export const EmployeeDetailPage = ({ permissions, onLogout }) => {
         </div>
         <div className="mt-6">{renderContent()}</div>
       </div>
-      {isJiraModalOpen && (
-        <JiraTicketModal
-          ticketId={selectedTicketId}
-          onClose={() => setIsJiraModalOpen(false)}
-        />
-      )}
-
-      {isAssetModalOpen && (
-        <AssetDetailModal
-          asset={selectedAsset}
-          onClose={() => setIsAssetModalOpen(false)}
-        />
-      )}
+      <JiraTicketModal
+        ticketId={selectedTicketId}
+        onClose={() => setIsJiraModalOpen(false)}
+      />
+      <AssetDetailModal
+        asset={selectedAsset}
+        onClose={() => setIsAssetModalOpen(false)}
+      />
     </>
   );
 };
