@@ -37,7 +37,20 @@ const updateCost = async (req, res, next) => {
   }
 };
 
+const getApplicationAssignments = async (req, res, next) => {
+  try {
+    const { applicationId } = req.params;
+    const assignments = await licenseService.getAssignmentsForApplication(
+      parseInt(applicationId, 10)
+    );
+    res.json(assignments);
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getLicenses,
   updateCost,
+  getApplicationAssignments,
 };

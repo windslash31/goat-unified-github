@@ -2,16 +2,12 @@ const pool = require("../../config/db");
 const { logActivity } = require("../../services/logService");
 const managedAccountService = require("../../services/managedAccountService");
 
-// ✨ FIX: Define action types for consistency
 const ACTION_TYPES = {
   MANAGED_ACCOUNT_CREATE: "MANAGED_ACCOUNT_CREATE",
   MANAGED_ACCOUNT_UPDATE: "MANAGED_ACCOUNT_UPDATE",
   MANAGED_ACCOUNT_DELETE: "MANAGED_ACCOUNT_DELETE",
 };
 
-// @desc    Get all managed accounts with search and pagination
-// @route   GET /api/managed-accounts
-// @access  Private (requires 'managed_account:manage' permission)
 const getAllManagedAccounts = async (req, res) => {
   const { page = 1, limit = 10, search = "" } = req.query;
   const offset = (page - 1) * limit;

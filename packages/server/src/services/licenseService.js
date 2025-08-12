@@ -6,27 +6,28 @@ const { logActivity } = require("./logService");
  */
 const getLicenseData = async () => {
   const query = `
-    SELECT
-        ma.id,
-        ma.name,
-        ma.description,
-        ma.category,
-        COALESCE(lc.license_tier, 'STANDARD') as license_tier,
-        COALESCE(lc.monthly_cost_decimal, 0.00) as cost_per_seat_monthly,
-        COALESCE(lc.currency, 'USD') as currency,
-        COALESCE(lc.total_seats, 0) as total_seats, -- Fetch the new total_seats column
-        COUNT(la.id) as assigned_seats
-    FROM
-        managed_applications ma -- Use the new unified applications table
-    LEFT JOIN
-        license_costs lc ON ma.id = lc.application_id
-    LEFT JOIN
-        license_assignments la ON ma.id = la.application_id
-    GROUP BY
-        ma.id, ma.name, ma.description, ma.category, lc.license_tier, lc.monthly_cost_decimal, lc.currency, lc.total_seats
-    ORDER BY
-        ma.name;
-  `;
+      SELECT
+          ma.id,
+          ma.name,
+          ma.description,
+          ma.category,
+          ma.type, -- THIS LINE WAS MISSING
+          COALESCE(lc.license_tier, 'STANDARD') as license_tier,
+          COALESCE(lc.monthly_cost_decimal, 0.00) as cost_per_seat_monthly,
+          COALESCE(lc.currency, 'USD') as currency,
+          COALESCE(lc.total_seats, 0) as total_seats,
+          COUNT(la.id) as assigned_seats
+      FROM
+          managed_applications ma
+      LEFT JOIN
+          license_costs lc ON ma.id = lc.application_id
+      LEFT JOIN
+          license_assignments la ON ma.id = la.application_id
+      GROUP BY
+          ma.id, ma.name, ma.description, ma.category, ma.type, lc.license_tier, lc.monthly_cost_decimal, lc.currency, lc.total_seats -- THE 'ma.type' WAS MISSING HERE TOO
+      ORDER BY
+          ma.name;
+    `;
   const result = await db.query(query);
   return result.rows;
 };
@@ -169,8 +170,25 @@ const reconcileLicenseAssignments = async (
   );
 };
 
+const getAssignmentsForApplication = async (applicationId) => {
+  const query = `
+        SELECT
+            la.principal_type,
+            COALESCE(e.first_name || ' ' || e.last_name, ma.name) as principal_name,
+            COALESCE(e.employee_email, ma.account_identifier) as principal_identifier
+        FROM license_assignments la
+        LEFT JOIN employees e ON la.principal_id = e.id AND la.principal_type = 'EMPLOYEE'
+        LEFT JOIN managed_accounts ma ON la.principal_id = ma.id AND la.principal_type = 'MANAGED_ACCOUNT'
+        WHERE la.application_id = $1
+        ORDER BY principal_name;
+    `;
+  const result = await db.query(query, [applicationId]);
+  return result.rows;
+};
+
 module.exports = {
   getLicenseData,
   updateLicenseCost,
   reconcileLicenseAssignments,
+  getAssignmentsForApplication,
 };

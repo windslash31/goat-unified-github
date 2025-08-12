@@ -9,8 +9,15 @@ const {
 router.get(
   "/",
   authenticateToken,
-  authorize("license:manage"), // Or a new, more general read permission
+  authorize("license:manage"),
   licenseController.getLicenses
+);
+
+router.get(
+  "/:applicationId/assignments",
+  authenticateToken,
+  authorize("license:manage"),
+  licenseController.getApplicationAssignments
 );
 
 router.put(
