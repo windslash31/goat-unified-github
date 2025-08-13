@@ -240,10 +240,36 @@ const getAccountLicenses = async (req, res, next) => {
   }
 };
 
+const getAccountPlatformStatuses = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const statuses = await managedAccountService.getPlatformStatusesForAccount(
+      parseInt(id, 10)
+    );
+    res.json(statuses);
+  } catch (error) {
+    next(error);
+  }
+};
+
+const getAccountApplicationAccess = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const access = await managedAccountService.getApplicationAccessForAccount(
+      parseInt(id, 10)
+    );
+    res.json(access);
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getAllManagedAccounts,
   createManagedAccount,
   updateManagedAccount,
   deleteManagedAccount,
   getAccountLicenses,
+  getAccountPlatformStatuses,
+  getAccountApplicationAccess,
 };

@@ -53,4 +53,18 @@ router.delete(
   managedAccountController.deleteManagedAccount
 );
 
+router.get(
+  "/:id/platform-statuses",
+  authenticateToken,
+  authorize("managed_account:manage"),
+  managedAccountController.getAccountPlatformStatuses
+);
+
+router.get(
+  "/:id/application-access",
+  authenticateToken,
+  authorize("managed_account:manage"),
+  managedAccountController.getAccountApplicationAccess
+);
+
 module.exports = router;
