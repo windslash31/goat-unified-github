@@ -51,34 +51,36 @@ const getEmployeeById = async (employeeId) => {
   const query = `
     SELECT
       e.*,
-            le.name as legal_entity,
-            ol.name as office_location,
-            et.name as employee_type,
-            est.name as employee_sub_type,
-            CONCAT_WS(' ', manager.first_name, manager.middle_name, manager.last_name) as manager_name,
-            manager.employee_email as manager_email,
-            (SELECT json_agg(json_build_object(
-                'name', ia.name,
-                'role', eaa.role,
-                'jira_ticket', eaa.jira_ticket
-            ))
-            FROM employee_application_access eaa
-            JOIN internal_applications ia ON eaa.application_id = ia.id
-            WHERE eaa.employee_id = e.id) as applications,
-            (SELECT json_agg(json_build_object(
-                'platform_name', pas.platform_name,
-                'status', pas.status,
-                'details', pas.details,
-                'last_synced_at', pas.last_synced_at
-            ) ORDER BY pas.platform_name)
-            FROM platform_access_status pas
-            WHERE pas.employee_id = e.id) as platform_statuses
+      le.name as legal_entity,
+      ol.name as office_location,
+      et.name as employee_type,
+      est.name as employee_sub_type,
+      CONCAT_WS(' ', manager.first_name, manager.middle_name, manager.last_name) as manager_name,
+      manager.employee_email as manager_email,
+      (SELECT json_agg(json_build_object(
+          'name', ma.name,
+          'role', eaa.role,
+          'jira_ticket', eaa.jira_ticket,
+          'type', ma.type,          -- ADDED
+          'category', ma.category   -- ADDED
+      ))
+      FROM employee_application_access eaa
+      JOIN managed_applications ma ON eaa.application_id = ma.id
+      WHERE eaa.employee_id = e.id) as applications,
+      (SELECT json_agg(json_build_object(
+          'platform_name', pas.platform_name,
+          'status', pas.status,
+          'details', pas.details,
+          'last_synced_at', pas.last_synced_at
+      ) ORDER BY pas.platform_name)
+      FROM platform_access_status pas
+      WHERE pas.employee_id = e.id) as platform_statuses
     FROM employees e
     LEFT JOIN legal_entities le ON e.legal_entity_id = le.id
     LEFT JOIN office_locations ol ON e.office_location_id = ol.id
     LEFT JOIN employee_types et ON e.employee_type_id = et.id
     LEFT JOIN employee_sub_types est ON e.employee_sub_type_id = est.id
-        LEFT JOIN employees manager ON e.manager_id = manager.id
+    LEFT JOIN employees manager ON e.manager_id = manager.id
     WHERE e.id = $1
   `;
   const result = await db.query(query, [employeeId]);

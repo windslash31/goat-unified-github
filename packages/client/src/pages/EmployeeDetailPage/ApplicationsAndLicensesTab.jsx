@@ -4,11 +4,11 @@ import api from "../../api/api";
 import {
   Search,
   ChevronRight,
-  CheckCircle2,
-  CircleAlert,
   BadgeCheck,
+  CircleAlert,
   X,
   Shield,
+  CheckCircle2,
   Cpu,
   Grid2X2,
   DollarSign,
@@ -19,14 +19,15 @@ import {
   Book,
   KeyRound,
 } from "lucide-react";
-import { formatTimeAgo } from "../../utils/formatters";
+import { formatTimeAgo, formatDateTime } from "../../utils/formatters";
 import { EmployeeListSkeleton } from "../../components/ui/EmployeeListSkeleton";
 import { Button } from "../../components/ui/Button";
 import { SegmentedControl } from "../../components/ui/SegmentedControl";
 import { AccessStatusBadge } from "../../components/ui/AccessStatusBadge";
 import { Drawer } from "../../components/ui/Drawer";
+import { PermissionBadge } from "../../components/ui/PermissionBadge";
 
-// Data fetching functions
+// --- Data Fetching Functions ---
 const fetchEmployeePlatformStatus = (employeeId) =>
   api
     .get(`/api/employees/${employeeId}/platform-statuses`)
@@ -40,7 +41,7 @@ const fetchDetailedAccess = (employeeId) =>
     .get(`/api/employees/${employeeId}/application-access`)
     .then((res) => res.data);
 
-// Child Components
+// --- Child Components ---
 const AppAvatar = ({ name }) => {
   const initials = name
     .split(" ")
@@ -56,16 +57,27 @@ const AppAvatar = ({ name }) => {
 };
 
 const SummaryChip = ({ icon, label, value }) => (
-  <div className="rounded-2xl border bg-blue-50 dark:bg-gray-800 border-blue-200 dark:border-gray-700 p-3">
-    <div className="flex items-center justify-between">
-      <div className="text-sm text-neutral-500">{label}</div>
-      <div className="opacity-70">{icon}</div>
+  <div className="flex items-center gap-4 rounded-2xl border bg-neutral-100 dark:bg-gray-900/50 border-neutral-200 dark:border-gray-700/50 p-3">
+    <div className="flex-shrink-0 rounded-lg bg-neutral-200 dark:bg-gray-700 text-neutral-600 dark:text-neutral-300 p-2">
+      {React.cloneElement(icon, { className: "h-5 w-5" })}
     </div>
-    <div className="mt-1 text-2xl font-semibold">{value}</div>
+    <div>
+      <div className="text-sm text-neutral-500">{label}</div>
+      <div className="text-xl font-semibold">{value}</div>
+    </div>
   </div>
 );
 
-const AppDetailsDrawerContent = ({ app, employeeId }) => {
+const DetailItem = ({ label, value }) => (
+  <div className="flex items-start justify-between py-2.5 border-b border-gray-200 dark:border-gray-700 last:border-b-0">
+    <dt className="text-sm text-gray-500 dark:text-gray-400 w-1/3 pr-2">
+      {label}
+    </dt>
+    <dd className="text-sm text-right font-medium w-2/3">{value}</dd>
+  </div>
+);
+
+const AppDetailsDrawerContent = ({ app, employeeId, platformStatus }) => {
   const {
     data: detailedAccess,
     isLoading,
@@ -73,76 +85,143 @@ const AppDetailsDrawerContent = ({ app, employeeId }) => {
   } = useQuery({
     queryKey: ["detailedAccess", employeeId],
     queryFn: () => fetchDetailedAccess(employeeId),
-    enabled:
-      !!app && (app.appName === "Atlassian" || app.appName === "JumpCloud"),
+    enabled: !!app && app.ax.connected,
   });
 
-  if (isLoading) return <p>Loading details...</p>;
-  if (isError)
-    return <p className="text-red-500">Could not load access details.</p>;
+  const formatBoolean = (value) =>
+    value ? (
+      <span className="flex items-center justify-end gap-1 text-green-600 dark:text-green-400 font-medium">
+        <CheckCircle2 size={14} /> Yes
+      </span>
+    ) : (
+      <span className="flex items-center justify-end gap-1 text-red-600 dark:text-red-400 font-medium">
+        <X size={14} /> No
+      </span>
+    );
 
-  let content = (
-    <p className="text-neutral-500">
-      No detailed access information available for this application.
+  const renderObjectDetails = (obj, prefix = "") => {
+    return Object.entries(obj).flatMap(([key, value]) => {
+      const formattedKey = key
+        .replace(/_/g, " ")
+        .replace(/([A-Z])/g, " $1")
+        .replace(/^./, (str) => str.toUpperCase());
+      const displayKey = prefix ? `${prefix} - ${formattedKey}` : formattedKey;
+      if (value === null || key === "last_synced_at") return [];
+      if (typeof value === "object" && !Array.isArray(value))
+        return renderObjectDetails(value, displayKey);
+      let formattedValue = String(value);
+      if (typeof value === "boolean") formattedValue = formatBoolean(value);
+      else if (
+        key.toLowerCase().includes("time") ||
+        key.toLowerCase().includes("date")
+      )
+        formattedValue = formatDateTime(value);
+      return [
+        <DetailItem
+          key={displayKey}
+          label={displayKey}
+          value={formattedValue}
+        />,
+      ];
+    });
+  };
+
+  let accessContent = (
+    <p className="text-neutral-500 text-sm">
+      No specific access details available.
     </p>
   );
 
   if (app.appName === "Atlassian" && detailedAccess?.accessData?.atlassian) {
     const { jiraProjects, bitbucketRepositories, confluenceSpaces } =
       detailedAccess.accessData.atlassian;
-    content = (
-      <div className="space-y-4 text-sm">
-        <h4 className="font-semibold flex items-center gap-2">
-          <Code size={16} /> Jira Projects
-        </h4>
-        {jiraProjects?.length > 0 ? (
-          jiraProjects.map((p) => (
-            <div key={p.project_id}>
-              {p.project_name} ({p.role_name})
-            </div>
-          ))
-        ) : (
-          <p className="text-xs text-neutral-500">No Jira access found.</p>
-        )}
-
-        <h4 className="font-semibold flex items-center gap-2 pt-4 border-t mt-4">
-          <GitBranch size={16} /> Bitbucket Repositories
-        </h4>
-        {bitbucketRepositories?.length > 0 ? (
-          bitbucketRepositories.map((r) => (
-            <div key={r.repo_uuid}>
-              {r.full_name} ({r.permission_level})
-            </div>
-          ))
-        ) : (
-          <p className="text-xs text-neutral-500">No Bitbucket access found.</p>
-        )}
-
-        <h4 className="font-semibold flex items-center gap-2 pt-4 border-t mt-4">
-          <Book size={16} /> Confluence Spaces
-        </h4>
-        {confluenceSpaces?.length > 0 ? (
-          confluenceSpaces.map((s) => <div key={s.id}>{s.name}</div>)
-        ) : (
-          <p className="text-xs text-neutral-500">
-            No Confluence access found.
-          </p>
-        )}
+    accessContent = (
+      <div className="space-y-6 text-sm">
+        <div>
+          <h4 className="font-semibold flex items-center gap-2 mb-2">
+            <Code size={16} /> Jira Projects
+          </h4>
+          {jiraProjects?.length > 0 ? (
+            [...jiraProjects]
+              .sort((a, b) => a.project_name.localeCompare(b.project_name))
+              .map((p) => (
+                <DetailItem
+                  key={p.project_id}
+                  label={p.project_name}
+                  value={<PermissionBadge level={p.role_name} />}
+                />
+              ))
+          ) : (
+            <p className="text-xs text-neutral-500">No Jira access found.</p>
+          )}
+        </div>
+        <div>
+          <h4 className="font-semibold flex items-center gap-2 mb-2">
+            <GitBranch size={16} /> Bitbucket Repositories
+          </h4>
+          {bitbucketRepositories?.length > 0 ? (
+            [...bitbucketRepositories]
+              .sort((a, b) => a.full_name.localeCompare(b.full_name))
+              .map((r) => (
+                <DetailItem
+                  key={r.repo_uuid}
+                  label={r.full_name}
+                  value={<PermissionBadge level={r.permission_level} />}
+                />
+              ))
+          ) : (
+            <p className="text-xs text-neutral-500">
+              No Bitbucket access found.
+            </p>
+          )}
+        </div>
+        <div>
+          <h4 className="font-semibold flex items-center gap-2 mb-2">
+            <Book size={16} /> Confluence Spaces
+          </h4>
+          {confluenceSpaces?.length > 0 ? (
+            [...confluenceSpaces]
+              .sort((a, b) => a.name.localeCompare(b.name))
+              .map((s) => (
+                <DetailItem
+                  key={s.id}
+                  label={s.name}
+                  value={
+                    <div className="flex flex-wrap gap-1 justify-end">
+                      {(s.permissions || []).map((p) => (
+                        <PermissionBadge key={p} level={p} />
+                      ))}
+                    </div>
+                  }
+                />
+              ))
+          ) : (
+            <p className="text-xs text-neutral-500">
+              No Confluence access found.
+            </p>
+          )}
+        </div>
       </div>
     );
   } else if (
     app.appName === "JumpCloud" &&
     detailedAccess?.accessData?.jumpcloud
   ) {
-    content = (
+    accessContent = (
       <div className="space-y-4 text-sm">
-        <h4 className="font-semibold flex items-center gap-2">
+        <h4 className="font-semibold flex items-center gap-2 mb-2">
           <KeyRound size={16} /> SSO Applications
         </h4>
         {detailedAccess.accessData.jumpcloud?.length > 0 ? (
-          detailedAccess.accessData.jumpcloud.map((app) => (
-            <div key={app.id}>{app.display_label}</div>
-          ))
+          [...detailedAccess.accessData.jumpcloud]
+            .sort((a, b) => a.display_label.localeCompare(b.display_label))
+            .map((app) => (
+              <DetailItem
+                key={app.id}
+                label={app.display_label}
+                value={<PermissionBadge level="Granted" />}
+              />
+            ))
         ) : (
           <p className="text-xs text-neutral-500">
             No JumpCloud SSO access found.
@@ -152,7 +231,35 @@ const AppDetailsDrawerContent = ({ app, employeeId }) => {
     );
   }
 
-  return <div>{content}</div>;
+  return (
+    <div className="space-y-6">
+      {platformStatus?.details &&
+        Object.keys(platformStatus.details).length > 0 && (
+          <div>
+            <h3 className="text-md font-semibold text-gray-800 dark:text-gray-200 border-b pb-2 mb-2">
+              Platform User Details
+            </h3>
+            {isLoading ? (
+              <p>Loading...</p>
+            ) : (
+              renderObjectDetails(platformStatus.details)
+            )}
+          </div>
+        )}
+      <div>
+        <h3 className="text-md font-semibold text-gray-800 dark:text-gray-200 border-b pb-2 mb-2">
+          Application Access
+        </h3>
+        {isLoading ? (
+          <p>Loading...</p>
+        ) : isError ? (
+          <p className="text-red-500">Could not load access details.</p>
+        ) : (
+          accessContent
+        )}
+      </div>
+    </div>
+  );
 };
 
 export const ApplicationsAndLicensesTab = ({ employee }) => {
@@ -199,19 +306,22 @@ export const ApplicationsAndLicensesTab = ({ employee }) => {
         },
       };
     });
-    const internalApps = (employee.applications || []).map((app) => ({
+
+    const assignedApps = (employee.applications || []).map((app) => ({
       appId: app.name.toLowerCase().replace(/\s/g, "-"),
       appName: app.name,
-      vendor: "Internal Platform",
-      category: "Internal",
+      vendor: "Manual Assignment",
+      category: app.category,
       ax: {
-        type: "internal",
+        type: app.type.toLowerCase(),
         access: "Granted",
         lastUpdated: app.updated_at,
         connected: false,
       },
     }));
-    const allItems = [...connectedApps, ...internalApps];
+
+    const allItems = [...connectedApps, ...assignedApps];
+
     const latestSync = (platformStatuses || []).reduce((latest, p) => {
       const currentSync = p.details?.last_synced_at || p.last_synced_at;
       if (!currentSync) return latest;
@@ -219,15 +329,17 @@ export const ApplicationsAndLicensesTab = ({ employee }) => {
         ? currentSync
         : latest;
     }, null);
+
     const summary = {
       total: allItems.length,
-      internal: internalApps.length,
-      external: connectedApps.length,
+      internal: allItems.filter((a) => a.ax.type === "internal").length,
+      external: allItems.filter((a) => a.ax.type === "external").length,
       active: allItems.filter((a) => a.ax.access === "Active").length,
       suspended: allItems.filter((a) => a.ax.access === "Suspended").length,
       granted: allItems.filter((a) => a.ax.access === "Granted").length,
       notfound: allItems.filter((a) => a.ax.access === "Not found").length,
     };
+
     return { items: allItems, lastSyncedAt: latestSync, appSummary: summary };
   }, [platformStatuses, employee.applications]);
 
@@ -251,9 +363,11 @@ export const ApplicationsAndLicensesTab = ({ employee }) => {
   const { licensesWithCost, licSummary } = useMemo(() => {
     if (!assignments || !allLicenseData)
       return { licensesWithCost: [], licSummary: {} };
+
     const licenseCostMap = new Map(
       allLicenseData.map((lic) => [lic.name, lic])
     );
+
     const licensesWithCost = assignments.map((asgn) => {
       const costData = licenseCostMap.get(asgn.application_name) || {};
       const unitPrice = parseFloat(costData.cost_per_seat_monthly) || 0;
@@ -265,6 +379,7 @@ export const ApplicationsAndLicensesTab = ({ employee }) => {
         unitPrice: unitPrice,
       };
     });
+
     const monthly = licensesWithCost.reduce((sum, l) => sum + l.unitPrice, 0);
     return {
       licensesWithCost,
@@ -334,6 +449,7 @@ export const ApplicationsAndLicensesTab = ({ employee }) => {
                 value={appSummary.notfound}
               />
             </div>
+
             <div className="flex flex-col md:flex-row md:items-center gap-3 mb-6">
               <SegmentedControl
                 value={segment}
@@ -352,8 +468,9 @@ export const ApplicationsAndLicensesTab = ({ employee }) => {
                 />
               </div>
             </div>
+
             <div className="overflow-hidden rounded-2xl border border-neutral-200 dark:border-neutral-800">
-              <div className="grid grid-cols-12 bg-neutral-100 dark:bg-neutral-900 text-sm px-4 py-3 font-semibold">
+              <div className="hidden md:grid grid-cols-12 bg-neutral-100 dark:bg-neutral-900 text-sm px-4 py-3 font-semibold">
                 <div className="col-span-5">Application</div>
                 <div className="col-span-2">Type</div>
                 <div className="col-span-2">Access</div>
@@ -364,7 +481,7 @@ export const ApplicationsAndLicensesTab = ({ employee }) => {
                 {filteredApps.map((app) => (
                   <li
                     key={app.appId}
-                    className="grid grid-cols-12 items-center px-4 py-3"
+                    className="block md:grid md:grid-cols-12 items-center px-4 py-3"
                   >
                     <div className="col-span-5 flex items-center gap-3">
                       <AppAvatar name={app.appName} />
@@ -375,16 +492,29 @@ export const ApplicationsAndLicensesTab = ({ employee }) => {
                         </div>
                       </div>
                     </div>
-                    <div className="col-span-2 text-xs">{app.ax.type}</div>
-                    <div className="col-span-2">
+                    <div className="col-span-2 mt-2 md:mt-0">
+                      <span className="md:hidden text-xs font-bold mr-2">
+                        Type:
+                      </span>
+                      <span className="text-xs">{app.ax.type}</span>
+                    </div>
+                    <div className="col-span-2 mt-2 md:mt-0">
+                      <span className="md:hidden text-xs font-bold mr-2">
+                        Access:
+                      </span>
                       <AccessStatusBadge access={app.ax.access} />
                     </div>
-                    <div className="col-span-2 text-sm text-neutral-500">
-                      {app.ax.lastUpdated
-                        ? formatTimeAgo(app.ax.lastUpdated)
-                        : "—"}
+                    <div className="col-span-2 mt-2 md:mt-0">
+                      <span className="md:hidden text-xs font-bold mr-2">
+                        Updated:
+                      </span>
+                      <span className="text-sm text-neutral-500">
+                        {app.ax.lastUpdated
+                          ? formatTimeAgo(app.ax.lastUpdated)
+                          : "—"}
+                      </span>
                     </div>
-                    <div className="col-span-1 flex justify-end">
+                    <div className="col-span-1 flex justify-start md:justify-end mt-2 md:mt-0">
                       {app.ax.connected && (
                         <Button
                           size="sm"
@@ -399,11 +529,6 @@ export const ApplicationsAndLicensesTab = ({ employee }) => {
                 ))}
               </ul>
             </div>
-            <p className="mt-6 text-xs text-neutral-500">
-              {lastSyncedAt
-                ? `Last synced ${formatTimeAgo(lastSyncedAt)}`
-                : "Syncing..."}
-            </p>
           </>
         ) : (
           <>
@@ -469,7 +594,13 @@ export const ApplicationsAndLicensesTab = ({ employee }) => {
         title={`${selectedApp?.appName} Access Details`}
       >
         {selectedApp && (
-          <AppDetailsDrawerContent app={selectedApp} employeeId={employee.id} />
+          <AppDetailsDrawerContent
+            app={selectedApp}
+            employeeId={employee.id}
+            platformStatus={platformStatuses.find(
+              (p) => p.platform === selectedApp.appName
+            )}
+          />
         )}
       </Drawer>
     </>

@@ -48,6 +48,15 @@ const addAssignment = async (
       [applicationId, principalId, principalType, source] // Use the source parameter here
     );
 
+    if (principalType === "EMPLOYEE") {
+      const accessQuery = `
+          INSERT INTO employee_application_access (employee_id, application_id, role, jira_ticket, updated_at)
+          VALUES ($1, $2, 'Licensed User', 'Granted via License Assignment', NOW())
+          ON CONFLICT (employee_id, application_id) DO NOTHING;
+      `;
+      await client.query(accessQuery, [principalId, applicationId]);
+    }
+
     const appRes = await client.query(
       "SELECT name FROM managed_applications WHERE id = $1",
       [applicationId]
@@ -94,15 +103,14 @@ const removeAssignment = async (assignmentId, actorId, reqContext) => {
   try {
     await client.query("BEGIN");
 
-    // First, get the details of the assignment we are about to delete for logging
     const detailsRes = await client.query(
-      `SELECT la.principal_type, la.principal_id, ma.name as application_name,
-                   COALESCE(e.employee_email, m.account_identifier) as principal_identifier
-            FROM license_assignments la
-            JOIN managed_applications ma ON la.application_id = ma.id
-            LEFT JOIN employees e ON la.principal_id = e.id AND la.principal_type = 'EMPLOYEE'
-            LEFT JOIN managed_accounts m ON la.principal_id = m.id AND la.principal_type = 'MANAGED_ACCOUNT'
-            WHERE la.id = $1`,
+      `SELECT la.principal_id, la.principal_type, la.application_id, ma.name as application_name,
+           COALESCE(e.employee_email, m.account_identifier) as principal_identifier
+        FROM license_assignments la
+        JOIN managed_applications ma ON la.application_id = ma.id
+        LEFT JOIN employees e ON la.principal_id = e.id AND la.principal_type = 'EMPLOYEE'
+        LEFT JOIN managed_accounts m ON la.principal_id = m.id AND la.principal_type = 'MANAGED_ACCOUNT'
+        WHERE la.id = $1`,
       [assignmentId]
     );
 
@@ -111,10 +119,19 @@ const removeAssignment = async (assignmentId, actorId, reqContext) => {
     }
     const details = detailsRes.rows[0];
 
-    // Now, delete the assignment
     await client.query("DELETE FROM license_assignments WHERE id = $1", [
       assignmentId,
     ]);
+
+    if (details.principal_type === "EMPLOYEE") {
+      await client.query(
+        `
+            DELETE FROM employee_application_access 
+            WHERE employee_id = $1 AND application_id = $2 AND jira_ticket = 'Granted via License Assignment'
+        `,
+        [details.principal_id, details.application_id]
+      );
+    }
 
     const logDetails = {
       applicationName: details.application_name,
