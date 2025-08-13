@@ -26,7 +26,8 @@ import { EmployeeDetailSkeleton } from "../../components/ui/EmployeeDetailSkelet
 import { useModalStore } from "../../stores/modalStore";
 
 // --- CORRECTED IMPORTS ---
-import ApplicationsTab from "./ApplicationsTab"; // Import our new consolidated component
+import ApplicationsTab from "./ApplicationsTab";
+import { ApplicationsAndLicensesTab } from "./ApplicationsAndLicensesTab";
 import { LicensesTab } from "./LicensesTab";
 
 const fetchEmployeeById = async (employeeId) => {
@@ -81,16 +82,10 @@ export const EmployeeDetailPage = ({ permissions, onLogout }) => {
       permission: true,
     },
     {
-      id: "applications",
-      label: "Applications",
+      id: "applications", // This now represents the combined tab
+      label: "Apps & Licenses",
       shortLabel: "Apps",
       icon: <LayoutGrid size={16} />,
-      permission: true,
-    },
-    {
-      id: "licenses",
-      label: "Licenses",
-      icon: <BookLock size={16} />,
       permission: true,
     },
     {
@@ -187,14 +182,7 @@ export const EmployeeDetailPage = ({ permissions, onLogout }) => {
           />
         );
       case "applications":
-        return (
-          <ApplicationsTab
-            employee={employee}
-            onTicketClick={handleTicketClick}
-          />
-        );
-      case "licenses":
-        return <LicensesTab employeeId={employeeId} />;
+        return <ApplicationsAndLicensesTab employee={employee} />;
       case "devices":
         return <DevicesTab employeeId={employeeId} />;
       case "platform-logs":
