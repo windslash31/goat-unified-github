@@ -185,9 +185,9 @@ const getEmployees = async (filters) => {
   const offset = (page - 1) * limit;
   const mainQuery = `
         SELECT e.*,
-            (SELECT json_agg(json_build_object('name', ia.name, 'role', eaa.role, 'jira_ticket', eaa.jira_ticket))
-             FROM employee_application_access eaa JOIN internal_applications ia ON eaa.application_id = ia.id
-             WHERE eaa.employee_id = e.id) as applications
+            (SELECT json_agg(json_build_object('name', ma.name, 'role', eaa.role, 'jira_ticket', eaa.jira_ticket))
+            FROM employee_application_access eaa JOIN managed_applications ma ON eaa.application_id = ma.id
+            WHERE eaa.employee_id = e.id) as applications
         FROM employees e
         LEFT JOIN employees m ON e.manager_id = m.id
         ${whereCondition}
@@ -298,12 +298,13 @@ const getEmployeesForExport = (filters) => {
             e.date_of_exit_at_date,
             e.access_cut_off_date_at_date,
             e.created_at,
-            (
-                SELECT STRING_AGG(ia.name || ' (Role: ' || eaa.role || ')', '; ')
-                FROM employee_application_access eaa
-                JOIN internal_applications ia ON eaa.application_id = ia.id
-                WHERE eaa.employee_id = e.id
-            ) as application_access,
+            (SELECT STRING_AGG(
+              ma.name || ' [' || ma.integration_mode || '] (Role: ' || COALESCE(eaa.role,'-') || ')',
+              '; '
+            )
+            FROM employee_application_access eaa
+            JOIN managed_applications ma ON eaa.application_id = ma.id
+            WHERE eaa.employee_id = e.id) as application_access,
             (
                 SELECT STRING_AGG(pas.platform_name || ': ' || pas.status, '; ')
                 FROM platform_access_status pas
@@ -876,13 +877,12 @@ const createApplicationAccess = async (ticketData, actorId, reqContext) => {
     const employeeId = employeeResult.rows[0].id;
 
     const applicationResult = await client.query(
-      "SELECT id FROM internal_applications WHERE name ILIKE $1",
+      "SELECT id FROM managed_applications WHERE name ILIKE $1",
       [application_name]
     );
-    if (applicationResult.rows.length === 0)
-      throw new Error(
-        `Internal application not found with name: ${application_name}`
-      );
+    if (applicationResult.rows.length === 0) {
+      throw new Error(`Application not found with name: ${application_name}`);
+    }
     const applicationId = applicationResult.rows[0].id;
 
     const query = `
