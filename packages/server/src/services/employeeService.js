@@ -1292,7 +1292,7 @@ const getPlatformStatuses = async (employeeId) => {
   if (googleRes.rows.length > 0) {
     const google = googleRes.rows[0];
     platformStatuses.push({
-      platform: "Google",
+      platform: "Google Workspace",
       status: google.suspended ? "Suspended" : "Active",
       details: {
         isAdmin: google.is_admin,
