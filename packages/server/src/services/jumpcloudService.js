@@ -553,6 +553,114 @@ const syncAllJumpCloudGroupMembers = async () => {
   }
 };
 
+const reconcileSsoAccess = async () => {
+  const client = await db.pool.connect();
+  try {
+    console.log(
+      "CRON JOB: Starting FINAL JumpCloud SSO access reconciliation..."
+    );
+    await client.query("BEGIN");
+
+    // Step 1: Build the map of which emails have access to which JumpCloud App IDs.
+    const provisionedAccessResult = await client.query(`
+      SELECT
+        ju.email,
+        jab.application_id as jumpcloud_app_id
+      FROM jumpcloud_users ju
+      JOIN jumpcloud_user_group_members jugm ON ju.id = jugm.user_id
+      JOIN jumpcloud_application_bindings jab ON jugm.group_id = jab.group_id
+    `);
+    const provisionedAccessMap = new Map();
+    for (const row of provisionedAccessResult.rows) {
+      if (!provisionedAccessMap.has(row.jumpcloud_app_id)) {
+        provisionedAccessMap.set(row.jumpcloud_app_id, new Set());
+      }
+      provisionedAccessMap.get(row.jumpcloud_app_id).add(row.email);
+    }
+
+    // Step 2: Get all of our internal apps that have a JumpCloud App ID configured.
+    // This query now correctly uses your 'jumpcloud_app_id' column.
+    const ssoAppsResult = await client.query(`
+      SELECT
+        ma.id as managed_application_id,
+        ai.id as app_instance_id,
+        ma.jumpcloud_app_id
+      FROM managed_applications ma
+      JOIN app_instances ai ON ma.id = ai.application_id
+      WHERE ma.jumpcloud_app_id IS NOT NULL
+    `);
+    const ssoApps = ssoAppsResult.rows;
+
+    if (ssoApps.length === 0) {
+      console.log(
+        "CRON JOB: No applications found with a configured 'jumpcloud_app_id'. Skipping SSO reconciliation."
+      );
+      await client.query("COMMIT");
+      return;
+    }
+
+    // Step 3: Get all our employees for email-to-ID mapping
+    const employeesResult = await client.query(
+      "SELECT id, employee_email FROM employees"
+    );
+    const employeeEmailToIdMap = new Map(
+      employeesResult.rows.map((e) => [e.employee_email, e.id])
+    );
+
+    // Step 4: Reconcile each app.
+    for (const app of ssoApps) {
+      const emailsWithAccess =
+        provisionedAccessMap.get(app.jumpcloud_app_id) || new Set();
+      const employeeIdsWithAccess = new Set();
+
+      for (const email of emailsWithAccess) {
+        const employeeId = employeeEmailToIdMap.get(email);
+        if (employeeId) {
+          employeeIdsWithAccess.add(employeeId);
+          await client.query(
+            `
+            INSERT INTO user_accounts (user_id, app_instance_id, status, last_seen_at)
+            VALUES ($1, $2, 'active', NOW())
+            ON CONFLICT (user_id, app_instance_id) DO UPDATE SET
+              status = 'active',
+              last_seen_at = NOW();
+            `,
+            [employeeId, app.app_instance_id]
+          );
+        }
+      }
+
+      const employeeIdsArray =
+        employeeIdsWithAccess.size > 0
+          ? Array.from(employeeIdsWithAccess)
+          : [0];
+      await client.query(
+        `
+        UPDATE user_accounts
+        SET status = 'deactivated'
+        WHERE app_instance_id = $1
+        AND user_id NOT IN (SELECT unnest($2::int[]));
+        `,
+        [app.app_instance_id, employeeIdsArray]
+      );
+    }
+
+    await client.query("COMMIT");
+    console.log(
+      "CRON JOB: Finished JumpCloud SSO access reconciliation with corrected logic and schema."
+    );
+  } catch (error) {
+    await client.query("ROLLBACK");
+    console.error(
+      "Error during final JumpCloud SSO access reconciliation:",
+      error
+    );
+    throw error;
+  } finally {
+    client.release();
+  }
+};
+
 module.exports = {
   suspendUser,
   getUserStatus,
@@ -564,4 +672,5 @@ module.exports = {
   syncAllJumpCloudGroupAssociations,
   syncAllJumpCloudGroupMembers,
   syncUserData,
+  reconcileSsoAccess,
 };

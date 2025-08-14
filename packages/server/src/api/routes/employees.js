@@ -180,6 +180,13 @@ router.get(
   employeeController.getEmployeeDevices
 );
 
+router.get(
+  "/:id/access-details/:platformKey",
+  authenticateToken,
+  authorizeAdminOrSelf,
+  employeeController.getApplicationAccessDetails
+);
+
 router.post(
   "/trigger-sync",
   // We will secure this in the Cloud Run settings, so no specific middleware is needed here.

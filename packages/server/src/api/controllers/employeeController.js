@@ -5,6 +5,10 @@ const {
   getJiraUserByEmail,
   getAtlassianAccessByAccountId,
 } = require("../../services/atlassianService");
+const atlassianService = require("../../services/atlassianService");
+const googleService = require("../../services/googleService");
+const slackService = require("../../services/slackService");
+const jumpcloudService = require("../../services/jumpcloudService");
 
 const listEmployees = async (req, res, next) => {
   try {
@@ -407,6 +411,52 @@ const getEmployeeApplicationAccess = async (req, res, next) => {
   }
 };
 
+const getApplicationAccessDetails = async (req, res, next) => {
+  try {
+    const { id: employeeId, platformKey } = req.params;
+    // req.employee is now correctly attached by our updated middleware
+    const employeeEmail = req.employee.employee_email;
+    let details;
+
+    switch (platformKey) {
+      case "atlassian":
+        // 1. Find the Atlassian-specific account ID using the employee's email.
+        const atlassianUser = await atlassianService.getJiraUserByEmail(
+          employeeEmail
+        );
+        if (!atlassianUser || !atlassianUser.account_id) {
+          // If the user isn't in Atlassian, return empty arrays.
+          details = {
+            jiraProjects: [],
+            bitbucketRepositories: [],
+            confluenceSpaces: [],
+          };
+        } else {
+          // 2. Use the correct Atlassian account ID to fetch access details.
+          details = await atlassianService.getAtlassianAccessByAccountId(
+            atlassianUser.account_id
+          );
+        }
+        break;
+      case "google":
+        details = await googleService.getUserStatus(employeeEmail);
+        break;
+      case "slack":
+        details = await slackService.getUserStatus(employeeEmail);
+        break;
+      case "jumpcloud":
+        details = await jumpcloudService.getUserStatus(employeeEmail);
+        break;
+      default:
+        return res.status(404).json({ message: "Platform details not found." });
+    }
+
+    res.json(details);
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   listEmployees,
   getEmployee,
@@ -432,4 +482,5 @@ module.exports = {
   triggerPlatformSync,
   getEmployeeAtlassianAccess,
   getEmployeeApplicationAccess,
+  getApplicationAccessDetails,
 };

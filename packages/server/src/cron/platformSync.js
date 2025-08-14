@@ -36,6 +36,11 @@ const syncAllJumpCloudData = async () => {
         name: "Group Members",
         func: jumpcloudService.syncAllJumpCloudGroupMembers,
       },
+      // ADD THIS NEW STEP
+      {
+        name: "SSO Access Reconciliation",
+        func: jumpcloudService.reconcileSsoAccess,
+      },
     ];
     for (let i = 0; i < steps.length; i++) {
       const step = steps[i];
@@ -129,7 +134,7 @@ const runAllSyncs = async () => {
 };
 
 const schedulePlatformSync = () => {
-  cron.schedule("* 2 * * *", runAllSyncs, {
+  cron.schedule("* * * * *", runAllSyncs, {
     scheduled: true,
     timezone: "Asia/Jakarta",
   });

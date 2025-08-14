@@ -3,11 +3,9 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
   UserSquare,
-  LayoutGrid,
   HardDrive,
   AlertTriangle,
   Bot,
-  BookLock,
   Laptop,
   MoreVertical,
   Briefcase,
@@ -15,10 +13,8 @@ import {
 import { useBreadcrumb } from "../../context/BreadcrumbContext";
 import { EmployeeDetailHeader } from "./EmployeeDetailHeader";
 import { EmployeeDetailsTab } from "./EmployeeDetailsTab";
-import { EmployeeApplicationsTab } from "./EmployeeApplicationsTab";
 import { JiraTicketModal } from "../../components/ui/JiraTicketModal";
 import { AssetDetailModal } from "../../components/ui/AssetDetailModal";
-import { LicensesTab } from "./LicensesTab";
 import { UnifiedTimelinePage } from "./UnifiedTimelinePage";
 import { PlatformLogPage } from "./PlatformLogPage";
 import { DevicesTab } from "./DevicesTab";
@@ -27,8 +23,8 @@ import { useMediaQuery } from "../../hooks/useMediaQuery";
 import api from "../../api/api";
 import { EmployeeDetailSkeleton } from "../../components/ui/EmployeeDetailSkeleton";
 import { useModalStore } from "../../stores/modalStore";
-// --- CHANGE 1: Import the new component ---
-import ApplicationAccessTab from "./ApplicationAccessTab";
+// Import the new unified tab component
+import { EmployeeAccessTab } from "./EmployeeAccessTab";
 
 const fetchEmployeeById = async (employeeId) => {
   const { data } = await api.get(`/api/employees/${employeeId}`);
@@ -51,7 +47,6 @@ export const EmployeeDetailPage = ({ permissions, onLogout }) => {
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
   const moreMenuRef = useRef(null);
   const isDesktop = useMediaQuery("(min-width: 768px)");
-
   const [isJiraModalOpen, setIsJiraModalOpen] = useState(false);
   const [selectedTicketId, setSelectedTicketId] = useState(null);
 
@@ -81,7 +76,7 @@ export const EmployeeDetailPage = ({ permissions, onLogout }) => {
     enabled: !!employeeId && activeTab === "timeline",
   });
 
-  // --- CHANGE 2: Update the allTabs array ---
+  // REVISED TABS: The old "platforms" and "application-access" are combined.
   const allTabs = [
     {
       id: "details",
@@ -90,29 +85,16 @@ export const EmployeeDetailPage = ({ permissions, onLogout }) => {
       permission: true,
     },
     {
-      id: "devices",
-      label: "Devices",
-      icon: <Laptop size={16} />,
-      permission: true,
-    },
-    {
-      id: "platforms",
-      label: "Apps & Platforms",
+      id: "access",
+      label: "Applications & Licenses",
       shortLabel: "Access",
-      icon: <LayoutGrid size={16} />,
-      permission: true,
-    },
-    {
-      id: "application-access",
-      label: "Application Access",
-      shortLabel: "App Access",
       icon: <Briefcase size={16} />,
       permission: true,
     },
     {
-      id: "licenses",
-      label: "Licenses",
-      icon: <BookLock size={16} />,
+      id: "devices",
+      label: "Devices",
+      icon: <Laptop size={16} />,
       permission: true,
     },
     {
@@ -213,7 +195,7 @@ export const EmployeeDetailPage = ({ permissions, onLogout }) => {
     </button>
   );
 
-  // --- CHANGE 3: Update the render logic ---
+  // REVISED RENDER LOGIC: Point the new 'access' tab to the new component
   const renderContent = () => {
     switch (activeTab) {
       case "details":
@@ -226,22 +208,10 @@ export const EmployeeDetailPage = ({ permissions, onLogout }) => {
             onAssetClick={handleAssetClick}
           />
         );
+      case "access":
+        return <EmployeeAccessTab employee={employee} />;
       case "devices":
         return <DevicesTab employeeId={employeeId} />;
-      case "platforms":
-        return (
-          <EmployeeApplicationsTab
-            employeeId={employeeId}
-            applications={employee.applications || []}
-            platformStatuses={employee.platform_statuses || []}
-            isLoading={isEmployeeLoading}
-            onTicketClick={handleTicketClick}
-          />
-        );
-      case "application-access":
-        return <ApplicationAccessTab />;
-      case "licenses":
-        return <LicensesTab employeeId={employeeId} />;
       case "platform-logs":
         return <PlatformLogPage employeeId={employeeId} onLogout={onLogout} />;
       case "timeline":
@@ -258,7 +228,6 @@ export const EmployeeDetailPage = ({ permissions, onLogout }) => {
   };
 
   if (isEmployeeLoading) return <EmployeeDetailSkeleton />;
-
   if (pageError)
     return (
       <div className="p-6 text-center text-red-500">
@@ -267,7 +236,6 @@ export const EmployeeDetailPage = ({ permissions, onLogout }) => {
         <p>{pageError.message || "An unexpected error occurred."}</p>
       </div>
     );
-
   if (!employee) return null;
 
   return (
