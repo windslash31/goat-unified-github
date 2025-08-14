@@ -166,6 +166,12 @@ router.get(
   employeeController.getEmployeeOptions
 );
 
+router.get(
+  "/:id/managed-app-access/:managedAppId",
+  authorizeAdminOrSelf,
+  employeeController.getJumpCloudAccessDetails
+);
+
 router.post(
   "/bulk-deactivate",
   authenticateToken,

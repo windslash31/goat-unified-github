@@ -4,9 +4,27 @@ import api from "../../api/api";
 import { formatDateTime } from "../../utils/formatters";
 import { DetailItem } from "../../components/ui/DetailItem";
 import { PermissionBadge } from "../../components/ui/PermissionBadge";
-import { CheckCircle2, X, Code, GitBranch, Book, KeyRound } from "lucide-react";
+import {
+  CheckCircle2,
+  X,
+  Code,
+  GitBranch,
+  Book,
+  KeyRound,
+  AlertTriangle,
+} from "lucide-react";
 
-// This component now fetches its own data based on the ID it's given
+// Helper function to fetch the access path via JumpCloud groups
+const fetchJumpCloudAccessPath = (employeeId, managedAppId) => {
+  if (!employeeId || !managedAppId) {
+    return Promise.resolve([]);
+  }
+  return api
+    .get(`/api/employees/${employeeId}/managed-app-access/${managedAppId}`)
+    .then((res) => res.data);
+};
+
+// This function remains for fetching Atlassian/main JumpCloud platform details
 const fetchDetailedAccess = (id, type) => {
   const endpoint =
     type === "employee"
@@ -26,12 +44,24 @@ export const AppDetailsDrawerContent = ({
 
   const {
     data: detailedAccess,
-    isLoading,
-    isError,
+    isLoading: isLoadingLegacyDetails,
+    isError: isErrorLegacy,
   } = useQuery({
     queryKey: ["detailedAccess", id, app.appName],
     queryFn: () => fetchDetailedAccess(id, type),
     enabled: !!app && app.ax.connected,
+    retry: false, // Prevent retrying on auth errors
+  });
+
+  const {
+    data: jumpcloudGroups,
+    isLoading: isLoadingJcGroups,
+    isError: isErrorJc,
+  } = useQuery({
+    queryKey: ["jumpcloudAccessPath", employeeId, app.id],
+    queryFn: () => fetchJumpCloudAccessPath(employeeId, app.id),
+    enabled: !!app?.jumpcloud_app_id,
+    retry: false, // Prevent retrying on auth errors
   });
 
   const formatBoolean = (value) =>
@@ -46,6 +76,7 @@ export const AppDetailsDrawerContent = ({
     );
 
   const renderObjectDetails = (obj, prefix = "") => {
+    // This function can remain the same
     return Object.entries(obj).flatMap(([key, value]) => {
       const formattedKey = key
         .replace(/_/g, " ")
@@ -72,110 +103,129 @@ export const AppDetailsDrawerContent = ({
     });
   };
 
-  let accessContent = (
-    <p className="text-neutral-500 text-sm">
-      No specific access details available.
-    </p>
-  );
+  const renderAccessContent = () => {
+    const isLoading = isLoadingLegacyDetails || isLoadingJcGroups;
+    const isError = isErrorLegacy || isErrorJc;
 
-  if (app.appName === "Atlassian" && detailedAccess?.accessData?.atlassian) {
-    const { jiraProjects, bitbucketRepositories, confluenceSpaces } =
-      detailedAccess.accessData.atlassian;
-    accessContent = (
-      <div className="space-y-6 text-sm">
-        <div>
-          <h4 className="font-semibold flex items-center gap-2 mb-2">
-            <Code size={16} /> Jira Projects
-          </h4>
-          {jiraProjects?.length > 0 ? (
-            [...jiraProjects]
-              .sort((a, b) => a.project_name.localeCompare(b.project_name))
-              .map((p) => (
-                <DetailItem
-                  key={p.project_id}
-                  label={p.project_name}
-                  value={<PermissionBadge level={p.role_name} />}
-                />
-              ))
-          ) : (
-            <p className="text-xs text-neutral-500">No Jira access found.</p>
-          )}
+    if (isLoading) {
+      return <p>Loading access details...</p>;
+    }
+
+    // --- START: THE FIX IS HERE ---
+    if (isError) {
+      return (
+        <div className="text-center text-yellow-600 dark:text-yellow-400 p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
+          <AlertTriangle className="mx-auto h-8 w-8 mb-2" />
+          <p className="font-semibold">Could not load details.</p>
+          <p className="text-xs">
+            Your session may have expired. Please try refreshing the page.
+          </p>
         </div>
-        <div>
+      );
+    }
+    // --- END: THE FIX IS HERE ---
+
+    if (app?.jumpcloud_app_id) {
+      return (
+        <div className="space-y-4 text-sm">
           <h4 className="font-semibold flex items-center gap-2 mb-2">
-            <GitBranch size={16} /> Bitbucket Repositories
+            <KeyRound size={16} /> Access via JumpCloud User Group(s)
           </h4>
-          {bitbucketRepositories?.length > 0 ? (
-            [...bitbucketRepositories]
-              .sort((a, b) => a.full_name.localeCompare(b.full_name))
-              .map((r) => (
-                <DetailItem
-                  key={r.repo_uuid}
-                  label={r.full_name}
-                  value={<PermissionBadge level={r.permission_level} />}
-                />
-              ))
-          ) : (
-            <p className="text-xs text-neutral-500">
-              No Bitbucket access found.
-            </p>
-          )}
-        </div>
-        <div>
-          <h4 className="font-semibold flex items-center gap-2 mb-2">
-            <Book size={16} /> Confluence Spaces
-          </h4>
-          {confluenceSpaces?.length > 0 ? (
-            [...confluenceSpaces]
-              .sort((a, b) => a.name.localeCompare(b.name))
-              .map((s) => (
-                <DetailItem
-                  key={s.id}
-                  label={s.name}
-                  value={
-                    <div className="flex flex-wrap gap-1 justify-end">
-                      {(s.permissions || []).map((p) => (
-                        <PermissionBadge key={p} level={p} />
-                      ))}
-                    </div>
-                  }
-                />
-              ))
-          ) : (
-            <p className="text-xs text-neutral-500">
-              No Confluence access found.
-            </p>
-          )}
-        </div>
-      </div>
-    );
-  } else if (
-    app.appName === "JumpCloud" &&
-    detailedAccess?.accessData?.jumpcloud
-  ) {
-    accessContent = (
-      <div className="space-y-4 text-sm">
-        <h4 className="font-semibold flex items-center gap-2 mb-2">
-          <KeyRound size={16} /> SSO Applications
-        </h4>
-        {detailedAccess.accessData.jumpcloud?.length > 0 ? (
-          [...detailedAccess.accessData.jumpcloud]
-            .sort((a, b) => a.display_label.localeCompare(b.display_label))
-            .map((app) => (
+          {jumpcloudGroups && jumpcloudGroups.length > 0 ? (
+            jumpcloudGroups.map((group) => (
               <DetailItem
-                key={app.id}
-                label={app.display_label}
-                value={<PermissionBadge level="Granted" />}
+                key={group.id}
+                label={group.name}
+                value={<PermissionBadge level="Member" />}
               />
             ))
-        ) : (
-          <p className="text-xs text-neutral-500">
-            No JumpCloud SSO access found.
-          </p>
-        )}
-      </div>
+          ) : (
+            <p className="text-xs text-neutral-500">
+              No specific user group grants access. Access might be granted by
+              default policies.
+            </p>
+          )}
+        </div>
+      );
+    }
+
+    if (app.ax.connected && detailedAccess?.accessData) {
+      if (app.appName === "Atlassian" && detailedAccess.accessData.atlassian) {
+        const { jiraProjects, bitbucketRepositories, confluenceSpaces } =
+          detailedAccess.accessData.atlassian;
+        return (
+          <div className="space-y-6 text-sm">
+            <div>
+              <h4 className="font-semibold flex items-center gap-2 mb-2">
+                <Code size={16} /> Jira Projects
+              </h4>
+              {jiraProjects?.length > 0 ? (
+                jiraProjects.map((p) => (
+                  <DetailItem
+                    key={p.project_id}
+                    label={p.project_name}
+                    value={<PermissionBadge level={p.role_name} />}
+                  />
+                ))
+              ) : (
+                <p className="text-xs text-neutral-500">
+                  No Jira access found.
+                </p>
+              )}
+            </div>
+            <div>
+              <h4 className="font-semibold flex items-center gap-2 mb-2">
+                <GitBranch size={16} /> Bitbucket Repositories
+              </h4>
+              {bitbucketRepositories?.length > 0 ? (
+                bitbucketRepositories.map((r) => (
+                  <DetailItem
+                    key={r.repo_uuid}
+                    label={r.full_name}
+                    value={<PermissionBadge level={r.permission_level} />}
+                  />
+                ))
+              ) : (
+                <p className="text-xs text-neutral-500">
+                  No Bitbucket access found.
+                </p>
+              )}
+            </div>
+            <div>
+              <h4 className="font-semibold flex items-center gap-2 mb-2">
+                <Book size={16} /> Confluence Spaces
+              </h4>
+              {confluenceSpaces?.length > 0 ? (
+                confluenceSpaces.map((s) => (
+                  <DetailItem
+                    key={s.id}
+                    label={s.name}
+                    value={
+                      <div className="flex flex-wrap gap-1 justify-end">
+                        {(s.permissions || []).map((p) => (
+                          <PermissionBadge key={p} level={p} />
+                        ))}
+                      </div>
+                    }
+                  />
+                ))
+              ) : (
+                <p className="text-xs text-neutral-500">
+                  No Confluence access found.
+                </p>
+              )}
+            </div>
+          </div>
+        );
+      }
+    }
+
+    return (
+      <p className="text-neutral-500 text-sm">
+        No specific access details available for this application.
+      </p>
     );
-  }
+  };
 
   return (
     <div className="space-y-6">
@@ -185,7 +235,7 @@ export const AppDetailsDrawerContent = ({
             <h3 className="text-md font-semibold text-gray-800 dark:text-gray-200 border-b pb-2 mb-2">
               Platform User Details
             </h3>
-            {isLoading ? (
+            {isLoadingLegacyDetails ? (
               <p>Loading...</p>
             ) : (
               renderObjectDetails(platformStatus.details)
@@ -194,15 +244,9 @@ export const AppDetailsDrawerContent = ({
         )}
       <div>
         <h3 className="text-md font-semibold text-gray-800 dark:text-gray-200 border-b pb-2 mb-2">
-          Application Access
+          Application Access Details
         </h3>
-        {isLoading ? (
-          <p>Loading...</p>
-        ) : isError ? (
-          <p className="text-red-500">Could not load access details.</p>
-        ) : (
-          accessContent
-        )}
+        {renderAccessContent()}
       </div>
     </div>
   );

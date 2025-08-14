@@ -30,6 +30,14 @@ const addAssignment = async (
   try {
     await client.query("BEGIN");
 
+    const ensureCostQuery = `
+      INSERT INTO license_costs (application_id, license_tier, monthly_cost_decimal, currency)
+      VALUES ($1, 'STANDARD', 0.00, 'USD')
+      ON CONFLICT (application_id, license_tier) DO NOTHING;
+    `;
+    await client.query(ensureCostQuery, [applicationId]);
+    // --- FIX END ---
+
     // 1. CHECK FOR DUPLICATES FIRST
     const existingAssignment = await client.query(
       `SELECT id FROM license_assignments WHERE application_id = $1 AND principal_id = $2 AND principal_type = $3`,

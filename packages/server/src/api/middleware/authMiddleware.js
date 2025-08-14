@@ -61,7 +61,6 @@ const authenticateApiKey = async (req, res, next) => {
       return res.status(401).json({ message: "Invalid API Key." });
     }
 
-    // --- ADDED: CHECK FOR EXPIRATION ---
     if (matchedKey.expires_at && new Date() > new Date(matchedKey.expires_at)) {
       return res.status(401).json({ message: "API Key has expired." });
     }
@@ -103,12 +102,15 @@ const authenticateApiKey = async (req, res, next) => {
 
 const authorize = (requiredPermission) => {
   return (req, res, next) => {
-    if (!req.user) {
+    // This robust check prevents crashes.
+    if (!req.user || !req.user.permissions) {
       return res
         .status(401)
-        .json({ message: "Authentication failed, user not found." });
+        .json({
+          message: "Authentication failed, user permissions not found.",
+        });
     }
-    const userPermissions = req.user.permissions || [];
+    const userPermissions = req.user.permissions;
     if (userPermissions.includes(requiredPermission)) {
       next();
     } else {
@@ -120,6 +122,19 @@ const authorize = (requiredPermission) => {
 };
 
 const authorizeAdminOrSelf = (req, res, next) => {
+  // This is the critical fix. It checks if req.user exists before trying to use it.
+  if (
+    !req.user ||
+    typeof req.user.employeeId === "undefined" ||
+    !req.user.permissions
+  ) {
+    return res
+      .status(401)
+      .json({
+        message: "Authentication failed, user information is incomplete.",
+      });
+  }
+
   const userPermissions = req.user.permissions || [];
   const requestedEmployeeId = parseInt(
     req.params.id || req.params.employeeId,
@@ -140,6 +155,19 @@ const authorizeAdminOrSelf = (req, res, next) => {
 };
 
 const authorizeAdminOrSelfForLogs = (req, res, next) => {
+  // This robust check prevents crashes.
+  if (
+    !req.user ||
+    typeof req.user.employeeId === "undefined" ||
+    !req.user.permissions
+  ) {
+    return res
+      .status(401)
+      .json({
+        message: "Authentication failed, user information is incomplete.",
+      });
+  }
+
   const userPermissions = req.user.permissions || [];
   const requestedEmployeeId = parseInt(
     req.params.id || req.params.employeeId,

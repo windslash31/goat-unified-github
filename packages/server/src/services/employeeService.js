@@ -61,8 +61,9 @@ const getEmployeeById = async (employeeId) => {
           'name', ma.name,
           'role', eaa.role,
           'jira_ticket', eaa.jira_ticket,
-          'type', ma.type,          -- ADDED
-          'category', ma.category   -- ADDED
+          'type', ma.type,
+          'category', ma.category,
+          'jumpcloud_app_id', ma.jumpcloud_app_id -- <<< THIS IS THE FIX
       ))
       FROM employee_application_access eaa
       JOIN managed_applications ma ON eaa.application_id = ma.id
@@ -807,6 +808,65 @@ const deactivateOnPlatforms = async (
   };
 };
 
+const getJumpCloudAccessPath = async (employeeId, managedAppId) => {
+  // --- START: DIAGNOSTIC LOGGING ---
+  console.log("--- [DEBUG] Entering getJumpCloudAccessPath ---");
+  console.log(
+    `[DEBUG] Received employeeId: ${employeeId}, managedAppId: ${managedAppId}`
+  );
+
+  if (!employeeId || !managedAppId) {
+    console.log("[DEBUG] Missing IDs. Aborting query.");
+    return [];
+  }
+  // --- END: DIAGNOSTIC LOGGING ---
+
+  const query = `
+    SELECT
+      jg.id,
+      jg.name
+    FROM employees e
+    JOIN jumpcloud_users ju ON e.employee_email = ju.email
+    JOIN jumpcloud_user_group_members jugm ON ju.id = jugm.user_id
+    JOIN jumpcloud_user_groups jg ON jugm.group_id = jg.id
+    JOIN jumpcloud_application_bindings jab ON jg.id = jab.group_id
+    JOIN managed_applications ma ON jab.application_id = ma.jumpcloud_app_id
+    WHERE
+      e.id = $1
+      AND ma.id = $2;
+  `;
+
+  try {
+    const result = await db.query(query, [employeeId, managedAppId]);
+
+    // --- START: DIAGNOSTIC LOGGING ---
+    console.log(
+      `[DEBUG] Query executed successfully for employeeId: ${employeeId}, managedAppId: ${managedAppId}`
+    );
+    console.log(`[DEBUG] Rows returned: ${result.rowCount}`);
+    if (result.rowCount > 0) {
+      console.log("[DEBUG] Found groups:", result.rows);
+    } else {
+      console.log(
+        "[DEBUG] No groups found. This indicates a data mismatch in the JOINs."
+      );
+    }
+    console.log("--- [DEBUG] Exiting getJumpCloudAccessPath ---");
+    // --- END: DIAGNOSTIC LOGGING ---
+
+    return result.rows;
+  } catch (error) {
+    // --- START: DIAGNOSTIC LOGGING ---
+    console.error(
+      `[DEBUG] ERROR executing query for employeeId: ${employeeId}, managedAppId: ${managedAppId}`,
+      error
+    );
+    console.log("--- [DEBUG] Exiting getJumpCloudAccessPath with error ---");
+    // --- END: DIAGNOSTIC LOGGING ---
+    throw error; // Re-throw the error to be handled by the controller
+  }
+};
+
 const bulkDeactivateOnPlatforms = async (
   employeeIds,
   platforms,
@@ -1466,4 +1526,5 @@ module.exports = {
   syncPlatformStatus,
   forceSyncPlatformStatus,
   getAssignmentsForEmployee,
+  getJumpCloudAccessPath,
 };

@@ -4,19 +4,24 @@ const { logActivity } = require("./logService");
 const getLicenseData = async () => {
   const query = `
       SELECT
-          ma.id, ma.name, ma.description, ma.category, ma.type,
+          ma.id,
+          ma.name,
+          ma.description,
+          ma.category,
+          ma.type,
+          ma.jumpcloud_app_id, -- <<< THIS LINE WAS MISSING
           COALESCE(lc.license_tier, 'STANDARD') as license_tier,
           COALESCE(lc.monthly_cost_decimal, 0.00) as cost_per_seat_monthly,
           COALESCE(lc.currency, 'USD') as currency,
           COALESCE(lc.total_seats, 0) as total_seats,
-          lc.purchase_date, -- ADD THIS
-          lc.renewal_date,   -- ADD THIS
+          lc.purchase_date,
+          lc.renewal_date,
           COUNT(la.id) as assigned_seats
       FROM managed_applications ma
       LEFT JOIN license_costs lc ON ma.id = lc.application_id
       LEFT JOIN license_assignments la ON ma.id = la.application_id
       WHERE ma.is_licensable = TRUE
-      GROUP BY ma.id, lc.id -- Group by lc.id to get all fields
+      GROUP BY ma.id, lc.id
       ORDER BY ma.name;
     `;
   const result = await db.query(query);

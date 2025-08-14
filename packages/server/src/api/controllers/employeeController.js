@@ -419,6 +419,19 @@ const getEmployeeAssignments = async (req, res, next) => {
   }
 };
 
+const getJumpCloudAccessDetails = async (req, res, next) => {
+  try {
+    const { id, managedAppId } = req.params; // Use the new param name
+    const accessPath = await employeeService.getJumpCloudAccessPath(
+      id,
+      managedAppId
+    );
+    res.json(accessPath);
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   listEmployees,
   getEmployee,
@@ -445,4 +458,5 @@ module.exports = {
   getEmployeeAtlassianAccess,
   getEmployeeApplicationAccess,
   getEmployeeAssignments,
+  getJumpCloudAccessDetails,
 };
