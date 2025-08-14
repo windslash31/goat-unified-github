@@ -168,6 +168,7 @@ router.get(
 
 router.get(
   "/:id/managed-app-access/:managedAppId",
+  authenticateToken,
   authorizeAdminOrSelf,
   employeeController.getJumpCloudAccessDetails
 );

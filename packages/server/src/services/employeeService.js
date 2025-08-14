@@ -809,27 +809,25 @@ const deactivateOnPlatforms = async (
 };
 
 const getJumpCloudAccessPath = async (employeeId, managedAppId) => {
-  // --- START: DIAGNOSTIC LOGGING ---
-  console.log("--- [DEBUG] Entering getJumpCloudAccessPath ---");
-  console.log(
-    `[DEBUG] Received employeeId: ${employeeId}, managedAppId: ${managedAppId}`
-  );
-
   if (!employeeId || !managedAppId) {
-    console.log("[DEBUG] Missing IDs. Aborting query.");
     return [];
   }
-  // --- END: DIAGNOSTIC LOGGING ---
 
+  // This query now correctly implements the logic you described.
   const query = `
     SELECT
       jg.id,
       jg.name
     FROM employees e
+    -- 1. Find the JumpCloud user by matching the employee's email
     JOIN jumpcloud_users ju ON e.employee_email = ju.email
+    -- 2. Find all group memberships for that JumpCloud user
     JOIN jumpcloud_user_group_members jugm ON ju.id = jugm.user_id
+    -- 3. Get the details of those groups
     JOIN jumpcloud_user_groups jg ON jugm.group_id = jg.id
+    -- 4. Find which of those groups are bound to any application
     JOIN jumpcloud_application_bindings jab ON jg.id = jab.group_id
+    -- 5. Find the specific managed application record using its JumpCloud App ID
     JOIN managed_applications ma ON jab.application_id = ma.jumpcloud_app_id
     WHERE
       e.id = $1
@@ -838,32 +836,13 @@ const getJumpCloudAccessPath = async (employeeId, managedAppId) => {
 
   try {
     const result = await db.query(query, [employeeId, managedAppId]);
-
-    // --- START: DIAGNOSTIC LOGGING ---
-    console.log(
-      `[DEBUG] Query executed successfully for employeeId: ${employeeId}, managedAppId: ${managedAppId}`
-    );
-    console.log(`[DEBUG] Rows returned: ${result.rowCount}`);
-    if (result.rowCount > 0) {
-      console.log("[DEBUG] Found groups:", result.rows);
-    } else {
-      console.log(
-        "[DEBUG] No groups found. This indicates a data mismatch in the JOINs."
-      );
-    }
-    console.log("--- [DEBUG] Exiting getJumpCloudAccessPath ---");
-    // --- END: DIAGNOSTIC LOGGING ---
-
-    return result.rows;
+    return result.rows; // This will now return the list of user groups
   } catch (error) {
-    // --- START: DIAGNOSTIC LOGGING ---
     console.error(
-      `[DEBUG] ERROR executing query for employeeId: ${employeeId}, managedAppId: ${managedAppId}`,
+      `[ERROR] Failed to get JumpCloud access path for employee ${employeeId}:`,
       error
     );
-    console.log("--- [DEBUG] Exiting getJumpCloudAccessPath with error ---");
-    // --- END: DIAGNOSTIC LOGGING ---
-    throw error; // Re-throw the error to be handled by the controller
+    throw error;
   }
 };
 
