@@ -473,35 +473,36 @@ const syncAllAtlassianUsers = async () => {
   let allUsers = [];
   let nextCursor = null;
   let keepFetching = true;
-
-  // --- FIX: Use the new Bearer token for authorization ---
-  const headers = {
+  const orgApiHeaders = {
     Authorization: `Bearer ${config.atlassian.orgToken}`,
     Accept: "application/json",
   };
+  const userApiHeaders = {
+    Authorization: `Basic ${Buffer.from(
+      `${config.atlassian.apiUser}:${config.atlassian.apiToken}`
+    ).toString("base64")}`,
+    Accept: "application/json",
+  };
 
-  // The rest of the function remains the same
+  // Step 1: Fetch the list of all users from the Organization API
   while (keepFetching) {
     const url = `https://api.atlassian.com/admin/v1/orgs/${
       config.atlassian.orgId
     }/users?limit=100${nextCursor ? `&cursor=${nextCursor}` : ""}`;
 
     try {
-      const response = await fetch(url, { headers });
+      const response = await fetch(url, { headers: orgApiHeaders });
       if (!response.ok) {
         const errorBody = await response.text();
         throw new Error(
           `Atlassian API Error: ${response.status} - ${errorBody}`
         );
       }
-
       const page = await response.json();
       const users = page.data;
-
       if (users && users.length > 0) {
         allUsers = allUsers.concat(users);
       }
-
       if (page.links && page.links.next) {
         const nextUrl = new URL(page.links.next);
         nextCursor = nextUrl.searchParams.get("cursor");
@@ -524,18 +525,19 @@ const syncAllAtlassianUsers = async () => {
     await client.query("BEGIN");
     for (const user of allUsers) {
       const query = `
-        INSERT INTO atlassian_users (
-          account_id, email_address, display_name, account_status, 
-          billable, product_access, last_updated_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, NOW())
-        ON CONFLICT (account_id) DO UPDATE SET
-          email_address = EXCLUDED.email_address,
-          display_name = EXCLUDED.display_name,
-          account_status = EXCLUDED.account_status,
-          billable = EXCLUDED.billable,
-          product_access = EXCLUDED.product_access,
-          last_updated_at = NOW();
-      `;
+      INSERT INTO atlassian_users (
+        account_id, email_address, display_name, account_status, 
+        billable, product_access, last_active_date, last_updated_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+      ON CONFLICT (account_id) DO UPDATE SET
+        email_address = EXCLUDED.email_address,
+        display_name = EXCLUDED.display_name,
+        account_status = EXCLUDED.account_status,
+        billable = EXCLUDED.billable,
+        product_access = EXCLUDED.product_access,
+        last_active_date = EXCLUDED.last_active_date,
+        last_updated_at = NOW();
+    `;
       const values = [
         user.account_id,
         user.email,
@@ -543,6 +545,7 @@ const syncAllAtlassianUsers = async () => {
         user.account_status,
         user.access_billable,
         user.product_access ? JSON.stringify(user.product_access) : null,
+        user.last_active,
       ];
       await client.query(query, values);
     }
