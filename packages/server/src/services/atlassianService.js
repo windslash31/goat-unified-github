@@ -367,12 +367,24 @@ const getAtlassianAccessByAccountId = async (atlassianAccountId) => {
   }
 
   const jiraProjectsQuery = `
-    SELECT DISTINCT p.project_id, p.project_key, p.project_name, r.role_name
+    WITH user_groups AS (
+        SELECT group_id 
+        FROM atlassian_group_members 
+        WHERE account_id = $1
+    )
+    SELECT DISTINCT 
+        p.project_id, 
+        p.project_key, 
+        p.project_name, 
+        r.role_name
     FROM jira_project_permissions jpp
     JOIN jira_projects p ON p.project_id = jpp.project_id
     LEFT JOIN jira_roles r ON r.role_id = jpp.role_id
-    WHERE jpp.actor_id = $1 AND jpp.actor_type = 'user';
-  `;
+    WHERE 
+        (jpp.actor_type = 'atlassian-user-role-actor' AND jpp.actor_id = $1)
+        OR 
+        (jpp.actor_type = 'atlassian-group-role-actor' AND jpp.actor_id IN (SELECT group_id FROM user_groups));
+`;
   const jiraRes = await db.query(jiraProjectsQuery, [atlassianAccountId]);
 
   const bitbucketReposQuery = `
