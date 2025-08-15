@@ -37,7 +37,6 @@ const authenticateToken = async (req, res, next) => {
 
 const authenticateApiKey = async (req, res, next) => {
   const apiKey = req.headers["x-api-key"];
-
   if (!apiKey) {
     return res.status(401).json({ message: "API Key is missing." });
   }
@@ -61,7 +60,6 @@ const authenticateApiKey = async (req, res, next) => {
       return res.status(401).json({ message: "Invalid API Key." });
     }
 
-    // --- ADDED: CHECK FOR EXPIRATION ---
     if (matchedKey.expires_at && new Date() > new Date(matchedKey.expires_at)) {
       return res.status(401).json({ message: "API Key has expired." });
     }
@@ -84,7 +82,6 @@ const authenticateApiKey = async (req, res, next) => {
       "SELECT p.name FROM permissions p JOIN role_permissions rp ON p.id = rp.permission_id WHERE rp.role_id = $1",
       [user.role_id]
     );
-
     req.user = {
       id: user.id,
       employeeId: user.employee_id,
@@ -93,7 +90,6 @@ const authenticateApiKey = async (req, res, next) => {
       role: user.role_name,
       permissions: permsResult.rows.map((p) => p.name),
     };
-
     next();
   } catch (err) {
     console.error("API Key Authentication error:", err);
@@ -119,7 +115,8 @@ const authorize = (requiredPermission) => {
   };
 };
 
-const authorizeAdminOrSelf = (req, res, next) => {
+// FULLY REVISED FUNCTION
+const authorizeAdminOrSelf = async (req, res, next) => {
   const userPermissions = req.user.permissions || [];
   const requestedEmployeeId = parseInt(
     req.params.id || req.params.employeeId,
@@ -127,11 +124,28 @@ const authorizeAdminOrSelf = (req, res, next) => {
   );
   const userEmployeeId = req.user.employeeId;
 
-  if (
+  const hasPermission =
     userPermissions.includes("employee:read:all") ||
-    requestedEmployeeId === userEmployeeId
-  ) {
-    next();
+    requestedEmployeeId === userEmployeeId;
+
+  if (hasPermission) {
+    try {
+      // Fetch the employee record since permission is granted
+      const employeeResult = await db.query(
+        "SELECT * FROM employees WHERE id = $1",
+        [requestedEmployeeId]
+      );
+
+      if (employeeResult.rows.length === 0) {
+        return res.status(404).json({ message: "Employee not found." });
+      }
+
+      // Attach the employee object to the request
+      req.employee = employeeResult.rows[0];
+      next();
+    } catch (error) {
+      next(error);
+    }
   } else {
     res.status(403).json({
       message: "Forbidden: You do not have permission to view this resource.",
@@ -146,7 +160,6 @@ const authorizeAdminOrSelfForLogs = (req, res, next) => {
     10
   );
   const userEmployeeId = req.user.employeeId;
-
   if (
     userPermissions.includes("log:read:platform") ||
     requestedEmployeeId === userEmployeeId
