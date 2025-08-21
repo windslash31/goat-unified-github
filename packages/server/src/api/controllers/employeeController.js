@@ -81,28 +81,6 @@ const getPlatformStatuses = async (req, res, next) => {
   }
 };
 
-const getJumpCloudLogs = async (req, res, next) => {
-  try {
-    const { startTime, endTime, limit, service } = req.query;
-    const logs = await employeeService.getJumpCloudLogs(
-      req.params.id,
-      startTime,
-      endTime,
-      limit,
-      service
-    );
-    res.json(logs);
-  } catch (error) {
-    if (error.message.includes("not found")) {
-      return res.status(404).json({ message: error.message });
-    }
-    if (error.message.includes("API Error")) {
-      return res.status(502).json({ message: error.message });
-    }
-    next(error);
-  }
-};
-
 const getEmployeeOptions = async (req, res, next) => {
   try {
     const tableName = req.params.table || req.params.tableName;
@@ -113,24 +91,6 @@ const getEmployeeOptions = async (req, res, next) => {
 
     const options = await employeeService.getEmployeeOptions(tableName);
     res.json(options);
-  } catch (error) {
-    next(error);
-  }
-};
-
-const getGoogleLogs = async (req, res, next) => {
-  try {
-    const logs = await employeeService.getGoogleLogs(req.params.id);
-    res.json(logs);
-  } catch (error) {
-    next(error);
-  }
-};
-
-const getSlackLogs = async (req, res, next) => {
-  try {
-    const logs = await employeeService.getSlackLogs(req.params.id);
-    res.json(logs);
   } catch (error) {
     next(error);
   }
@@ -328,6 +288,54 @@ const getEmployeeImportTemplate = (req, res) => {
   res.send(csv);
 };
 
+const getPlatformLogs = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { platform, ...filters } = req.query;
+    if (!platform) {
+      return res
+        .status(400)
+        .json({ message: "A platform query parameter is required." });
+    }
+    const logs = await employeeService.getPlatformLogsFromDB(
+      id,
+      platform,
+      filters
+    );
+    res.json(logs);
+  } catch (error) {
+    next(error);
+  }
+};
+
+const onboardDeferred = async (req, res, next) => {
+  try {
+    const employeeData = req.body;
+    const reqContext = { ip: req.ip, userAgent: req.headers["user-agent"] };
+    const result = await employeeService.onboardDeferred(
+      employeeData,
+      req.user.id,
+      reqContext
+    );
+    res.status(202).json(result); // 202 Accepted
+  } catch (error) {
+    next(error);
+  }
+};
+
+const reconcileManagers = async (req, res, next) => {
+  try {
+    const reqContext = { ip: req.ip, userAgent: req.headers["user-agent"] };
+    const result = await employeeService.reconcileManagers(
+      req.user.id,
+      reqContext
+    );
+    res.status(200).json(result);
+  } catch (error) {
+    next(error);
+  }
+};
+
 const getEmployeeDevices = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -469,9 +477,7 @@ module.exports = {
   deactivateOnPlatforms,
   bulkDeactivateOnPlatforms,
   getPlatformStatuses,
-  getJumpCloudLogs,
-  getGoogleLogs,
-  getSlackLogs,
+  getPlatformLogs,
   getUnifiedTimeline,
   exportEmployees,
   getLicenseDetails,
@@ -483,4 +489,6 @@ module.exports = {
   getEmployeeAtlassianAccess,
   getEmployeeApplicationAccess,
   getApplicationAccessDetails,
+  onboardDeferred,
+  reconcileManagers,
 };

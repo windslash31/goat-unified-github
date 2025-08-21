@@ -622,7 +622,7 @@ const reconcileSsoAccess = async () => {
             INSERT INTO user_accounts (user_id, app_instance_id, status, last_seen_at)
             VALUES ($1, $2, 'active', NOW())
             ON CONFLICT (user_id, app_instance_id) DO UPDATE SET
-              status = 'active',
+               status = 'active',
               last_seen_at = NOW();
             `,
             [employeeId, app.app_instance_id]
@@ -661,6 +661,196 @@ const reconcileSsoAccess = async () => {
   }
 };
 
+const syncAllUserLogs = async () => {
+  console.log(
+    "CRON JOB: Starting JumpCloud log sync (ingesting ALL raw logs)..."
+  );
+  const client = await db.pool.connect();
+
+  try {
+    // Reconciliation Step to link previously unmatched logs
+    console.log("CRON JOB: Reconciling previously unmatched logs...");
+    const emailUpdateResult = await client.query(`
+      UPDATE jumpcloud_logs l SET employee_id = e.id
+      FROM employees e
+      WHERE l.employee_id IS NULL
+      AND e.employee_email = l.details -> 'initiated_by' ->> 'email';
+    `);
+    const usernameUpdateResult = await client.query(`
+      UPDATE jumpcloud_logs l SET employee_id = e.id
+      FROM jumpcloud_users ju
+      JOIN employees e ON ju.email = e.employee_email
+      WHERE l.employee_id IS NULL
+      AND ju.username = l.details -> 'initiated_by' ->> 'username';
+    `);
+    const reconciledCount =
+      emailUpdateResult.rowCount + usernameUpdateResult.rowCount;
+    if (reconciledCount > 0) {
+      console.log(
+        `CRON JOB: Successfully linked ${reconciledCount} previously unmatched logs.`
+      );
+    }
+
+    // Prepare lookup maps
+    const employeesResult = await client.query(
+      "SELECT id, employee_email FROM employees"
+    );
+    const emailToEmployeeIdMap = new Map(
+      employeesResult.rows.map((e) => [e.employee_email, e.id])
+    );
+
+    const jcUsersResult = await client.query(
+      "SELECT username, email FROM jumpcloud_users"
+    );
+    const usernameToEmailMap = new Map(
+      jcUsersResult.rows.map((u) => [u.username, u.email])
+    );
+
+    // Get last synced timestamp
+    const lastLogResult = await client.query(
+      "SELECT timestamp FROM jumpcloud_logs ORDER BY timestamp DESC LIMIT 1"
+    );
+
+    let startTime;
+    if (lastLogResult.rows[0]?.timestamp) {
+      startTime = lastLogResult.rows[0].timestamp.toISOString();
+    } else {
+      startTime = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
+      console.log(
+        "CRON JOB: No previous JumpCloud logs found. Starting sync from 90 days ago."
+      );
+    }
+
+    let keepFetching = true;
+    let searchAfterToken = null;
+    let totalIngested = 0;
+
+    await client.query("BEGIN");
+
+    while (keepFetching) {
+      const body = {
+        service: ["all"],
+        sort: "asc",
+        limit: 10000,
+        start_time: startTime,
+        ...(searchAfterToken && { search_after: searchAfterToken }),
+      };
+
+      const response = await fetch(
+        "https://api.jumpcloud.com/insights/directory/v1/events",
+        {
+          method: "POST",
+          headers: {
+            "x-api-key": API_KEY,
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+          body: JSON.stringify(body),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(
+          `JumpCloud Events API Error: ${
+            response.status
+          } ${await response.text()}`
+        );
+      }
+
+      const resultCount = parseInt(response.headers.get("x-result-count"), 10);
+      const limit = parseInt(response.headers.get("x-limit"), 10);
+      const searchAfterHeader = response.headers.get("x-search_after");
+      const newLogs = await response.json();
+
+      if (newLogs && newLogs.length > 0) {
+        const values = [];
+        const valuePlaceholders = [];
+        let paramIndex = 1;
+
+        for (const log of newLogs) {
+          // ** FIX: Skip any log that is missing the essential event_type field **
+          if (!log.event_type) {
+            console.warn(
+              "CRON JOB: Skipping a malformed log from JumpCloud API (missing event_type).",
+              log
+            );
+            continue; // Go to the next log
+          }
+
+          let employeeId = null;
+          const initiatedBy = log.initiated_by || {};
+
+          if (
+            initiatedBy.email &&
+            emailToEmployeeIdMap.has(initiatedBy.email)
+          ) {
+            employeeId = emailToEmployeeIdMap.get(initiatedBy.email);
+          } else if (
+            initiatedBy.username &&
+            usernameToEmailMap.has(initiatedBy.username)
+          ) {
+            const emailFromUsername = usernameToEmailMap.get(
+              initiatedBy.username
+            );
+            if (emailToEmployeeIdMap.has(emailFromUsername)) {
+              employeeId = emailToEmployeeIdMap.get(emailFromUsername);
+            }
+          }
+
+          values.push(
+            employeeId,
+            log.event_type,
+            log.timestamp,
+            log.success,
+            log.client_ip,
+            JSON.stringify(log)
+          );
+
+          const placeholders = [];
+          for (let i = 0; i < 6; i++) {
+            placeholders.push(`$${paramIndex++}`);
+          }
+          valuePlaceholders.push(`(${placeholders.join(", ")})`);
+        }
+
+        if (values.length > 0) {
+          const insertQuery = `
+            INSERT INTO jumpcloud_logs (employee_id, event_type, timestamp, success, client_ip, details)
+            VALUES ${valuePlaceholders.join(", ")}
+          `;
+          await client.query(insertQuery, values);
+          totalIngested += values.length / 6;
+        }
+
+        console.log(
+          `CRON JOB: Bulk ingested a page of ${newLogs.length} raw logs. Total so far: ${totalIngested}`
+        );
+      }
+
+      if (resultCount < limit) {
+        keepFetching = false;
+      } else {
+        searchAfterToken = JSON.parse(searchAfterHeader);
+      }
+    }
+
+    await client.query("COMMIT");
+
+    console.log(
+      `CRON JOB: Sync complete. Successfully ingested a total of ${totalIngested} new raw JumpCloud logs.`
+    );
+  } catch (error) {
+    await client.query("ROLLBACK");
+    console.error(
+      "CRON JOB: Error during JumpCloud log sync. Transaction rolled back.",
+      error
+    );
+    throw error;
+  } finally {
+    client.release();
+  }
+};
+
 module.exports = {
   suspendUser,
   getUserStatus,
@@ -673,4 +863,5 @@ module.exports = {
   syncAllJumpCloudGroupMembers,
   syncUserData,
   reconcileSsoAccess,
+  syncAllUserLogs,
 };

@@ -13,8 +13,8 @@ const googleService = require("../services/googleService");
 const slackService = require("../services/slackService");
 
 let isMasterSyncRunning = false;
-const BATCH_SIZE = 20; // A shared batch size for individual syncs
-const DELAY_BETWEEN_BATCHES_MS = 1000; // 1 second delay
+const BATCH_SIZE = 20;
+const DELAY_BETWEEN_BATCHES_MS = 1000;
 
 // --- JUMPCLOUD SYNC LOGIC ---
 const syncAllJumpCloudData = async () => {
@@ -235,13 +235,14 @@ const runAllSyncs = async () => {
   console.log("CRON JOB: Starting master sync job for all platforms...");
   try {
     // Step 1: Run all raw data syncs
-    await syncAllJumpCloudData(); // This also handles SSO app reconciliation
-    await atlassianService.syncAllAtlassianData();
-    await runIndividualUserSync("google_sync", googleService.syncUserData);
-    await runIndividualUserSync("slack_sync", slackService.syncUserData);
+    //await syncAllJumpCloudData(); // This also handles SSO app reconciliation
+    //await atlassianService.syncAllAtlassianData();
+    //await runIndividualUserSync("google_sync", googleService.syncUserData);
+    //await runIndividualUserSync("slack_sync", slackService.syncUserData);
+    await reconcileDirectApiAccess();
+    //await jumpcloudService.syncAllUserLogs();
 
     // Step 2: Run the new final reconciliation for direct API apps
-    await reconcileDirectApiAccess();
   } catch (error) {
     console.error(
       "CRON JOB: Master sync stopped due to a failure in a sub-process.",

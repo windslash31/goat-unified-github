@@ -1,7 +1,8 @@
-import React, { useState, useCallback, useMemo } from "react";
+// In packages/client/src/pages/EmployeeDetailPage/PlatformLogPage.jsx
+import React, { useState, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Filter } from "lucide-react";
 import { CustomSelect } from "../../components/ui/CustomSelect";
-import { Button } from "../../components/ui/Button";
 import { JumpCloudLogPage } from "./JumpcloudLogPage";
 import { GoogleLogPage } from "./GoogleLogPage";
 import { SlackLogPage } from "./SlackLogPage";
@@ -14,31 +15,21 @@ const platformOptions = [
 ];
 
 const jumpCloudServiceOptions = [
-  { id: "all", name: "All" },
-  { id: "access_management", name: "Access Management" },
-  { id: "alert", name: "Alert" },
+  { id: "all", name: "All Services" },
+  { id: "sso", name: "SSO" },
   { id: "directory", name: "Directory" },
   { id: "ldap", name: "LDAP" },
-  { id: "mdm", name: "MDM" },
-  { id: "notifications", name: "Notifications" },
-  { id: "password_manager", name: "Password Manager" },
-  { id: "object_storage", name: "Object Storage" },
-  { id: "radius", name: "RADIUS" },
-  { id: "reports", name: "Reports" },
-  { id: "software", name: "Software" },
-  { id: "sso", name: "SSO" },
   { id: "systems", name: "Systems" },
 ];
 
-export const PlatformLogPage = ({ employeeId, onLogout }) => {
-  const [selectedPlatform, setSelectedPlatform] = useState("jumpcloud");
-  const [logData, setLogData] = useState({
-    data: [],
-    loading: false,
-    error: null,
-    fetched: false,
-  });
+const limitOptions = [
+  { id: 100, name: "100 Results" },
+  { id: 500, name: "500 Results" },
+  { id: 1000, name: "1000 Results" },
+];
 
+export const PlatformLogPage = ({ employeeId }) => {
+  const [selectedPlatform, setSelectedPlatform] = useState("jumpcloud");
   const [filterParams, setFilterParams] = useState({
     startTime: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
       .toISOString()
@@ -48,52 +39,26 @@ export const PlatformLogPage = ({ employeeId, onLogout }) => {
     service: "all",
   });
 
-  const fetchLogData = useCallback(async () => {
-    if (!employeeId) return;
-
-    setLogData({ data: [], loading: true, error: null, fetched: false });
-
-    let url;
-    const baseUrl = `/api/employees/${employeeId}`;
-
-    switch (selectedPlatform) {
-      case "jumpcloud":
-        const params = new URLSearchParams({
-          startTime: filterParams.startTime,
-          endTime: filterParams.endTime,
-          limit: filterParams.limit,
-          service: filterParams.service,
-        });
-        url = `${baseUrl}/jumpcloud-logs?${params.toString()}`;
-        break;
-      case "google":
-        url = `${baseUrl}/google-logs`;
-        break;
-      case "slack":
-        url = `${baseUrl}/slack-logs`;
-        break;
-      default:
-        setLogData({
-          data: [],
-          loading: false,
-          error: "Invalid platform selected",
-          fetched: true,
-        });
-        return;
-    }
-
-    try {
-      const { data } = await api.get(url);
-      setLogData({ data, loading: false, error: null, fetched: true });
-    } catch (error) {
-      setLogData({
-        data: [],
-        loading: false,
-        error: error.response?.data?.message || "Failed to fetch logs",
-        fetched: true,
+  const {
+    data: logData,
+    isLoading,
+    error,
+    isFetching,
+  } = useQuery({
+    queryKey: ["platformLogs", employeeId, selectedPlatform, filterParams],
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        platform: selectedPlatform,
+        ...filterParams,
       });
-    }
-  }, [employeeId, selectedPlatform, filterParams]);
+      const { data } = await api.get(
+        `/api/employees/${employeeId}/platform-logs?${params}`
+      );
+      return data;
+    },
+    enabled: !!employeeId, // Query will run automatically
+    keepPreviousData: true, // Prevents UI flicker while new data loads
+  });
 
   const handleFilterChange = (e) => {
     setFilterParams((prev) => ({ ...prev, [e.target.name]: e.target.value }));
@@ -108,46 +73,33 @@ export const PlatformLogPage = ({ employeeId, onLogout }) => {
       case "jumpcloud":
         return (
           <JumpCloudLogPage
-            logs={logData.data}
-            loading={logData.loading}
-            error={logData.error}
+            logs={logData}
+            loading={isLoading || isFetching}
+            error={error}
           />
         );
       case "google":
         return (
           <GoogleLogPage
-            logs={logData.data}
-            loading={logData.loading}
-            error={logData.error}
+            logs={logData}
+            loading={isLoading || isFetching}
+            error={error}
           />
         );
       case "slack":
         return (
           <SlackLogPage
-            logs={logData.data}
-            loading={logData.loading}
-            error={logData.error}
+            logs={logData}
+            loading={isLoading || isFetching}
+            error={error}
           />
         );
       default:
-        return (
-          <div className="p-8 text-center">
-            Please select a platform to view logs.
-          </div>
-        );
+        return null;
     }
-  }, [selectedPlatform, logData]);
+  }, [selectedPlatform, logData, isLoading, error, isFetching]);
 
   const maxDate = new Date().toISOString().split("T")[0];
-  const minDate = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000)
-    .toISOString()
-    .split("T")[0];
-  const limitOptions = [
-    { id: 10, name: "10" },
-    { id: 100, name: "100" },
-    { id: 500, name: "500" },
-    { id: 1000, name: "1000" },
-  ];
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
@@ -169,9 +121,9 @@ export const PlatformLogPage = ({ employeeId, onLogout }) => {
         {selectedPlatform === "jumpcloud" && (
           <div className="p-4 border border-gray-200 dark:border-gray-700 rounded-md">
             <h4 className="font-semibold text-md mb-2 flex items-center gap-2">
-              <Filter size={16} /> JumpCloud Filters
+              <Filter size={16} /> Filters
             </h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
               <div>
                 <label
                   htmlFor="service"
@@ -212,7 +164,6 @@ export const PlatformLogPage = ({ employeeId, onLogout }) => {
                   name="startTime"
                   id="startTime"
                   value={filterParams.startTime}
-                  min={minDate}
                   max={maxDate}
                   onChange={handleFilterChange}
                   className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 rounded-md shadow-sm focus:ring-2 focus:ring-kredivo-primary"
@@ -239,17 +190,6 @@ export const PlatformLogPage = ({ employeeId, onLogout }) => {
             </div>
           </div>
         )}
-        <Button
-          onClick={fetchLogData}
-          disabled={logData.loading}
-          className="w-full md:w-auto justify-center"
-        >
-          {logData.loading
-            ? "Fetching..."
-            : `Fetch ${
-                platformOptions.find((p) => p.id === selectedPlatform)?.name
-              } Logs`}
-        </Button>
       </div>
       <div className="p-4">{LogViewer}</div>
     </div>

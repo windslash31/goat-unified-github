@@ -674,77 +674,56 @@ const updateOffboardingFromTicket = async (ticketData, actorId, reqContext) => {
   return await updateEmployee(employeeId, updatedData, actorId, reqContext);
 };
 
-const getJumpCloudLogs = async (
-  employeeId,
-  startTime,
-  endTime,
-  limit,
-  service = "all"
-) => {
-  if (!process.env.JUMPCLOUD_API_KEY) {
-    throw new Error("Server configuration error for JumpCloud.");
+const getPlatformLogsFromDB = async (employeeId, platform, filters = {}) => {
+  let tableName;
+  const whereClauses = ["employee_id = $1"];
+  const queryParams = [employeeId];
+  let paramIndex = 2;
+
+  switch (platform) {
+    case "jumpcloud":
+      tableName = "jumpcloud_logs";
+      // Add specific filters for JumpCloud
+      if (filters.service && filters.service !== "all") {
+        whereClauses.push(`details ->> 'service' = $${paramIndex++}`);
+        queryParams.push(filters.service);
+      }
+      break;
+    case "google":
+      tableName = "google_workspace_logs";
+      // Add filters for Google here in the future
+      break;
+    default:
+      throw new Error("Invalid or unsupported platform specified for logs.");
   }
 
-  const employeeEmailRes = await db.query(
-    "SELECT employee_email FROM employees WHERE id = $1",
-    [employeeId]
-  );
-  if (employeeEmailRes.rows.length === 0) {
-    throw new Error("Employee not found.");
+  // Add generic filters like date range
+  if (filters.startTime) {
+    whereClauses.push(`timestamp >= $${paramIndex++}`);
+    queryParams.push(filters.startTime);
   }
-  const email = employeeEmailRes.rows[0].employee_email;
-  const user = await jumpcloudService.getUser(email);
-  if (!user || !user.username) {
-    return [];
-  }
-
-  const eventsUrl = "https://api.jumpcloud.com/insights/directory/v1/events";
-
-  const parsedLimit = parseInt(limit, 10);
-  const effectiveLimit = isNaN(parsedLimit)
-    ? 100
-    : Math.max(10, Math.min(parsedLimit, 1000));
-
-  const body = {
-    service: [service], // Use the service parameter
-    sort: "DESC",
-    search_term: {
-      and: [{ "initiated_by.username": user.username }],
-    },
-    limit: effectiveLimit,
-  };
-
-  if (startTime) {
-    body.start_time = new Date(startTime).toISOString();
-  } else {
-    body.start_time = new Date(
-      Date.now() - 90 * 24 * 60 * 60 * 1000
-    ).toISOString();
+  if (filters.endTime) {
+    // To make the end date inclusive, we check for dates less than the next day
+    const inclusiveEndDate = new Date(filters.endTime);
+    inclusiveEndDate.setDate(inclusiveEndDate.getDate() + 1);
+    whereClauses.push(`timestamp < $${paramIndex++}`);
+    queryParams.push(inclusiveEndDate.toISOString().split("T")[0]);
   }
 
-  if (endTime) {
-    const endDate = new Date(endTime);
-    endDate.setHours(23, 59, 59, 999);
-    body.end_time = endDate.toISOString();
-  }
+  const whereCondition =
+    whereClauses.length > 0 ? `WHERE ${whereClauses.join(" AND ")}` : "";
+  const limit = parseInt(filters.limit, 10) || 100;
+  queryParams.push(limit);
 
-  const eventsResponse = await fetch(eventsUrl, {
-    method: "POST",
-    headers: {
-      "x-api-key": process.env.JUMPCLOUD_API_KEY,
-      "Content-Type": "application/json",
-      Accept: "application/json",
-    },
-    body: JSON.stringify(body),
-  });
+  const query = `
+    SELECT * FROM ${tableName}
+    ${whereCondition}
+    ORDER BY timestamp DESC
+    LIMIT $${paramIndex}
+  `;
 
-  if (!eventsResponse.ok) {
-    const errorBody = await eventsResponse.text();
-    console.error("JumpCloud API Error:", errorBody);
-    throw new Error(`JumpCloud Events API Error: ${eventsResponse.status}.`);
-  }
-
-  return eventsResponse.json();
+  const result = await db.query(query, queryParams);
+  return result.rows;
 };
 
 const getGoogleLogs = async (employeeId) => {
@@ -1451,13 +1430,135 @@ const getApplicationAccess = async (employeeId) => {
   }
 };
 
+const onboardDeferred = async (employeeData, actorId, reqContext) => {
+  const { manager_email, ...restOfEmployeeData } = employeeData;
+
+  // Pre-fetch all possible related entities to create lookup maps
+  const [legalEntities, officeLocations, employeeTypes, employeeSubTypes] =
+    await Promise.all([
+      db.query("SELECT id, name FROM legal_entities"),
+      db.query("SELECT id, name FROM office_locations"),
+      db.query("SELECT id, name FROM employee_types"),
+      db.query("SELECT id, name FROM employee_sub_types"),
+    ]);
+
+  const legalEntityMap = new Map(
+    legalEntities.rows.map((item) => [item.name, item.id])
+  );
+  const officeLocationMap = new Map(
+    officeLocations.rows.map((item) => [item.name, item.id])
+  );
+  const employeeTypeMap = new Map(
+    employeeTypes.rows.map((item) => [item.name, item.id])
+  );
+  const employeeSubTypeMap = new Map(
+    employeeSubTypes.rows.map((item) => [item.name, item.id])
+  );
+
+  const resolvedData = {
+    ...restOfEmployeeData,
+    legal_entity_id: legalEntityMap.get(employeeData.legal_entity_name),
+    office_location_id: officeLocationMap.get(
+      employeeData.office_location_name
+    ),
+    employee_type_id: employeeTypeMap.get(employeeData.employee_type_name),
+    employee_sub_type_id: employeeSubTypeMap.get(
+      employeeData.employee_sub_type_name
+    ),
+  };
+
+  const allowedFields = [
+    "first_name",
+    "last_name",
+    "middle_name",
+    "employee_email",
+    "position_name",
+    "join_date",
+    "asset_name",
+    "onboarding_ticket",
+    "legal_entity_id",
+    "office_location_id",
+    "employee_type_id",
+    "employee_sub_type_id",
+    "pending_manager_email",
+  ];
+
+  const columns = [];
+  const values = [];
+  const valuePlaceholders = [];
+  let paramIndex = 1;
+
+  for (const field of allowedFields) {
+    let value = resolvedData[field];
+    if (field === "pending_manager_email") value = manager_email;
+
+    if (value !== undefined && value !== null) {
+      columns.push(field);
+      values.push(value);
+      valuePlaceholders.push(`$${paramIndex++}`);
+    }
+  }
+
+  const query = `
+      INSERT INTO employees (${columns.join(", ")})
+      VALUES (${valuePlaceholders.join(", ")})
+      RETURNING id;
+  `;
+
+  const result = await db.query(query, values);
+  return {
+    message: "Employee accepted for deferred processing.",
+    employeeId: result.rows[0].id,
+  };
+};
+
+// ** THIS IS THE FULL, CORRECTED reconcileManagers FUNCTION **
+const reconcileManagers = async (actorId, reqContext) => {
+  console.log("Starting manager reconciliation job...");
+  const client = await db.pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    const result = await client.query(`
+      UPDATE employees e
+      SET manager_id = m.id,
+          pending_manager_email = NULL
+      FROM employees m
+      WHERE e.pending_manager_email = m.employee_email
+      AND e.pending_manager_email IS NOT NULL;
+    `);
+
+    await client.query("COMMIT");
+
+    const updatedCount = result.rowCount;
+    console.log(
+      `Manager reconciliation complete. ${updatedCount} employees updated.`
+    );
+
+    await logActivity(
+      actorId,
+      "MANAGER_RECONCILIATION",
+      { details: { updatedCount } },
+      reqContext
+    );
+
+    return { message: "Manager reconciliation complete.", updatedCount };
+  } catch (err) {
+    await client.query("ROLLBACK");
+    console.error("Manager reconciliation failed.", err);
+    throw err;
+  } finally {
+    client.release();
+  }
+};
+
 module.exports = {
   getEmployeeById,
   getEmployees,
   getEmployeesForExport,
   updateEmployee,
   getPlatformStatuses,
-  getJumpCloudLogs,
+  getPlatformLogsFromDB,
   deactivateOnPlatforms,
   getEmployeeOptions,
   getGoogleLogs,
@@ -1473,5 +1574,7 @@ module.exports = {
   getEmployeeDevices,
   getApplicationAccess,
   syncPlatformStatus,
+  onboardDeferred,
+  reconcileManagers,
   forceSyncPlatformStatus,
 };
