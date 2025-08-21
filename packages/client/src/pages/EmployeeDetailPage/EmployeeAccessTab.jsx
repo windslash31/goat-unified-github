@@ -14,7 +14,6 @@ import { motion, AnimatePresence } from "framer-motion";
 
 // Helper to fetch detailed data for a specific platform
 const fetchAccessDetails = async (employeeId, platformKey) => {
-  // We need to map the application name to a simple key for the API route
   const platformRouteKey = {
     "Google Workspace": "google",
     Slack: "slack",
@@ -22,7 +21,7 @@ const fetchAccessDetails = async (employeeId, platformKey) => {
     Atlassian: "atlassian",
   }[platformKey];
 
-  if (!platformRouteKey) return null; // Or throw an error
+  if (!platformRouteKey) return null;
 
   const { data } = await api.get(
     `/api/employees/${employeeId}/access-details/${platformRouteKey}`
@@ -35,7 +34,7 @@ const DetailView = ({ employeeId, applicationName }) => {
   const { data, isLoading, error } = useQuery({
     queryKey: ["accessDetails", employeeId, applicationName],
     queryFn: () => fetchAccessDetails(employeeId, applicationName),
-    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+    staleTime: 5 * 60 * 1000,
   });
 
   if (isLoading)
@@ -49,8 +48,6 @@ const DetailView = ({ employeeId, applicationName }) => {
       <div className="p-4 text-xs text-red-500">Could not load details.</div>
     );
 
-  // Render details based on the application
-  // This can be expanded with more specific components later
   return (
     <div className="p-3 bg-gray-100 dark:bg-gray-900/70 rounded-lg shadow-inner mt-3">
       <h4 className="font-semibold text-sm mb-2 text-gray-800 dark:text-gray-200">
@@ -98,23 +95,16 @@ const SourceBadge = ({ mode }) => {
 export const EmployeeAccessTab = ({ employee }) => {
   const [expandedAccountId, setExpandedAccountId] = useState(null);
 
-  const totalCost = useMemo(() => {
-    return (employee.assigned_licenses || []).reduce(
-      (sum, license) => sum + parseFloat(license.cost || 0),
-      0
-    );
-  }, [employee.assigned_licenses]);
-
-  const licenseMap = useMemo(() => {
-    return new Map(
-      (employee.assigned_licenses || []).map((lic) => [
-        lic.application_name,
-        lic,
-      ])
-    );
-  }, [employee.assigned_licenses]);
+  // --- CHANGE START ---
+  // The old, incorrect logic is removed. We now calculate the total cost
+  // directly from the `provisioned_accounts` array that the API provides.
+  const totalCost = (employee.provisioned_accounts || []).reduce(
+    (sum, account) => sum + parseFloat(account.cost || 0),
+    0
+  );
 
   const provisionedAccounts = employee.provisioned_accounts || [];
+  // --- CHANGE END ---
 
   return (
     <div className="space-y-6">
@@ -142,7 +132,6 @@ export const EmployeeAccessTab = ({ employee }) => {
         {provisionedAccounts.length > 0 ? (
           <div className="space-y-3">
             {provisionedAccounts.map((account) => {
-              const license = licenseMap.get(account.application_name);
               const isExpanded = expandedAccountId === account.account_id;
 
               return (
@@ -168,15 +157,25 @@ export const EmployeeAccessTab = ({ employee }) => {
                     </div>
                     <div className="flex items-center gap-4 flex-wrap">
                       <SourceBadge mode={account.integration_mode} />
-                      {license ? (
-                        <span className="text-sm font-medium text-gray-900 dark:text-white">
-                          ${parseFloat(license.cost).toFixed(2)}/mo
-                        </span>
+
+                      {/* --- CHANGE START --- */}
+                      {/* This logic now directly reads the `cost` and `tier_name` from the account object */}
+                      {account.cost ? (
+                        <div className="text-sm text-right">
+                          <span className="font-medium text-gray-900 dark:text-white">
+                            ${parseFloat(account.cost).toFixed(2)}/mo
+                          </span>
+                          <div className="text-xs text-gray-500 dark:text-gray-400">
+                            {account.tier_name}
+                          </div>
+                        </div>
                       ) : (
                         <span className="text-sm text-gray-400 italic">
                           No License Cost
                         </span>
                       )}
+                      {/* --- CHANGE END --- */}
+
                       <span
                         className={`px-2.5 py-0.5 text-xs font-semibold rounded-full capitalize ${
                           account.status === "active"

@@ -57,30 +57,45 @@ const getEmployeeById = async (employeeId) => {
       est.name as employee_sub_type,
       CONCAT_WS(' ', manager.first_name, manager.middle_name, manager.last_name) as manager_name,
       manager.employee_email as manager_email,
-      
-      -- ** FIX: This is now the single source of truth for the application list **
-      -- It joins access records with license assignments to get all data in one place.
       (
         SELECT json_agg(json_build_object(
           'account_id', ua.id,
           'application_name', ma.name,
-          'application_id', ma.id, -- Pass the app ID to the frontend
+          'application_id', ma.id,
           'instance_name', ai.display_name,
           'status', ua.status,
           'integration_mode', ma.integration_mode,
           'is_licensable', ma.is_licensable,
-          'tier_name', l.tier_name,
-          'cost', l.monthly_cost,
-          'currency', l.currency
+          'tier_name', final_license.tier_name,
+          'cost', final_license.monthly_cost,
+          'currency', final_license.currency
         ))
         FROM user_accounts ua
         JOIN app_instances ai ON ua.app_instance_id = ai.id
         JOIN managed_applications ma ON ai.application_id = ma.id
-        LEFT JOIN license_assignments la ON ua.user_id = la.employee_id
-        LEFT JOIN licenses l ON la.license_id = l.id AND l.application_id = ma.id
+        LEFT JOIN LATERAL (
+          -- This subquery runs for each user_account and finds the single best license match
+          (
+            -- PRIORITY 1: Look for a direct, manual assignment for this user and application
+            SELECT l.tier_name, l.monthly_cost, l.currency, 1 as priority
+            FROM license_assignments la
+            JOIN licenses l ON la.license_id = l.id
+            WHERE la.employee_id = ua.user_id AND l.application_id = ma.id
+          )
+          UNION ALL
+          (
+            -- PRIORITY 2: If no manual assignment, look for an automatic single-tier license
+            SELECT l.tier_name, l.monthly_cost, l.currency, 2 as priority
+            FROM licenses l
+            WHERE l.application_id = ma.id AND (
+              SELECT count(*) FROM licenses WHERE application_id = ma.id
+            ) = 1
+          )
+          ORDER BY priority ASC
+          LIMIT 1
+        ) final_license ON true
         WHERE ua.user_id = e.id
       ) as provisioned_accounts,
-      
       (
         SELECT json_agg(json_build_object(
           'platform_name', pas.platform_name,
@@ -105,7 +120,6 @@ const getEmployeeById = async (employeeId) => {
   const employee = result.rows[0];
   employee.status = getEmployeeStatus(employee);
   employee.provisioned_accounts = employee.provisioned_accounts || [];
-  // The old assigned_licenses is no longer needed as its data is merged above
   employee.platform_statuses = employee.platform_statuses || [];
   return employee;
 };
