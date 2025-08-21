@@ -148,7 +148,10 @@ const syncAllJumpCloudApplications = async () => {
     return;
   }
 
+  const client = await db.pool.connect();
   try {
+    await client.query("BEGIN");
+
     for (const app of applications) {
       if (!app._id) {
         console.warn(
@@ -159,37 +162,68 @@ const syncAllJumpCloudApplications = async () => {
         continue;
       }
 
-      const query = `
-        INSERT INTO jumpcloud_applications (
-          id, display_name, display_label, sso_url, sso, updated_at,
-          description, provision, organization -- Final Columns
-        ) VALUES ($1, $2, $3, $4, $5, NOW(), $6, $7, $8)
-        ON CONFLICT (id) DO UPDATE SET
-            display_name = EXCLUDED.display_name,
-            display_label = EXCLUDED.display_label,
-            sso_url = EXCLUDED.sso_url,
-            sso = EXCLUDED.sso,
-            updated_at = NOW(),
-            description = EXCLUDED.description,
-            provision = EXCLUDED.provision,
-            organization = EXCLUDED.organization;
-      `;
-      const values = [
-        app._id,
-        app.displayName,
-        app.displayLabel,
-        app.sso?.url,
-        app.sso ? JSON.stringify(app.sso) : null,
-        app.description,
-        app.provision ? JSON.stringify(app.provision) : null,
-        app.organization,
-      ];
-      await db.query(query, values);
+      // Step 1: Sync the raw data to the jumpcloud_applications table (as before)
+      await client.query(
+        `INSERT INTO jumpcloud_applications (id, display_name, display_label, sso_url, sso, updated_at, description, provision, organization) 
+         VALUES ($1, $2, $3, $4, $5, NOW(), $6, $7, $8)
+         ON CONFLICT (id) DO UPDATE SET
+            display_name = EXCLUDED.display_name, display_label = EXCLUDED.display_label, sso_url = EXCLUDED.sso_url,
+            sso = EXCLUDED.sso, updated_at = NOW(), description = EXCLUDED.description, provision = EXCLUDED.provision,
+            organization = EXCLUDED.organization;`,
+        [
+          app._id,
+          app.displayName,
+          app.displayLabel,
+          app.sso?.url,
+          app.sso ? JSON.stringify(app.sso) : null,
+          app.description,
+          app.provision ? JSON.stringify(app.provision) : null,
+          app.organization,
+        ]
+      );
+
+      // ** FIX: Use jumpcloud_app_id as the conflict key, per your suggestion **
+      const name =
+        app.displayLabel || app.displayName || `JumpCloud App ${app._id}`;
+      const category = "SSO";
+      const type = "EXTERNAL";
+      const integrationMode = "SSO_JUMPCLOUD";
+      const jumpcloudAppId = app._id;
+
+      // Step 2: Ensure it exists in managed_applications
+      const managedAppResult = await client.query(
+        `INSERT INTO managed_applications ("name", "category", "type", "integration_mode", "jumpcloud_app_id")
+         VALUES ($1, $2, $3, $4, $5)
+         ON CONFLICT (jumpcloud_app_id) DO UPDATE SET 
+            "name" = EXCLUDED."name", 
+            "category" = EXCLUDED."category",
+            "type" = EXCLUDED."type",
+            "integration_mode" = EXCLUDED."integration_mode",
+            "updated_at" = NOW()
+         RETURNING id;`,
+        [name, category, type, integrationMode, jumpcloudAppId]
+      );
+      const applicationId = managedAppResult.rows[0].id;
+
+      // Step 3: Ensure its primary instance exists in app_instances
+      await client.query(
+        `INSERT INTO app_instances (application_id, display_name, is_primary)
+         VALUES ($1, $2, true)
+         ON CONFLICT (application_id, display_name) DO NOTHING;`,
+        [applicationId, name]
+      );
     }
-    console.log(`Successfully synced JumpCloud applications.`);
+
+    await client.query("COMMIT");
+    console.log(
+      `Successfully synced and onboarded ${applications.length} JumpCloud applications.`
+    );
   } catch (error) {
+    await client.query("ROLLBACK");
     console.error("Error during JumpCloud application sync:", error);
     throw error;
+  } finally {
+    client.release();
   }
 };
 

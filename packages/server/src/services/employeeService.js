@@ -57,37 +57,30 @@ const getEmployeeById = async (employeeId) => {
       est.name as employee_sub_type,
       CONCAT_WS(' ', manager.first_name, manager.middle_name, manager.last_name) as manager_name,
       manager.employee_email as manager_email,
-      -- Aggregate all provisioned accounts for this user
+      
+      -- ** FIX: This is now the single source of truth for the application list **
+      -- It joins access records with license assignments to get all data in one place.
       (
         SELECT json_agg(json_build_object(
           'account_id', ua.id,
           'application_name', ma.name,
+          'application_id', ma.id, -- Pass the app ID to the frontend
           'instance_name', ai.display_name,
           'status', ua.status,
           'integration_mode', ma.integration_mode,
-          'last_seen_at', ua.last_seen_at
+          'is_licensable', ma.is_licensable,
+          'tier_name', l.tier_name,
+          'cost', l.monthly_cost,
+          'currency', l.currency
         ))
         FROM user_accounts ua
         JOIN app_instances ai ON ua.app_instance_id = ai.id
         JOIN managed_applications ma ON ai.application_id = ma.id
+        LEFT JOIN license_assignments la ON ua.user_id = la.employee_id
+        LEFT JOIN licenses l ON la.license_id = l.id AND l.application_id = ma.id
         WHERE ua.user_id = e.id
       ) as provisioned_accounts,
-      -- Aggregate all assigned licenses for this user
-      (
-        SELECT json_agg(json_build_object(
-          'assignment_id', la.id,
-          'application_name', ma.name,
-          'tier', la.license_tier,
-          'source', la.source,
-          'cost', lc.monthly_cost_decimal,
-          'currency', lc.currency
-        ))
-        FROM license_assignments la
-        JOIN managed_applications ma ON la.application_id = ma.id
-        JOIN license_costs lc ON la.application_id = lc.application_id AND la.license_tier = lc.license_tier
-        WHERE la.principal_id = e.id AND la.principal_type = 'EMPLOYEE'
-      ) as assigned_licenses,
-      -- Keep platform status for quick, high-level checks
+      
       (
         SELECT json_agg(json_build_object(
           'platform_name', pas.platform_name,
@@ -111,9 +104,8 @@ const getEmployeeById = async (employeeId) => {
 
   const employee = result.rows[0];
   employee.status = getEmployeeStatus(employee);
-  // Ensure arrays exist even if they are null from the DB
   employee.provisioned_accounts = employee.provisioned_accounts || [];
-  employee.assigned_licenses = employee.assigned_licenses || [];
+  // The old assigned_licenses is no longer needed as its data is merged above
   employee.platform_statuses = employee.platform_statuses || [];
   return employee;
 };

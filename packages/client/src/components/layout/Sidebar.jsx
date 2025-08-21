@@ -9,8 +9,8 @@ import {
   FileText,
   LogOut,
   UserCircle,
-  UsersRound,
   UserCog,
+  Tag,
 } from "lucide-react";
 import { createContext, useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
@@ -62,6 +62,13 @@ export function Sidebar({ onLogout, isMobileOpen, setMobileOpen }) {
       label: "Managed Accounts",
       icon: <UserCog size={20} />,
       visible: permissions.includes("managed_account:manage"),
+    },
+    {
+      id: "licenses",
+      path: "/licenses",
+      label: "License Management",
+      icon: <Tag size={20} />,
+      visible: permissions.includes("admin:manage_applications"),
     },
     {
       id: "logs",

@@ -30,6 +30,11 @@ const DashboardPage = lazy(() =>
     default: module.DashboardPage,
   }))
 );
+const LicenseManagementPage = lazy(() =>
+  import("./pages/LicenseManagementPage").then((module) => ({
+    default: module.LicenseManagementPage,
+  }))
+);
 const EmployeeListPage = lazy(() =>
   import("./pages/EmployeeListPage").then((module) => ({
     default: module.EmployeeListPage,
@@ -258,7 +263,18 @@ const AppContent = () => {
               </Suspense>
             }
           />
-
+          <Route
+            element={<ProtectedRoute permission="admin:manage_applications" />}
+          >
+            <Route
+              path="/licenses"
+              element={
+                <Suspense fallback={<ApplicationManagementSkeleton />}>
+                  <LicenseManagementPage />
+                </Suspense>
+              }
+            />
+          </Route>
           <Route
             path="/employees"
             element={
