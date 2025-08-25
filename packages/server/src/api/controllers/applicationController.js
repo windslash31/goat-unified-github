@@ -2,8 +2,21 @@ const applicationService = require("../../services/applicationService");
 
 const listAllApplications = async (req, res, next) => {
   try {
-    const applications = await applicationService.getAllApplications();
+    // Pass the query parameters to the service
+    const applications = await applicationService.getAllManagedApplications(
+      req.query
+    );
     res.json(applications);
+  } catch (error) {
+    next(error);
+  }
+};
+
+const onboardApplication = async (req, res, next) => {
+  try {
+    const appData = req.body;
+    const newApplication = await applicationService.onboardApplication(appData);
+    res.status(201).json(newApplication);
   } catch (error) {
     next(error);
   }
@@ -49,9 +62,25 @@ const deleteApplication = async (req, res, next) => {
   }
 };
 
+const setLicensableStatus = async (req, res, next) => {
+  try {
+    const { appId } = req.params;
+    const { is_licensable } = req.body;
+    const updatedApp = await applicationService.setApplicationLicensableStatus(
+      appId,
+      is_licensable
+    );
+    res.json(updatedApp);
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   listAllApplications,
   createApplication,
   updateApplication,
   deleteApplication,
+  onboardApplication,
+  setLicensableStatus,
 };

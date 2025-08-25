@@ -834,73 +834,87 @@ const syncJiraRolesAndPermissions = async () => {
       Accept: "application/json",
     };
 
-    for (const project of projects) {
-      const rolesUrl = `https://${config.atlassian.domain}/rest/api/3/project/${project.project_id}/role`;
-      const rolesResponse = await fetch(rolesUrl, { headers: jiraHeaders });
+    // ** FIX START: Implement parallel batch processing **
+    const BATCH_SIZE = 10;
+    const DELAY_BETWEEN_BATCHES_MS = 2000; // 2-second delay between batches
 
-      if (!rolesResponse.ok) {
-        console.warn(
-          `Could not fetch roles for project ${project.project_id}. Status: ${rolesResponse.status}`
-        );
-        continue;
-      }
+    for (let i = 0; i < projects.length; i += BATCH_SIZE) {
+      const batch = projects.slice(i, i + BATCH_SIZE);
+      console.log(
+        `CRON JOB: Processing Jira permissions for batch ${
+          Math.floor(i / BATCH_SIZE) + 1
+        } of ${Math.ceil(projects.length / BATCH_SIZE)}...`
+      );
 
-      const projectRoles = await rolesResponse.json();
+      const permissionPromises = batch.map(async (project) => {
+        const rolesUrl = `https://${config.atlassian.domain}/rest/api/3/project/${project.project_id}/role`;
+        const rolesResponse = await fetch(rolesUrl, { headers: jiraHeaders });
 
-      if (projectRoles && Object.keys(projectRoles).length > 0) {
-        // Clear old permissions for this project before re-inserting
-        await client.query(
-          "DELETE FROM jira_project_permissions WHERE project_id = $1",
-          [project.project_id]
-        );
+        if (!rolesResponse.ok) {
+          console.warn(
+            `Could not fetch roles for project ${project.project_id}. Status: ${rolesResponse.status}`
+          );
+          return; // Skip this project
+        }
 
-        for (const roleName in projectRoles) {
-          const roleDetailsUrl = projectRoles[roleName];
-          const roleId = new URL(roleDetailsUrl).pathname.split("/").pop();
+        const projectRoles = await rolesResponse.json();
 
-          // Insert or update the role in the jira_roles table
+        if (projectRoles && Object.keys(projectRoles).length > 0) {
           await client.query(
-            `
-            INSERT INTO jira_roles (role_id, role_name, last_updated_at)
-            VALUES ($1, $2, NOW())
-            ON CONFLICT (role_id) DO UPDATE SET
-              role_name = EXCLUDED.role_name,
-              last_updated_at = NOW();
-          `,
-            [roleId, roleName]
+            "DELETE FROM jira_project_permissions WHERE project_id = $1",
+            [project.project_id]
           );
 
-          // Fetch the details for this specific role to get its actors (users/groups)
-          const roleDetailResponse = await fetch(roleDetailsUrl, {
-            headers: jiraHeaders,
-          });
-          if (!roleDetailResponse.ok) {
-            console.warn(
-              `Could not fetch actors for role ${roleName} in project ${project.project_id}.`
-            );
-            continue;
-          }
+          for (const roleName in projectRoles) {
+            const roleDetailsUrl = projectRoles[roleName];
+            const roleId = new URL(roleDetailsUrl).pathname.split("/").pop();
 
-          const roleData = await roleDetailResponse.json();
-          if (roleData.actors && roleData.actors.length > 0) {
-            for (const actor of roleData.actors) {
-              await client.query(
-                `
-                INSERT INTO jira_project_permissions (project_id, role_id, actor_type, actor_id, last_updated_at)
-                VALUES ($1, $2, $3, $4, NOW())
-              `,
-                [
-                  project.project_id,
-                  roleId,
-                  actor.type,
-                  actor.actorUser?.accountId || actor.actorGroup?.groupId,
-                ]
+            await client.query(
+              `INSERT INTO jira_roles (role_id, role_name, last_updated_at)
+               VALUES ($1, $2, NOW())
+               ON CONFLICT (role_id) DO UPDATE SET role_name = EXCLUDED.role_name, last_updated_at = NOW()`,
+              [roleId, roleName]
+            );
+
+            const roleDetailResponse = await fetch(roleDetailsUrl, {
+              headers: jiraHeaders,
+            });
+            if (!roleDetailResponse.ok) {
+              console.warn(
+                `Could not fetch actors for role ${roleName} in project ${project.project_id}.`
               );
+              continue;
+            }
+
+            const roleData = await roleDetailResponse.json();
+            if (roleData.actors && roleData.actors.length > 0) {
+              for (const actor of roleData.actors) {
+                await client.query(
+                  `INSERT INTO jira_project_permissions (project_id, role_id, actor_type, actor_id, last_updated_at)
+                   VALUES ($1, $2, $3, $4, NOW())`,
+                  [
+                    project.project_id,
+                    roleId,
+                    actor.type,
+                    actor.actorUser?.accountId || actor.actorGroup?.groupId,
+                  ]
+                );
+              }
             }
           }
         }
+      });
+
+      await Promise.allSettled(permissionPromises);
+
+      if (i + BATCH_SIZE < projects.length) {
+        await new Promise((resolve) =>
+          setTimeout(resolve, DELAY_BETWEEN_BATCHES_MS)
+        );
       }
     }
+    // ** FIX END **
+
     console.log("Successfully finished syncing Jira roles and permissions.");
   } catch (error) {
     console.error("Error during Jira roles and permissions sync:", error);
@@ -934,54 +948,81 @@ const syncAllBitbucketRepositoriesAndPermissions = async () => {
     Accept: "application/json",
   };
 
-  // Stage 1: Fetch all repository metadata
-  let allRepositories = [];
-  const lastYear = new Date().getFullYear() - 1;
-  const startDate = `${lastYear}-01-01`;
-  const encodedQuery = encodeURIComponent(`updated_on > "${startDate}"`);
-  let nextPageUrl = `https://api.bitbucket.org/2.0/repositories/${config.atlassian.bitbucketWorkspace}?q=${encodedQuery}&sort=-updated_on`;
-
-  while (nextPageUrl) {
-    try {
-      // --- STEP 2: USE THE NEW HELPER FUNCTION FOR THE FETCH CALL ---
-      const response = await fetchWithRetry(nextPageUrl, {
-        headers: bitbucketRepoHeaders,
-      });
-
-      if (!response.ok) {
-        throw new Error(
-          `Bitbucket API Error fetching repositories: ${
-            response.status
-          } - ${await response.text()}`
-        );
-      }
-      const page = await response.json();
-      if (page.values && page.values.length > 0) {
-        allRepositories.push(...page.values);
-      }
-      nextPageUrl = page.next;
-    } catch (error) {
-      console.error("Failed to fetch a page of Bitbucket repositories:", error);
-      nextPageUrl = null;
-    }
-  }
-
-  if (allRepositories.length === 0) {
-    console.log("CRON JOB: No Bitbucket repositories found to sync.");
-    return;
-  }
-
   const client = await db.pool.connect();
   try {
-    // Stage 2: Save repository metadata to DB
-    await client.query("BEGIN");
-    await client.query(
-      "TRUNCATE TABLE bitbucket_repositories RESTART IDENTITY CASCADE;"
+    const repoCheck = await client.query(
+      "SELECT repo_uuid FROM bitbucket_repositories LIMIT 1"
     );
+    const isInitialSync = repoCheck.rows.length === 0;
+
+    let startDate;
+    const now = new Date();
+
+    if (isInitialSync) {
+      console.log(
+        "CRON JOB: Performing initial Bitbucket sync for the last year."
+      );
+      now.setFullYear(now.getFullYear() - 1);
+      startDate = now.toISOString().split("T")[0];
+    } else {
+      console.log(
+        "CRON JOB: Performing incremental Bitbucket sync for the last 7 days."
+      );
+      now.setDate(now.getDate() - 7);
+      startDate = now.toISOString().split("T")[0];
+    }
+
+    // Stage 1: Fetch repository metadata
+    let allRepositories = [];
+    const encodedQuery = encodeURIComponent(`updated_on > "${startDate}"`);
+    let nextPageUrl = `https://api.bitbucket.org/2.0/repositories/${config.atlassian.bitbucketWorkspace}?q=${encodedQuery}&sort=-updated_on`;
+
+    while (nextPageUrl) {
+      try {
+        const response = await fetchWithRetry(nextPageUrl, {
+          headers: bitbucketRepoHeaders,
+        });
+        if (!response.ok) {
+          throw new Error(
+            `Bitbucket API Error fetching repositories: ${
+              response.status
+            } - ${await response.text()}`
+          );
+        }
+        const page = await response.json();
+        if (page.values && page.values.length > 0) {
+          allRepositories.push(...page.values);
+        }
+        nextPageUrl = page.next;
+      } catch (error) {
+        console.error(
+          "Failed to fetch a page of Bitbucket repositories:",
+          error
+        );
+        nextPageUrl = null;
+      }
+    }
+
+    if (allRepositories.length === 0) {
+      console.log(
+        "CRON JOB: No recently updated Bitbucket repositories found to sync."
+      );
+      client.release();
+      return;
+    }
+
+    // Stage 2: Save repository metadata using ON CONFLICT
+    await client.query("BEGIN");
     for (const repo of allRepositories) {
       await client.query(
         `INSERT INTO bitbucket_repositories (repo_uuid, full_name, name, created_on, updated_on, description, project_name)
-             VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
+         ON CONFLICT (repo_uuid) DO UPDATE SET
+            full_name = EXCLUDED.full_name,
+            name = EXCLUDED.name,
+            updated_on = EXCLUDED.updated_on,
+            description = EXCLUDED.description,
+            project_name = EXCLUDED.project_name;`,
         [
           repo.uuid.replace(/[{}]/g, ""),
           repo.full_name,
@@ -995,76 +1036,66 @@ const syncAllBitbucketRepositoriesAndPermissions = async () => {
     }
     await client.query("COMMIT");
     console.log(
-      `CRON JOB: Successfully synced ${allRepositories.length} Bitbucket repositories.`
+      `CRON JOB: Successfully synced metadata for ${allRepositories.length} Bitbucket repositories.`
     );
 
-    // Stage 3: Fetch permissions in parallel batches
-    console.log(
-      "CRON JOB: Starting Bitbucket repository permissions sync in parallel batches..."
+    // Stage 3: Fetch permissions
+    console.log("CRON JOB: Starting Bitbucket repository permissions sync...");
+    const repoUuidsToUpdate = allRepositories.map((repo) =>
+      repo.uuid.replace(/[{}]/g, "")
     );
+
+    // ** FIX: Clear out old permissions only for the repos we are about to refresh **
     await client.query(
-      "TRUNCATE TABLE bitbucket_repository_permissions RESTART IDENTITY;"
+      "DELETE FROM bitbucket_repository_permissions WHERE repo_uuid = ANY($1::text[])",
+      [repoUuidsToUpdate]
     );
 
-    const BATCH_SIZE = 50;
-    const DELAY_BETWEEN_BATCHES_MS = 1000;
-    let allPermissionsToInsert = [];
+    const allPermissionsToInsert = [];
+    let processedCount = 0;
+    const totalRepos = allRepositories.length;
 
-    for (let i = 0; i < allRepositories.length; i += BATCH_SIZE) {
-      const batch = allRepositories.slice(i, i + BATCH_SIZE);
-      console.log(
-        `CRON JOB: Processing permissions for batch ${
-          Math.floor(i / BATCH_SIZE) + 1
-        }...`
-      );
-
-      const permissionPromises = batch.map(async (repo) => {
-        let permissionsUrl = `https://api.bitbucket.org/2.0/workspaces/${config.atlassian.bitbucketWorkspace}/permissions/repositories/${repo.name}`;
-        const repoPermissions = [];
-        while (permissionsUrl) {
-          const response = await fetchWithRetry(permissionsUrl, {
-            headers: bitbucketPermsHeaders,
-          });
-          if (!response.ok) {
-            console.warn(
-              `Could not fetch permissions for repo ${repo.full_name}. Status: ${response.status}`
-            );
-            return [];
-          }
-          const data = await response.json();
-          if (data.values) {
-            data.values.forEach((perm) => {
-              if (perm.user && perm.user.account_id) {
-                repoPermissions.push({
-                  repo_uuid: repo.uuid.replace(/[{}]/g, ""),
-                  user_account_id: perm.user.account_id,
-                  permission_level: perm.permission,
-                });
-              }
-            });
-          }
-          permissionsUrl = data.next;
-        }
-        return repoPermissions;
-      });
-
-      const results = await Promise.allSettled(permissionPromises);
-      results.forEach((result) => {
-        if (result.status === "fulfilled" && result.value.length > 0) {
-          allPermissionsToInsert.push(...result.value);
-        } else if (result.status === "rejected") {
-          console.error("A permission fetch failed:", result.reason);
-        }
-      });
-
-      if (i + BATCH_SIZE < allRepositories.length) {
-        await new Promise((resolve) =>
-          setTimeout(resolve, DELAY_BETWEEN_BATCHES_MS)
+    for (const repo of allRepositories) {
+      processedCount++;
+      if (processedCount % 40 === 0 || processedCount === totalRepos) {
+        console.log(
+          `CRON JOB: Processing permissions for repo ${processedCount} of ${totalRepos}...`
         );
       }
+
+      let permissionsUrl = `https://api.bitbucket.org/2.0/workspaces/${config.atlassian.bitbucketWorkspace}/permissions/repositories/${repo.name}`;
+      while (permissionsUrl) {
+        const response = await fetchWithRetry(permissionsUrl, {
+          headers: bitbucketPermsHeaders,
+        });
+        if (!response.ok) {
+          console.warn(
+            `Could not fetch permissions for repo ${repo.full_name}. Status: ${response.status}`
+          );
+          break;
+        }
+        const data = await response.json();
+        if (data.values) {
+          data.values.forEach((perm) => {
+            if (perm.user && perm.user.account_id) {
+              allPermissionsToInsert.push({
+                repo_uuid: repo.uuid.replace(/[{}]/g, ""),
+                user_account_id: perm.user.account_id,
+                permission_level: perm.permission,
+              });
+            }
+          });
+        }
+        permissionsUrl = data.next;
+
+        if (permissionsUrl) {
+          await new Promise((resolve) => setTimeout(resolve, 200));
+        }
+      }
+      await new Promise((resolve) => setTimeout(resolve, 200));
     }
 
-    // Stage 4: Perform a single bulk insert for all collected permissions
+    // Stage 4: Bulk insert new permissions
     if (allPermissionsToInsert.length > 0) {
       await client.query("BEGIN");
       const repoUuids = allPermissionsToInsert.map((p) => p.repo_uuid);

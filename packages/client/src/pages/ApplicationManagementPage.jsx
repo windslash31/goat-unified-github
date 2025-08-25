@@ -1,194 +1,112 @@
-import React, { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import toast from "react-hot-toast";
-import { PlusCircle, Edit, Trash2, Briefcase } from "lucide-react";
-import { Button } from "../components/ui/Button";
-import api from "../api/api";
+import React from "react";
+import { useQuery } from "@tanstack/react-query";
+import { Briefcase, PlusCircle } from "lucide-react";
 import { motion } from "framer-motion";
-import { ApplicationManagementSkeleton } from "../components/ui/ApplicationManagementSkeleton";
 
+import api from "../api/api";
+import { useModalStore } from "../stores/modalStore";
+import { Button } from "../components/ui/Button";
+import { ApplicationManagementSkeleton } from "../components/ui/ApplicationManagementSkeleton";
+import { AddApplicationModal } from "../components/ui/AddApplicationModal";
+
+// This endpoint now correctly fetches from the managed_applications table
 const fetchApplications = async () => {
   const { data } = await api.get("/api/applications");
   return data;
 };
 
 export const ApplicationManagementPage = () => {
-  const queryClient = useQueryClient();
-  const [newAppName, setNewAppName] = useState("");
-  const [editingApp, setEditingApp] = useState(null);
+  const { openModal, closeModal, modal } = useModalStore();
 
   const { data: applications, isLoading } = useQuery({
-    queryKey: ["applications"],
+    queryKey: ["managedApplications"], // Use a new, clear query key
     queryFn: fetchApplications,
   });
-
-  const createMutation = useMutation({
-    mutationFn: (name) => api.post("/api/applications", { name }),
-    onSuccess: () => {
-      toast.success("Application created!");
-      queryClient.invalidateQueries(["applications"]);
-      setNewAppName("");
-    },
-    onError: (err) => {
-      const errorMessage =
-        err.response?.data?.message || "Failed to create application.";
-      toast.error(errorMessage);
-    },
-  });
-
-  const updateMutation = useMutation({
-    mutationFn: ({ id, name }) => api.put(`/api/applications/${id}`, { name }),
-    onSuccess: () => {
-      toast.success("Application updated!");
-      queryClient.invalidateQueries(["applications"]);
-      setEditingApp(null);
-    },
-    onError: (err) => {
-      const errorMessage =
-        err.response?.data?.message || "Failed to update application.";
-      toast.error(errorMessage);
-    },
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: (id) => api.delete(`/api/applications/${id}`),
-    onSuccess: () => {
-      toast.success("Application deleted!");
-      queryClient.invalidateQueries(["applications"]);
-    },
-    onError: (err) => {
-      const errorMessage =
-        err.response?.data?.message || "Failed to delete application.";
-      toast.error(errorMessage);
-    },
-  });
-
-  const handleCreate = (e) => {
-    e.preventDefault();
-    if (newAppName.trim()) {
-      createMutation.mutate(newAppName.trim());
-    }
-  };
-
-  const handleUpdate = (e) => {
-    e.preventDefault();
-    if (editingApp && editingApp.name.trim()) {
-      updateMutation.mutate({
-        id: editingApp.id,
-        name: editingApp.name.trim(),
-      });
-    }
-  };
 
   if (isLoading) return <ApplicationManagementSkeleton />;
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -20 }}
-      transition={{ duration: 0.3 }}
-      className="p-6"
-    >
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-          Manage Applications
-        </h1>
-        <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-          Add, remove, or edit internal applications available for access
-          requests.
-        </p>
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div>
-          <h2 className="text-lg font-semibold mb-2">Add New Application</h2>
-          <form onSubmit={handleCreate} className="flex gap-2">
-            <input
-              type="text"
-              value={newAppName}
-              onChange={(e) => setNewAppName(e.target.value)}
-              placeholder="New application name"
-              className="flex-grow px-3 py-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
-            />
-            <Button type="submit" disabled={createMutation.isLoading}>
-              <PlusCircle size={16} className="mr-2" /> Add
-            </Button>
-          </form>
+    <>
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -20 }}
+        transition={{ duration: 0.3 }}
+        className="p-6"
+      >
+        <div className="flex flex-col sm:flex-row justify-between sm:items-center mb-6">
+          <div>
+            <h1 className="text-2xl font-bold">Application Management</h1>
+            <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+              View and onboard all applications managed by G.O.A.T.
+            </p>
+          </div>
+          <Button
+            onClick={() => openModal("addApplication")}
+            className="w-full mt-4 sm:mt-0 sm:w-auto justify-center"
+          >
+            <PlusCircle className="mr-2 h-4 w-4" /> Onboard New Application
+          </Button>
         </div>
-        <div>
-          <h2 className="text-lg font-semibold mb-2">Existing Applications</h2>
-          {applications && applications.length > 0 ? (
-            <ul className="space-y-2">
-              {applications.map((app) => (
-                <li
-                  key={app.id}
-                  className="flex items-center justify-between p-2 bg-gray-100 dark:bg-gray-800 rounded-md"
-                >
-                  {editingApp?.id === app.id ? (
-                    <form
-                      onSubmit={handleUpdate}
-                      className="flex-grow flex gap-2"
+
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+              <thead className="bg-gray-50 dark:bg-gray-700/50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-bold uppercase">
+                    Name
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-bold uppercase">
+                    Key
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-bold uppercase">
+                    Integration Mode
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                {applications && applications.length > 0 ? (
+                  applications.map((app) => (
+                    <tr
+                      key={app.id}
+                      className="hover:bg-gray-50 dark:hover:bg-gray-700/50"
                     >
-                      <input
-                        type="text"
-                        value={editingApp.name}
-                        onChange={(e) =>
-                          setEditingApp({ ...editingApp, name: e.target.value })
-                        }
-                        className="flex-grow px-3 py-1 border rounded-md dark:bg-gray-700 dark:border-gray-600"
-                      />
-                      <Button
-                        type="submit"
-                        size="sm"
-                        disabled={updateMutation.isLoading}
-                      >
-                        Save
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="secondary"
-                        onClick={() => setEditingApp(null)}
-                      >
-                        Cancel
-                      </Button>
-                    </form>
-                  ) : (
-                    <>
-                      <span>{app.name}</span>
-                      <div className="flex gap-2">
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          onClick={() => setEditingApp(app)}
-                        >
-                          <Edit size={14} />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="danger"
-                          onClick={() => deleteMutation.mutate(app.id)}
-                          disabled={deleteMutation.isLoading}
-                        >
-                          <Trash2 size={14} />
-                        </Button>
-                      </div>
-                    </>
-                  )}
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <div className="text-center py-10 text-gray-500 dark:text-gray-400 border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-lg">
-              <Briefcase className="mx-auto w-10 h-10 text-gray-400" />
-              <p className="font-semibold mt-4">No Applications Found</p>
-              <p className="text-sm mt-1">
-                Add a new application using the form on the left.
-              </p>
-            </div>
-          )}
+                      <td className="px-6 py-4 whitespace-nowrap font-medium">
+                        {app.name}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400 font-mono">
+                        {app.key}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                        <span className="px-2 py-1 font-semibold leading-tight text-xs rounded-full bg-gray-100 dark:bg-gray-600">
+                          {app.integration_mode}
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan="3" className="text-center py-16 text-gray-500">
+                      <Briefcase className="mx-auto w-12 h-12 text-gray-400" />
+                      <p className="font-semibold mt-4">
+                        No Applications Found
+                      </p>
+                      <p className="text-sm mt-1">
+                        Click "Onboard New Application" to get started.
+                      </p>
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
-    </motion.div>
+      </motion.div>
+
+      {modal === "addApplication" && (
+        <AddApplicationModal onClose={closeModal} />
+      )}
+    </>
   );
 };

@@ -9,6 +9,7 @@ const atlassianService = require("../../services/atlassianService");
 const googleService = require("../../services/googleService");
 const slackService = require("../../services/slackService");
 const jumpcloudService = require("../../services/jumpcloudService");
+const db = require("../../config/db");
 
 const listEmployees = async (req, res, next) => {
   try {
@@ -81,28 +82,6 @@ const getPlatformStatuses = async (req, res, next) => {
   }
 };
 
-const getJumpCloudLogs = async (req, res, next) => {
-  try {
-    const { startTime, endTime, limit, service } = req.query;
-    const logs = await employeeService.getJumpCloudLogs(
-      req.params.id,
-      startTime,
-      endTime,
-      limit,
-      service
-    );
-    res.json(logs);
-  } catch (error) {
-    if (error.message.includes("not found")) {
-      return res.status(404).json({ message: error.message });
-    }
-    if (error.message.includes("API Error")) {
-      return res.status(502).json({ message: error.message });
-    }
-    next(error);
-  }
-};
-
 const getEmployeeOptions = async (req, res, next) => {
   try {
     const tableName = req.params.table || req.params.tableName;
@@ -113,24 +92,6 @@ const getEmployeeOptions = async (req, res, next) => {
 
     const options = await employeeService.getEmployeeOptions(tableName);
     res.json(options);
-  } catch (error) {
-    next(error);
-  }
-};
-
-const getGoogleLogs = async (req, res, next) => {
-  try {
-    const logs = await employeeService.getGoogleLogs(req.params.id);
-    res.json(logs);
-  } catch (error) {
-    next(error);
-  }
-};
-
-const getSlackLogs = async (req, res, next) => {
-  try {
-    const logs = await employeeService.getSlackLogs(req.params.id);
-    res.json(logs);
   } catch (error) {
     next(error);
   }
@@ -328,6 +289,54 @@ const getEmployeeImportTemplate = (req, res) => {
   res.send(csv);
 };
 
+const getPlatformLogs = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { platform, ...filters } = req.query;
+    if (!platform) {
+      return res
+        .status(400)
+        .json({ message: "A platform query parameter is required." });
+    }
+    const logs = await employeeService.getPlatformLogsFromDB(
+      id,
+      platform,
+      filters
+    );
+    res.json(logs);
+  } catch (error) {
+    next(error);
+  }
+};
+
+const onboardDeferred = async (req, res, next) => {
+  try {
+    const employeeData = req.body;
+    const reqContext = { ip: req.ip, userAgent: req.headers["user-agent"] };
+    const result = await employeeService.onboardDeferred(
+      employeeData,
+      req.user.id,
+      reqContext
+    );
+    res.status(202).json(result); // 202 Accepted
+  } catch (error) {
+    next(error);
+  }
+};
+
+const reconcileManagers = async (req, res, next) => {
+  try {
+    const reqContext = { ip: req.ip, userAgent: req.headers["user-agent"] };
+    const result = await employeeService.reconcileManagers(
+      req.user.id,
+      reqContext
+    );
+    res.status(200).json(result);
+  } catch (error) {
+    next(error);
+  }
+};
+
 const getEmployeeDevices = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -414,41 +423,45 @@ const getEmployeeApplicationAccess = async (req, res, next) => {
 const getApplicationAccessDetails = async (req, res, next) => {
   try {
     const { id: employeeId, platformKey } = req.params;
-    // req.employee is now correctly attached by our updated middleware
     const employeeEmail = req.employee.employee_email;
     let details;
 
-    switch (platformKey) {
-      case "atlassian":
-        // 1. Find the Atlassian-specific account ID using the employee's email.
-        const atlassianUser = await atlassianService.getJiraUserByEmail(
-          employeeEmail
+    // Handle direct platform integrations
+    if (platformKey === "google") {
+      details = await googleService.getUserStatus(employeeEmail);
+    } else if (platformKey === "slack") {
+      details = await slackService.getUserStatus(employeeEmail);
+    } else if (platformKey === "atlassian") {
+      const atlassianUser = await atlassianService.getJiraUserByEmail(
+        employeeEmail
+      );
+      if (!atlassianUser || !atlassianUser.account_id) {
+        details = { message: "User not found in Atlassian." };
+      } else {
+        details = await atlassianService.getAtlassianAccessByAccountId(
+          atlassianUser.account_id
         );
-        if (!atlassianUser || !atlassianUser.account_id) {
-          // If the user isn't in Atlassian, return empty arrays.
-          details = {
-            jiraProjects: [],
-            bitbucketRepositories: [],
-            confluenceSpaces: [],
-          };
-        } else {
-          // 2. Use the correct Atlassian account ID to fetch access details.
-          details = await atlassianService.getAtlassianAccessByAccountId(
-            atlassianUser.account_id
-          );
-        }
-        break;
-      case "google":
-        details = await googleService.getUserStatus(employeeEmail);
-        break;
-      case "slack":
-        details = await slackService.getUserStatus(employeeEmail);
-        break;
-      case "jumpcloud":
-        details = await jumpcloudService.getUserStatus(employeeEmail);
-        break;
-      default:
-        return res.status(404).json({ message: "Platform details not found." });
+      }
+    } else if (platformKey === "jumpcloud") {
+      details = await jumpcloudService.getUserStatus(employeeEmail);
+    } else {
+      // Handle other managed applications (like JumpCloud SSO apps)
+      const appRes = await db.query(
+        "SELECT id, jumpcloud_app_id FROM managed_applications WHERE name = $1",
+        [platformKey]
+      );
+
+      if (appRes.rows.length > 0 && appRes.rows[0].jumpcloud_app_id) {
+        const managedApplicationId = appRes.rows[0].id;
+        details = await employeeService.getJumpCloudSsoAppDetails(
+          employeeId,
+          managedApplicationId
+        );
+      } else {
+        return res
+          .status(404)
+          .json({ message: "Details not available for this application." });
+      }
     }
 
     res.json(details);
@@ -469,9 +482,7 @@ module.exports = {
   deactivateOnPlatforms,
   bulkDeactivateOnPlatforms,
   getPlatformStatuses,
-  getJumpCloudLogs,
-  getGoogleLogs,
-  getSlackLogs,
+  getPlatformLogs,
   getUnifiedTimeline,
   exportEmployees,
   getLicenseDetails,
@@ -483,4 +494,6 @@ module.exports = {
   getEmployeeAtlassianAccess,
   getEmployeeApplicationAccess,
   getApplicationAccessDetails,
+  onboardDeferred,
+  reconcileManagers,
 };

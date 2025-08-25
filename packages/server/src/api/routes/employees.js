@@ -122,22 +122,10 @@ router.get(
   employeeController.getPlatformStatuses
 );
 router.get(
-  "/:id/jumpcloud-logs",
+  "/:id/platform-logs",
   authenticateToken,
   authorizeAdminOrSelfForLogs,
-  employeeController.getJumpCloudLogs
-);
-router.get(
-  "/:id/google-logs",
-  authenticateToken,
-  authorizeAdminOrSelfForLogs,
-  employeeController.getGoogleLogs
-);
-router.get(
-  "/:id/slack-logs",
-  authenticateToken,
-  authorizeAdminOrSelfForLogs,
-  employeeController.getSlackLogs
+  employeeController.getPlatformLogs
 );
 router.get(
   "/:id/unified-timeline",
@@ -157,6 +145,18 @@ router.post(
   authenticateToken,
   authorize("employee:read:all"),
   employeeController.logEmployeeView
+);
+router.post(
+  "/onboard-deferred",
+  authenticateApiKey,
+  authorize("employee:create"),
+  employeeController.onboardDeferred
+);
+router.post(
+  "/reconcile-managers",
+  authenticateApiKey,
+  authorize("employee:create"),
+  employeeController.reconcileManagers
 );
 
 router.get(

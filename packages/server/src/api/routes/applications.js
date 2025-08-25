@@ -27,4 +27,11 @@ router.delete(
   applicationController.deleteApplication
 );
 
+router.put(
+  "/:appId/licensable",
+  authenticateToken,
+  authorize("admin:manage_applications"),
+  applicationController.setLicensableStatus
+);
+
 module.exports = router;
