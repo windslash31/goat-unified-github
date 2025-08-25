@@ -749,7 +749,7 @@ const syncAllUserLogs = async () => {
     if (lastLogResult.rows[0]?.timestamp) {
       startTime = lastLogResult.rows[0].timestamp.toISOString();
     } else {
-      startTime = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
+      startTime = new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString();
       console.log(
         "CRON JOB: No previous JumpCloud logs found. Starting sync from 90 days ago."
       );
