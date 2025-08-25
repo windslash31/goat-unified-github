@@ -1558,6 +1558,21 @@ const reconcileManagers = async (actorId, reqContext) => {
   }
 };
 
+const getJumpCloudSsoAppDetails = async (employeeId, managedApplicationId) => {
+  const query = `
+    SELECT jg.name as group_name
+    FROM jumpcloud_user_groups jg
+    JOIN jumpcloud_user_group_members jgm ON jg.id = jgm.group_id
+    JOIN jumpcloud_users ju ON jgm.user_id = ju.id
+    JOIN employees e ON ju.email = e.employee_email
+    JOIN jumpcloud_application_bindings jab ON jg.id = jab.group_id
+    JOIN managed_applications ma ON jab.application_id = ma.jumpcloud_app_id
+    WHERE e.id = $1 AND ma.id = $2;
+  `;
+  const result = await db.query(query, [employeeId, managedApplicationId]);
+  return { user_groups: result.rows.map((row) => row.group_name) };
+};
+
 module.exports = {
   getEmployeeById,
   getEmployees,
@@ -1583,4 +1598,5 @@ module.exports = {
   onboardDeferred,
   reconcileManagers,
   forceSyncPlatformStatus,
+  getJumpCloudSsoAppDetails,
 };

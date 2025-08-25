@@ -28,7 +28,7 @@ router.post(
     console.log("The next middleware in the chain is 'authenticateApiKey'.");
     next();
   },
-  authenticateApiKey,
+  authenticateToken,
   authorize("log:read:platform"),
   syncController.triggerMasterSync
 );

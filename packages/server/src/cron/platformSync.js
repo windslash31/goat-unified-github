@@ -235,12 +235,12 @@ const runAllSyncs = async () => {
   console.log("CRON JOB: Starting master sync job for all platforms...");
   try {
     // Step 1: Run all raw data syncs
-    //await syncAllJumpCloudData(); // This also handles SSO app reconciliation
-    //await atlassianService.syncAllAtlassianData();
-    //await runIndividualUserSync("google_sync", googleService.syncUserData);
-    //await runIndividualUserSync("slack_sync", slackService.syncUserData);
+    await syncAllJumpCloudData(); // This also handles SSO app reconciliation
+    await atlassianService.syncAllAtlassianData();
+    await runIndividualUserSync("google_sync", googleService.syncUserData);
+    await runIndividualUserSync("slack_sync", slackService.syncUserData);
     await reconcileDirectApiAccess();
-    //await jumpcloudService.syncAllUserLogs();
+    await jumpcloudService.syncAllUserLogs();
 
     // Step 2: Run the new final reconciliation for direct API apps
   } catch (error) {
