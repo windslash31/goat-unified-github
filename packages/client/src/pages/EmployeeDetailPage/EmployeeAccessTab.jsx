@@ -14,7 +14,6 @@ import api from "../../api/api";
 import { motion, AnimatePresence } from "framer-motion";
 import { formatDateTime } from "../../utils/formatters";
 
-// Helper to fetch detailed data for a specific platform
 const fetchAccessDetails = async (employeeId, platformKey) => {
   const platformRouteKey = {
     "Google Workspace": "google",
@@ -23,11 +22,14 @@ const fetchAccessDetails = async (employeeId, platformKey) => {
     Atlassian: "atlassian",
   }[platformKey];
 
-  // This check is important for SSO apps that don't have a direct mapping
-  if (!platformRouteKey) return null;
+  // If the app is a JumpCloud SSO app, it won't be in the map.
+  // We use the platformKey directly in that case.
+  const finalKey = platformRouteKey || platformKey;
 
   const { data } = await api.get(
-    `/api/employees/${employeeId}/access-details/${platformRouteKey}`
+    `/api/employees/${employeeId}/access-details/${encodeURIComponent(
+      finalKey
+    )}`
   );
   return data;
 };
