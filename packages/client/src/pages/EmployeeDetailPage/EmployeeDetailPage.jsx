@@ -304,6 +304,9 @@ export const EmployeeDetailPage = ({ permissions, onLogout }) => {
         </div>
         <div className="mt-6">{renderContent()}</div>
       </div>
+      {modal === "assignLicense" && (
+        <AssignLicenseModal employee={employee} onClose={closeModal} />
+      )}
       {isJiraModalOpen && (
         <JiraTicketModal
           ticketId={selectedTicketId}

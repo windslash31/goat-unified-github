@@ -30,10 +30,19 @@ const deleteApplication = async (id) => {
   return { message: "Application deleted successfully." };
 };
 
-const getAllManagedApplications = async () => {
-  const query =
-    "SELECT id, name, key, integration_mode, is_licensable FROM managed_applications ORDER BY name";
-  const result = await db.query(query);
+const getAllManagedApplications = async (filters = {}) => {
+  let query =
+    "SELECT id, name, key, integration_mode, is_licensable FROM managed_applications";
+  const queryParams = [];
+
+  if (filters.is_licensable) {
+    query += " WHERE is_licensable = $1";
+    queryParams.push(filters.is_licensable);
+  }
+
+  query += " ORDER BY name";
+
+  const result = await db.query(query, queryParams);
   return result.rows;
 };
 
