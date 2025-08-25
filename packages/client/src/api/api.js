@@ -31,12 +31,15 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
-    // Check if the error is a 401 and we haven't retried yet.
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    const isLoginAttempt = originalRequest.url.endsWith("/api/auth/login");
+
+    if (
+      error.response?.status === 401 &&
+      !originalRequest._retry &&
+      !isLoginAttempt
+    ) {
       originalRequest._retry = true;
 
-      // If refreshPromise is not null, another request is already trying to refresh the token.
-      // We hook into that existing promise.
       if (refreshPromise) {
         try {
           const newAccessToken = await refreshPromise;
@@ -47,35 +50,25 @@ api.interceptors.response.use(
         }
       }
 
-      // If refreshPromise is null, this is the first 401.
-      // We start the refresh process.
       refreshPromise = new Promise(async (resolve, reject) => {
         try {
           const { data } = await api.post("/api/auth/refresh");
           const newAccessToken = data.accessToken;
-
-          // IMPORTANT: Use the centralized store method to update the token.
-          // This will update localStorage and trigger the 'storage' event for other tabs.
           useAuthStore.getState().setAccessToken(newAccessToken);
-
           resolve(newAccessToken);
         } catch (refreshError) {
-          // If refresh fails, log out from all tabs.
           useAuthStore.getState().logout();
           reject(refreshError);
         } finally {
-          // Whether it succeeded or failed, reset the refreshPromise so the next 401 can trigger a new refresh.
           refreshPromise = null;
         }
       });
 
-      // Now, retry the original request using the result of our new refreshPromise.
       try {
         const newAccessToken = await refreshPromise;
         originalRequest.headers["Authorization"] = `Bearer ${newAccessToken}`;
         return api(originalRequest);
       } catch (err) {
-        // This will catch the rejection from the refreshPromise if the refresh failed.
         return Promise.reject(err);
       }
     }
