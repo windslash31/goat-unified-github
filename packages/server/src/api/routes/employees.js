@@ -193,4 +193,11 @@ router.post(
   employeeController.triggerPlatformSync
 );
 
+router.delete(
+  "/:employeeId/accounts/:accountId",
+  authenticateToken,
+  authorize("employee:update"),
+  employeeController.removeProvisionedAccount
+);
+
 module.exports = router;
