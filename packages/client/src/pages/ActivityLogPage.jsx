@@ -21,7 +21,6 @@ import {
   PlusCircle,
   FilePlus,
   Filter as FilterIcon,
-  // ✨ FIX: Import Trash2 icon
   Trash2,
 } from "lucide-react";
 import { Button } from "../components/ui/Button";
@@ -144,6 +143,44 @@ const RoleDeleteDetail = ({ details }) => (
     <span>
       Role deleted: <span className="font-semibold">{details.roleName}</span>
     </span>
+  </div>
+);
+
+const LicenseAssignmentCreateDetail = ({ details }) => (
+  <div className="flex items-start">
+    <PlusCircle className="w-4 h-4 text-green-500 mr-2 mt-1 flex-shrink-0" />
+    <div>
+      <p>
+        Assigned the <span className="font-semibold">{details.tierName}</span>{" "}
+        license for{" "}
+        <span className="font-semibold">{details.applicationName}</span>.
+      </p>
+    </div>
+  </div>
+);
+
+const LicenseAssignmentDeleteDetail = ({ details }) => (
+  <div className="flex items-start">
+    <Trash2 className="w-4 h-4 text-red-500 mr-2 mt-1 flex-shrink-0" />
+    <div>
+      <p>
+        Revoked the <span className="font-semibold">{details.tierName}</span>{" "}
+        license for{" "}
+        <span className="font-semibold">{details.applicationName}</span>.
+      </p>
+    </div>
+  </div>
+);
+
+const ApplicationAccessDeleteDetail = ({ details }) => (
+  <div className="flex items-start">
+    <UserX className="w-4 h-4 text-red-500 mr-2 mt-1 flex-shrink-0" />
+    <div>
+      <p>
+        Removed access to the application{" "}
+        <span className="font-semibold">{details.details.application}</span>.
+      </p>
+    </div>
   </div>
 );
 
@@ -444,7 +481,15 @@ const LogDetailContent = ({ log, roles }) => {
     MANUAL_PLATFORM_SUSPENSION: (
       <SuspensionDetail results={log.details.deactivation_results} />
     ),
-    // ✨ FIX: Add Managed Account action types to the component map
+    LICENSE_ASSIGNMENT_CREATE: (
+      <LicenseAssignmentCreateDetail details={log.details.details} />
+    ),
+    LICENSE_ASSIGNMENT_DELETE: (
+      <LicenseAssignmentDeleteDetail details={log.details.details} />
+    ),
+    APPLICATION_ACCESS_DELETE: (
+      <ApplicationAccessDeleteDetail details={log.details} />
+    ),
     MANAGED_ACCOUNT_CREATE: (
       <ManagedAccountCreateDetail details={log.details.createdAccount} />
     ),
@@ -523,7 +568,12 @@ const ActivityLogItem = ({ log, roles, isExpanded, onToggle }) => {
       return `Role: ${log.details?.roleName}`;
     if (log.action_type.startsWith("API_KEY"))
       return log.target_user_email || "N/A";
-    // ✨ FIX: Add display name for managed account logs
+    if (
+      log.action_type.startsWith("LICENSE_ASSIGNMENT_") ||
+      log.action_type === "APPLICATION_ACCESS_DELETE"
+    ) {
+      return log.target_employee_email || "N/A";
+    }
     if (log.action_type.startsWith("MANAGED_ACCOUNT_")) {
       const account =
         log.details?.createdAccount ||
