@@ -109,45 +109,6 @@ const DetailView = ({ employeeId, applicationName }) => {
       {title}
     </h4>
   );
-
-  const LicenseAssignmentCreateDetail = ({ details }) => (
-    <div className="flex items-start">
-      <PlusCircle className="w-4 h-4 text-green-500 mr-2 mt-1 flex-shrink-0" />
-      <div>
-        <p>
-          Assigned the <span className="font-semibold">{details.tierName}</span>{" "}
-          license for{" "}
-          <span className="font-semibold">{details.applicationName}</span>.
-        </p>
-      </div>
-    </div>
-  );
-
-  const LicenseAssignmentDeleteDetail = ({ details }) => (
-    <div className="flex items-start">
-      <Trash2 className="w-4 h-4 text-red-500 mr-2 mt-1 flex-shrink-0" />
-      <div>
-        <p>
-          Revoked the <span className="font-semibold">{details.tierName}</span>{" "}
-          license for{" "}
-          <span className="font-semibold">{details.applicationName}</span>.
-        </p>
-      </div>
-    </div>
-  );
-
-  const ApplicationAccessDeleteDetail = ({ details }) => (
-    <div className="flex items-start">
-      <UserX className="w-4 h-4 text-red-500 mr-2 mt-1 flex-shrink-0" />
-      <div>
-        <p>
-          Removed access to the application{" "}
-          <span className="font-semibold">{details.details.application}</span>.
-        </p>
-      </div>
-    </div>
-  );
-
   const JumpCloudSsoDetailView = ({ details }) => (
     <div>
       <DetailSectionHeader title="Access Granted Via Groups" />

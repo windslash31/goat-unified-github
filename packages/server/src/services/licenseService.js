@@ -93,11 +93,6 @@ const assignLicenseToEmployee = async (
       [actorId]
     );
     const actorEmail = actorRes.rows[0]?.email || "Unknown";
-    const sourceDetails = JSON.stringify({
-      source: "UI Assignment",
-      actor: actorEmail,
-      timestamp: new Date().toISOString(),
-    });
 
     await client.query(
       `INSERT INTO user_accounts (user_id, app_instance_id, status, last_seen_at)
