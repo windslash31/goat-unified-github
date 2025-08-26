@@ -45,31 +45,26 @@ const assignLicenseToEmployee = async (
   try {
     await client.query("BEGIN");
 
-    // --- FIX START: Build the query dynamically ---
+    // --- (This part for finding the license ID is unchanged) ---
     let availableLicenseQuery = `
-      SELECT l.id
-      FROM licenses l
-      LEFT JOIN (
-           SELECT license_id, COUNT(*) as assigned_seats
-          FROM license_assignments
-          GROUP BY license_id
-      ) la ON l.id = la.license_id
-      WHERE l.application_id = $1
-        AND (l.is_unlimited = TRUE OR COALESCE(la.assigned_seats, 0) < l.total_seats)
-    `;
+        SELECT l.id
+        FROM licenses l
+        LEFT JOIN (
+             SELECT license_id, COUNT(*) as assigned_seats
+            FROM license_assignments
+            GROUP BY license_id
+        ) la ON l.id = la.license_id
+         WHERE l.application_id = $1
+          AND (l.is_unlimited = TRUE OR COALESCE(la.assigned_seats, 0) < l.total_seats)
+      `;
     const queryParams = [applicationId];
 
     if (tierName) {
-      // If a tier name is provided, add it to the filter
       queryParams.push(tierName);
       availableLicenseQuery += ` AND l.tier_name = $2`;
     }
-
-    // Always find the first available license pool
     availableLicenseQuery += ` ORDER BY l.id LIMIT 1;`;
-
     const licenseRes = await client.query(availableLicenseQuery, queryParams);
-    // --- FIX END ---
 
     if (licenseRes.rows.length === 0) {
       const errorMessage = tierName
@@ -79,13 +74,37 @@ const assignLicenseToEmployee = async (
     }
     const licenseId = licenseRes.rows[0].id;
 
-    // The rest of the function remains the same
+    // --- START OF NEW CODE ---
+    // ADDED: Find the primary app instance for the managed application.
+    const instanceRes = await client.query(
+      `SELECT id FROM app_instances WHERE application_id = $1 AND is_primary = true LIMIT 1`,
+      [applicationId]
+    );
+
+    if (instanceRes.rows.length === 0) {
+      throw new Error(
+        "Could not find a primary instance for this application."
+      );
+    }
+    const appInstanceId = instanceRes.rows[0].id;
+
+    // ADDED: Create the user_accounts record if it doesn't exist. This links the employee to the app.
+    // ON CONFLICT ensures we don't create duplicates if the link already exists.
+    await client.query(
+      `INSERT INTO user_accounts (user_id, app_instance_id, status, last_seen_at)
+           VALUES ($1, $2, 'active', NOW())
+           ON CONFLICT (user_id, app_instance_id) DO NOTHING;`,
+      [employeeId, appInstanceId]
+    );
+    // --- END OF NEW CODE ---
+
+    // --- (This part for inserting the assignment is unchanged) ---
     const insertQuery = `
-      INSERT INTO license_assignments (employee_id, license_id)
-      VALUES ($1, $2)
-      ON CONFLICT (employee_id, license_id) DO NOTHING
-      RETURNING id;
-    `;
+        INSERT INTO license_assignments (employee_id, license_id)
+        VALUES ($1, $2)
+         ON CONFLICT (employee_id, license_id) DO NOTHING
+        RETURNING id;
+      `;
     const assignmentResult = await client.query(insertQuery, [
       employeeId,
       licenseId,
@@ -119,7 +138,7 @@ const assignLicenseToEmployee = async (
     client.release();
   }
 };
-// --- ADD NEW FUNCTION ---
+
 const removeLicenseAssignment = async (assignmentId, actorId, reqContext) => {
   const client = await db.pool.connect();
   try {

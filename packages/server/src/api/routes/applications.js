@@ -1,37 +1,54 @@
 const express = require("express");
 const router = express.Router();
-const applicationController = require("../controllers/applicationController");
+const {
+  listAllApplications,
+  createApplication,
+  updateApplication,
+  deleteApplication,
+  onboardApplication,
+  setLicensableStatus,
+} = require("../controllers/applicationController");
 const {
   authenticateToken,
   authorize,
 } = require("../middleware/authMiddleware");
 
-router.get("/", authenticateToken, applicationController.listAllApplications);
+router.get("/", authenticateToken, listAllApplications);
 
 router.post(
   "/",
   authenticateToken,
   authorize("admin:manage_applications"),
-  applicationController.createApplication
+  createApplication
 );
+
 router.put(
   "/:id",
   authenticateToken,
   authorize("admin:manage_applications"),
-  applicationController.updateApplication
+  updateApplication
 );
+
 router.delete(
   "/:id",
   authenticateToken,
   authorize("admin:manage_applications"),
-  applicationController.deleteApplication
+  deleteApplication
+);
+
+// This is the new route you added
+router.post(
+  "/onboard",
+  authenticateToken,
+  authorize("admin:manage_applications"),
+  onboardApplication
 );
 
 router.put(
   "/:appId/licensable",
   authenticateToken,
   authorize("admin:manage_applications"),
-  applicationController.setLicensableStatus
+  setLicensableStatus
 );
 
 module.exports = router;

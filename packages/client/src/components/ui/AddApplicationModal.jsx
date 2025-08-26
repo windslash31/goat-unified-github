@@ -59,8 +59,8 @@ export const AddApplicationModal = ({ onClose }) => {
   };
 
   const integrationOptions = [
-    { id: "MANUAL", name: "Manual" },
-    { id: "SSO_JUMPCLOUD", name: "JumpCloud SSO" },
+    { id: "MANUAL_INTERNAL", name: "Manual" },
+    { id: "MANUAL_LICENSED", name: "Manual Licensed" },
   ];
 
   const inputClasses =

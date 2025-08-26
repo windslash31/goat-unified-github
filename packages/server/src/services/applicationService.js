@@ -62,10 +62,65 @@ const setApplicationLicensableStatus = async (appId, isLicensable) => {
   return result.rows[0];
 };
 
+const onboardApplication = async (appData) => {
+  const { name, key, integration_mode, jumpcloud_app_id = null } = appData;
+  const client = await db.pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    // Step A: Insert the main record into the managed_applications table
+    const managedAppQuery = `
+      INSERT INTO managed_applications (name, key, integration_mode, jumpcloud_app_id)
+      VALUES ($1, $2, $3, $4)
+      RETURNING id, name, key, integration_mode, is_licensable;
+    `;
+    const managedAppResult = await client.query(managedAppQuery, [
+      name,
+      key,
+      integration_mode,
+      jumpcloud_app_id,
+    ]);
+
+    const newApplication = managedAppResult.rows[0];
+
+    // Step B: Create a default "primary" instance for the new application
+    const appInstanceQuery = `
+      INSERT INTO app_instances (application_id, display_name, is_primary)
+      VALUES ($1, $2, true);
+    `;
+    await client.query(appInstanceQuery, [
+      newApplication.id,
+      newApplication.name,
+    ]);
+
+    await client.query("COMMIT");
+    return newApplication;
+  } catch (err) {
+    await client.query("ROLLBACK");
+    // Provide a user-friendly error if the name or key already exists
+    if (err.code === "23505") {
+      // PostgreSQL unique violation error code
+      if (err.constraint.includes("managed_applications_key_key")) {
+        throw new Error(`An application with the key "${key}" already exists.`);
+      }
+      if (err.constraint.includes("managed_applications_name_key")) {
+        throw new Error(
+          `An application with the name "${name}" already exists.`
+        );
+      }
+    }
+    throw err;
+  } finally {
+    client.release();
+  }
+};
+
+// 2. ADD the new function to the exports
 module.exports = {
   createApplication,
   updateApplication,
   deleteApplication,
   getAllManagedApplications,
   setApplicationLicensableStatus,
+  onboardApplication,
 };
