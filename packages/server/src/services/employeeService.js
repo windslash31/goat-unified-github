@@ -69,15 +69,15 @@ const getEmployeeById = async (employeeId) => {
           'tier_name', final_license.tier_name,
           'cost', final_license.monthly_cost,
           'currency', final_license.currency,
-          'license_assignment_id', final_license.license_assignment_id -- ADDED THIS LINE
+          'license_assignment_id', final_license.license_assignment_id
         ))
          FROM user_accounts ua
         JOIN app_instances ai ON ua.app_instance_id = ai.id
         JOIN managed_applications ma ON ai.application_id = ma.id
         LEFT JOIN LATERAL (
           (
-            -- PRIORITY 1: Look for a direct, manual assignment
-            SELECT l.tier_name, l.monthly_cost, l.currency, la.id as license_assignment_id, 1 as priority -- ADDED la.id
+            -- PRIORITY 1: Look for a direct, manual assignment (This part is unchanged)
+            SELECT l.tier_name, l.monthly_cost, l.currency, la.id as license_assignment_id, 1 as priority
             FROM license_assignments la
             JOIN licenses l ON la.license_id = l.id
             WHERE la.employee_id = ua.user_id AND l.application_id = ma.id
@@ -85,11 +85,13 @@ const getEmployeeById = async (employeeId) => {
           UNION ALL
           (
             -- PRIORITY 2: Look for an automatic single-tier license
-            SELECT l.tier_name, l.monthly_cost, l.currency, NULL::integer as license_assignment_id, 2 as priority -- ADDED NULL placeholder
+            SELECT l.tier_name, l.monthly_cost, l.currency, NULL::integer as license_assignment_id, 2 as priority
             FROM licenses l
             WHERE l.application_id = ma.id AND (
               SELECT count(*) FROM licenses WHERE application_id = ma.id
             ) = 1
+            -- THIS IS THE NEW CONDITION TO FIX THE LOGIC --
+            AND ma.integration_mode NOT IN ('MANUAL_INTERNAL', 'MANUAL_LICENSED')
           )
           ORDER BY priority ASC
           LIMIT 1
@@ -1573,6 +1575,64 @@ const getJumpCloudSsoAppDetails = async (employeeId, managedApplicationId) => {
   return { user_groups: result.rows.map((row) => row.group_name) };
 };
 
+const removeUserAccount = async (userAccountId, actorId, reqContext) => {
+  const client = await db.pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    // Find the account to get details for logging before deleting
+    const accountRes = await client.query(
+      `SELECT ua.user_id, ma.name as app_name
+       FROM user_accounts ua
+       JOIN app_instances ai ON ua.app_instance_id = ai.id
+       JOIN managed_applications ma ON ai.application_id = ma.id
+       WHERE ua.id = $1`,
+      [userAccountId]
+    );
+
+    if (accountRes.rows.length === 0) {
+      throw new Error("User account not found.");
+    }
+    const { user_id: employeeId, app_name } = accountRes.rows[0];
+
+    // Delete any associated license assignments first
+    await client.query(
+      `DELETE FROM license_assignments WHERE id IN (
+         SELECT la.id FROM license_assignments la
+         JOIN licenses l ON la.license_id = l.id
+         JOIN app_instances ai ON l.application_id = ai.application_id
+         WHERE la.employee_id = $1 AND ai.id = (SELECT app_instance_id FROM user_accounts WHERE id = $2)
+       )`,
+      [employeeId, userAccountId]
+    );
+
+    // Now delete the main account record
+    await client.query("DELETE FROM user_accounts WHERE id = $1", [
+      userAccountId,
+    ]);
+
+    // Log the activity
+    await logActivity(
+      actorId,
+      "APPLICATION_ACCESS_DELETE",
+      { targetEmployeeId: employeeId, details: { application: app_name } },
+      reqContext,
+      client
+    );
+
+    await client.query("COMMIT");
+    return {
+      success: true,
+      message: "Application access removed successfully.",
+    };
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
+};
+
 module.exports = {
   getEmployeeById,
   getEmployees,
@@ -1599,4 +1659,5 @@ module.exports = {
   reconcileManagers,
   forceSyncPlatformStatus,
   getJumpCloudSsoAppDetails,
+  removeUserAccount,
 };

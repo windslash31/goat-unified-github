@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect, useRef, memo } from "react";
 import { useQueryClient, useMutation, useQuery } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import {
@@ -12,6 +12,8 @@ import {
   ExternalLink,
   PlusCircle,
   Trash2,
+  UserX,
+  MoreVertical,
 } from "lucide-react";
 import api from "../../api/api";
 import { motion, AnimatePresence } from "framer-motion";
@@ -20,6 +22,36 @@ import { useModalStore } from "../../stores/modalStore";
 import { Button } from "../../components/ui/Button";
 import { ConfirmationModal } from "../../components/ui/ConfirmationModal";
 
+const SourceBadge = ({ mode }) => {
+  const styles = {
+    API_INTEGRATED: {
+      icon: <Cpu size={12} />,
+      label: "API Synced",
+      classes: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300",
+    },
+    MANUAL_INTERNAL: {
+      icon: <User size={12} />,
+      label: "Manual",
+      classes: "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300",
+    },
+    MANUAL_LICENSED: {
+      icon: <PenSquare size={12} />,
+      label: "Manual License",
+      classes:
+        "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300",
+    },
+  };
+  const style = styles[mode] || styles.MANUAL_INTERNAL;
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 py-1 px-2.5 rounded-full text-xs font-medium ${style.classes}`}
+    >
+      {style.icon}
+      {style.label}
+    </span>
+  );
+};
+
 const fetchAccessDetails = async (employeeId, platformKey) => {
   const platformRouteKey = {
     "Google Workspace": "google",
@@ -27,11 +59,7 @@ const fetchAccessDetails = async (employeeId, platformKey) => {
     JumpCloud: "jumpcloud",
     Atlassian: "atlassian",
   }[platformKey];
-
-  // If the app is a JumpCloud SSO app, it won't be in the map.
-  // We use the platformKey directly in that case.
   const finalKey = platformRouteKey || platformKey;
-
   const { data } = await api.get(
     `/api/employees/${employeeId}/access-details/${encodeURIComponent(
       finalKey
@@ -61,7 +89,6 @@ const DetailView = ({ employeeId, applicationName }) => {
       </div>
     );
 
-  // Reusable Row Component
   const DetailRow = ({ label, value }) => {
     if (value === null || typeof value === "undefined" || value === "")
       return null;
@@ -77,13 +104,11 @@ const DetailView = ({ employeeId, applicationName }) => {
     );
   };
 
-  // Reusable Section Header
   const DetailSectionHeader = ({ title }) => (
     <h4 className="text-sm font-semibold text-gray-800 dark:text-gray-200 mt-4 mb-2 first:mt-0">
       {title}
     </h4>
   );
-
   const JumpCloudSsoDetailView = ({ details }) => (
     <div>
       <DetailSectionHeader title="Access Granted Via Groups" />
@@ -100,56 +125,51 @@ const DetailView = ({ employeeId, applicationName }) => {
       )}
     </div>
   );
-
   const GoogleDetailView = ({ details }) => (
     <dl>
-      <DetailSectionHeader title="Google Workspace Details" />
-      <DetailRow label="Admin" value={details.isAdmin ? "Yes" : "No"} />
+      {" "}
+      <DetailSectionHeader title="Google Workspace Details" />{" "}
+      <DetailRow label="Admin" value={details.isAdmin ? "Yes" : "No"} />{" "}
       <DetailRow
         label="2-Step Verification"
         value={details.isEnrolledIn2Sv ? "Enrolled" : "Not Enrolled"}
-      />
-      <DetailRow label="Org Unit" value={details.orgUnitPath} />
+      />{" "}
+      <DetailRow label="Org Unit" value={details.orgUnitPath} />{" "}
       <DetailRow
         label="Last Login"
         value={
           details.lastLoginTime ? formatDateTime(details.lastLoginTime) : "N/A"
         }
-      />
+      />{" "}
     </dl>
   );
-
   const SlackDetailView = ({ details }) => (
     <dl>
-      <DetailSectionHeader title="Slack Details" />
-      <DetailRow label="User ID" value={details.id} />
-      <DetailRow label="Admin" value={details.is_admin ? "Yes" : "No"} />
-      <DetailRow label="Owner" value={details.is_owner ? "Yes" : "No"} />
-      <DetailRow label="Guest" value={details.is_guest ? "Yes" : "No"} />
+      {" "}
+      <DetailSectionHeader title="Slack Details" />{" "}
+      <DetailRow label="User ID" value={details.id} />{" "}
+      <DetailRow label="Admin" value={details.is_admin ? "Yes" : "No"} />{" "}
+      <DetailRow label="Owner" value={details.is_owner ? "Yes" : "No"} />{" "}
+      <DetailRow label="Guest" value={details.is_guest ? "Yes" : "No"} />{" "}
     </dl>
   );
-
   const JumpCloudDetailView = ({ details }) => (
     <div>
-      <DetailSectionHeader title="Core Identity" />
-      <DetailRow label="Username" value={details.coreIdentity?.username} />
-      <DetailRow label="Email" value={details.coreIdentity?.email} />
-
-      <DetailSectionHeader title="Account Status" />
-      <DetailRow label="State" value={details.accountStatus?.state} />
+      {" "}
+      <DetailSectionHeader title="Core Identity" />{" "}
+      <DetailRow label="Username" value={details.coreIdentity?.username} />{" "}
+      <DetailRow label="Email" value={details.coreIdentity?.email} />{" "}
+      <DetailSectionHeader title="Account Status" />{" "}
+      <DetailRow label="State" value={details.accountStatus?.state} />{" "}
       <DetailRow
         label="Suspended"
         value={details.accountStatus?.suspended ? "Yes" : "No"}
-      />
-      <DetailRow label="MFA Status" value={details.accountStatus?.mfaStatus} />
+      />{" "}
+      <DetailRow label="MFA Status" value={details.accountStatus?.mfaStatus} />{" "}
     </div>
   );
-
-  // --- START OF NECESSARY CHANGES ---
-  // This is the only component that has been changed.
   const AtlassianDetailView = ({ details }) => {
     const [activeTab, setActiveTab] = useState("jira");
-
     const tabs = [
       { id: "jira", label: "Jira", data: details.jiraProjects || [] },
       {
@@ -163,7 +183,6 @@ const DetailView = ({ employeeId, applicationName }) => {
         data: details.bitbucketRepositories || [],
       },
     ];
-
     const TabButton = ({ tab }) => (
       <button
         onClick={() => setActiveTab(tab.id)}
@@ -177,17 +196,14 @@ const DetailView = ({ employeeId, applicationName }) => {
         <span className="text-xs opacity-75">{tab.data.length}</span>
       </button>
     );
-
     const renderContent = () => {
       const activeTabData = tabs.find((t) => t.id === activeTab)?.data;
-      if (!activeTabData || activeTabData.length === 0) {
+      if (!activeTabData || activeTabData.length === 0)
         return (
           <p className="text-center text-sm text-gray-500 py-4">
             No access records found for this product.
           </p>
         );
-      }
-
       switch (activeTab) {
         case "jira":
           return (
@@ -255,7 +271,6 @@ const DetailView = ({ employeeId, applicationName }) => {
           return null;
       }
     };
-
     return (
       <div>
         <DetailSectionHeader title="Atlassian Access" />
@@ -271,16 +286,11 @@ const DetailView = ({ employeeId, applicationName }) => {
       </div>
     );
   };
-  // --- END OF NECESSARY CHANGES ---
 
   const renderDetails = () => {
     if (!data)
       return <p className="text-sm text-gray-500">No details available.</p>;
-
-    if (data.user_groups) {
-      return <JumpCloudSsoDetailView details={data} />;
-    }
-
+    if (data.user_groups) return <JumpCloudSsoDetailView details={data} />;
     if (data.details) {
       switch (applicationName) {
         case "Google Workspace":
@@ -297,11 +307,8 @@ const DetailView = ({ employeeId, applicationName }) => {
           );
       }
     }
-
-    if (data.jiraProjects || data.confluenceSpaces) {
+    if (data.jiraProjects || data.confluenceSpaces)
       return <AtlassianDetailView details={data} />;
-    }
-
     return (
       <pre className="text-xs whitespace-pre-wrap font-mono">
         {JSON.stringify(data, null, 2)}
@@ -316,79 +323,142 @@ const DetailView = ({ employeeId, applicationName }) => {
   );
 };
 
-const SourceBadge = ({ mode }) => {
-  const styles = {
-    API_INTEGRATED: {
-      icon: <Cpu size={12} />,
-      label: "API Synced",
-      classes: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300",
-    },
-    MANUAL_INTERNAL: {
-      icon: <User size={12} />,
-      label: "Manual",
-      classes: "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300",
-    },
-    MANUAL_LICENSED: {
-      icon: <PenSquare size={12} />,
-      label: "Manual License",
-      classes:
-        "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300",
-    },
-  };
-  const style = styles[mode] || styles.MANUAL_INTERNAL;
-  return (
-    <span
-      className={`inline-flex items-center gap-1.5 py-1 px-2.5 rounded-full text-xs font-medium ${style.classes}`}
-    >
-      {style.icon}
-      {style.label}
-    </span>
-  );
+// --- START: NEW HELPER COMPONENTS ---
+
+const useOutsideClick = (ref, callback) => {
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (ref.current && !ref.current.contains(event.target)) {
+        callback();
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [ref, callback]);
 };
+
+const ActionMenu = memo(({ account, onRevoke, onRemove }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const menuRef = useRef(null);
+  useOutsideClick(menuRef, () => setIsOpen(false));
+
+  const canBeRevoked = !!account.license_assignment_id;
+  const canBeRemoved = account.integration_mode?.startsWith("MANUAL");
+
+  if (!canBeRevoked && !canBeRemoved) return null;
+
+  return (
+    <div className="relative" ref={menuRef}>
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="p-2 text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition-colors"
+        title="Actions"
+      >
+        <MoreVertical size={16} />
+      </button>
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: -10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: -10 }}
+            className="absolute top-full right-0 mt-2 w-56 bg-white dark:bg-gray-800 border dark:border-gray-700 rounded-lg shadow-xl z-20"
+          >
+            <ul>
+              {canBeRevoked && (
+                <li>
+                  <button
+                    onClick={() => {
+                      onRevoke();
+                      setIsOpen(false);
+                    }}
+                    className="w-full text-left flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+                  >
+                    <Trash2 className="w-4 h-4" /> Revoke License
+                  </button>
+                </li>
+              )}
+              {canBeRemoved && (
+                <li>
+                  <button
+                    onClick={() => {
+                      onRemove();
+                      setIsOpen(false);
+                    }}
+                    className="w-full text-left flex items-center gap-3 px-4 py-2 text-sm text-red-500 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/50"
+                  >
+                    <UserX className="w-4 h-4" /> Remove Access
+                  </button>
+                </li>
+              )}
+            </ul>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+});
+
+// --- END: NEW HELPER COMPONENTS ---
 
 export const EmployeeAccessTab = ({ employee }) => {
   const [expandedAccountId, setExpandedAccountId] = useState(null);
   const { openModal } = useModalStore();
-
-  // --- ADD: State and logic for the revoke confirmation modal ---
-  const [revokeTarget, setRevokeTarget] = useState(null);
   const queryClient = useQueryClient();
+  const [actionTarget, setActionTarget] = useState(null);
 
   const { mutate: removeAssignmentMutation } = useMutation({
     mutationFn: (assignmentId) =>
       api.delete(`/api/licenses/assignments/${assignmentId}`),
     onSuccess: () => {
-      toast.success("License assignment revoked successfully!");
-      // Refresh the employee data to show the change
-      queryClient.invalidateQueries({
-        queryKey: ["employee", employee.id],
-      });
-      setRevokeTarget(null); // Close the modal
+      toast.success("License revoked successfully!");
+      queryClient.invalidateQueries({ queryKey: ["employee", employee.id] });
+      setActionTarget(null);
     },
     onError: (error) => {
       toast.error(error.response?.data?.message || "Failed to revoke license.");
-      setRevokeTarget(null); // Close the modal
+      setActionTarget(null);
+    },
+  });
+
+  const { mutate: removeAccountMutation } = useMutation({
+    mutationFn: ({ employeeId, accountId }) =>
+      api.delete(`/api/employees/${employeeId}/accounts/${accountId}`),
+    onSuccess: () => {
+      toast.success("Application access removed successfully!");
+      queryClient.invalidateQueries({ queryKey: ["employee", employee.id] });
+      setActionTarget(null);
+    },
+    onError: (error) => {
+      toast.error(error.response?.data?.message || "Failed to remove access.");
+      setActionTarget(null);
     },
   });
 
   const handleRevokeConfirm = () => {
-    if (revokeTarget) {
-      removeAssignmentMutation(revokeTarget.license_assignment_id);
+    if (actionTarget?.license_assignment_id) {
+      removeAssignmentMutation(actionTarget.license_assignment_id);
     }
   };
-  // --- END ADD ---
+
+  const handleRemoveAccessConfirm = () => {
+    if (actionTarget?.account_id) {
+      removeAccountMutation({
+        employeeId: employee.id,
+        accountId: actionTarget.account_id,
+      });
+    }
+  };
 
   const totalCost = (employee.provisioned_accounts || []).reduce(
     (sum, account) => sum + parseFloat(account.cost || 0),
     0
   );
-
   const provisionedAccounts = employee.provisioned_accounts || [];
 
   return (
     <>
       <div className="space-y-6">
-        {/* Total Cost Section - Unchanged */}
         <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
           <div className="flex items-center">
             <div className="flex-shrink-0 bg-kredivo-light text-kredivo-primary rounded-lg p-3">
@@ -407,7 +477,6 @@ export const EmployeeAccessTab = ({ employee }) => {
         </div>
 
         <div>
-          {/* FIX: Improved Header Layout */}
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
               Provisioned Accounts ({provisionedAccounts.length})
@@ -425,16 +494,12 @@ export const EmployeeAccessTab = ({ employee }) => {
             <div className="space-y-3">
               {provisionedAccounts.map((account) => {
                 const isExpanded = expandedAccountId === account.account_id;
-                // ADD: Determine if an account's license can be revoked
-                const canBeRevoked = !!account.license_assignment_id;
-
                 return (
                   <div
                     key={account.account_id}
                     className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg"
                   >
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                      {/* This part remains clickable to expand details */}
                       <div
                         className="flex-1 cursor-pointer"
                         onClick={() =>
@@ -451,10 +516,8 @@ export const EmployeeAccessTab = ({ employee }) => {
                         </p>
                       </div>
 
-                      {/* Group all actions and badges together for uniform layout */}
-                      <div className="flex items-center gap-2 flex-wrap">
+                      <div className="flex items-center gap-2 flex-wrap self-start sm:self-center">
                         <SourceBadge mode={account.integration_mode} />
-
                         {account.cost ? (
                           <div className="text-sm text-right">
                             <span className="font-medium text-gray-900 dark:text-white">
@@ -469,7 +532,6 @@ export const EmployeeAccessTab = ({ employee }) => {
                             No License Cost
                           </span>
                         )}
-
                         <span
                           className={`px-2.5 py-0.5 text-xs font-semibold rounded-full capitalize ${
                             account.status === "active"
@@ -480,17 +542,15 @@ export const EmployeeAccessTab = ({ employee }) => {
                           {account.status}
                         </span>
 
-                        {/* ADD: The Revoke button, only shown when possible */}
-                        {canBeRevoked && (
-                          <button
-                            onClick={() => setRevokeTarget(account)}
-                            className="p-2 text-red-500 hover:bg-red-100 dark:hover:bg-red-900/20 rounded-full transition-colors"
-                            title="Revoke License"
-                          >
-                            <Trash2 size={16} />
-                          </button>
-                        )}
-
+                        <ActionMenu
+                          account={account}
+                          onRevoke={() =>
+                            setActionTarget({ ...account, type: "revoke" })
+                          }
+                          onRemove={() =>
+                            setActionTarget({ ...account, type: "remove" })
+                          }
+                        />
                         <button
                           className="p-2"
                           onClick={() =>
@@ -541,14 +601,25 @@ export const EmployeeAccessTab = ({ employee }) => {
         </div>
       </div>
 
-      {/* ADD: Render the Confirmation Modal when a revoke target is set */}
       <ConfirmationModal
-        isOpen={!!revokeTarget}
-        onClose={() => setRevokeTarget(null)}
-        onConfirm={handleRevokeConfirm}
-        title="Revoke License Assignment"
-        message={`Are you sure you want to revoke the "${revokeTarget?.tier_name}" license for "${revokeTarget?.application_name}"? This will remove the manual license assignment.`}
-        confirmationText="revoke"
+        isOpen={!!actionTarget}
+        onClose={() => setActionTarget(null)}
+        onConfirm={
+          actionTarget?.type === "remove"
+            ? handleRemoveAccessConfirm
+            : handleRevokeConfirm
+        }
+        title={
+          actionTarget?.type === "remove"
+            ? "Remove Application Access"
+            : "Revoke License"
+        }
+        message={
+          actionTarget?.type === "remove"
+            ? `Are you sure you want to completely remove access to "${actionTarget?.application_name}" for this user? This will also revoke any assigned licenses and cannot be undone.`
+            : `Are you sure you want to revoke the "${actionTarget?.tier_name}" license for "${actionTarget?.application_name}"? The user will still have access but it will be unlicensed.`
+        }
+        confirmationText={actionTarget?.type === "remove" ? "remove" : "revoke"}
       />
     </>
   );

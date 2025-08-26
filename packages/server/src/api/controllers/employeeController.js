@@ -470,6 +470,22 @@ const getApplicationAccessDetails = async (req, res, next) => {
   }
 };
 
+const removeProvisionedAccount = async (req, res, next) => {
+  try {
+    const { accountId } = req.params;
+    const actorId = req.user.id;
+    const reqContext = { ip: req.ip, userAgent: req.headers["user-agent"] };
+    const result = await employeeService.removeUserAccount(
+      accountId,
+      actorId,
+      reqContext
+    );
+    res.status(200).json(result);
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   listEmployees,
   getEmployee,
@@ -496,4 +512,5 @@ module.exports = {
   getApplicationAccessDetails,
   onboardDeferred,
   reconcileManagers,
+  removeProvisionedAccount,
 };
