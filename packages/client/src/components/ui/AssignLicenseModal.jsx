@@ -42,6 +42,7 @@ export const AssignLicenseModal = ({ employee, onClose }) => {
     mutationFn: assignLicenseMutationFn,
     onSuccess: () => {
       toast.success("License assigned successfully!");
+      // Invalidate the employee's data to refetch the updated application list
       queryClient.invalidateQueries({ queryKey: ["employee", employee.id] });
       onClose();
     },

@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQueryClient, useMutation, useQuery } from "@tanstack/react-query";
+import toast from "react-hot-toast";
 import {
   DollarSign,
   AlertCircle,
@@ -9,10 +10,15 @@ import {
   ChevronDown,
   Loader,
   ExternalLink,
+  PlusCircle,
+  Trash2,
 } from "lucide-react";
 import api from "../../api/api";
 import { motion, AnimatePresence } from "framer-motion";
 import { formatDateTime } from "../../utils/formatters";
+import { useModalStore } from "../../stores/modalStore";
+import { Button } from "../../components/ui/Button";
+import { ConfirmationModal } from "../../components/ui/ConfirmationModal";
 
 const fetchAccessDetails = async (employeeId, platformKey) => {
   const platformRouteKey = {
@@ -342,6 +348,35 @@ const SourceBadge = ({ mode }) => {
 
 export const EmployeeAccessTab = ({ employee }) => {
   const [expandedAccountId, setExpandedAccountId] = useState(null);
+  const { openModal } = useModalStore();
+
+  // --- ADD: State and logic for the revoke confirmation modal ---
+  const [revokeTarget, setRevokeTarget] = useState(null);
+  const queryClient = useQueryClient();
+
+  const { mutate: removeAssignmentMutation } = useMutation({
+    mutationFn: (assignmentId) =>
+      api.delete(`/api/licenses/assignments/${assignmentId}`),
+    onSuccess: () => {
+      toast.success("License assignment revoked successfully!");
+      // Refresh the employee data to show the change
+      queryClient.invalidateQueries({
+        queryKey: ["employee", employee.id],
+      });
+      setRevokeTarget(null); // Close the modal
+    },
+    onError: (error) => {
+      toast.error(error.response?.data?.message || "Failed to revoke license.");
+      setRevokeTarget(null); // Close the modal
+    },
+  });
+
+  const handleRevokeConfirm = () => {
+    if (revokeTarget) {
+      removeAssignmentMutation(revokeTarget.license_assignment_id);
+    }
+  };
+  // --- END ADD ---
 
   const totalCost = (employee.provisioned_accounts || []).reduce(
     (sum, account) => sum + parseFloat(account.cost || 0),
@@ -351,119 +386,170 @@ export const EmployeeAccessTab = ({ employee }) => {
   const provisionedAccounts = employee.provisioned_accounts || [];
 
   return (
-    <div className="space-y-6">
-      <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
-        <div className="flex items-center">
-          <div className="flex-shrink-0 bg-kredivo-light text-kredivo-primary rounded-lg p-3">
-            <DollarSign className="h-6 w-6" />
+    <>
+      <div className="space-y-6">
+        {/* Total Cost Section - Unchanged */}
+        <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+          <div className="flex items-center">
+            <div className="flex-shrink-0 bg-kredivo-light text-kredivo-primary rounded-lg p-3">
+              <DollarSign className="h-6 w-6" />
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                Total Assigned License Cost
+              </p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                ${totalCost.toFixed(2)}
+                <span className="text-base font-medium text-gray-500">/mo</span>
+              </p>
+            </div>
           </div>
-          <div className="ml-4">
-            <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
-              Total Assigned License Cost
-            </p>
-            <p className="text-2xl font-bold text-gray-900 dark:text-white">
-              ${totalCost.toFixed(2)}
-              <span className="text-base font-medium text-gray-500">/mo</span>
-            </p>
+        </div>
+
+        <div>
+          {/* FIX: Improved Header Layout */}
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+              Provisioned Accounts ({provisionedAccounts.length})
+            </h3>
+            <Button
+              onClick={() => openModal("assignLicense", employee)}
+              variant="secondary"
+              className="h-9 px-3 text-sm"
+            >
+              <PlusCircle className="w-4 h-4 mr-2" /> Assign License
+            </Button>
           </div>
+
+          {provisionedAccounts.length > 0 ? (
+            <div className="space-y-3">
+              {provisionedAccounts.map((account) => {
+                const isExpanded = expandedAccountId === account.account_id;
+                // ADD: Determine if an account's license can be revoked
+                const canBeRevoked = !!account.license_assignment_id;
+
+                return (
+                  <div
+                    key={account.account_id}
+                    className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg"
+                  >
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                      {/* This part remains clickable to expand details */}
+                      <div
+                        className="flex-1 cursor-pointer"
+                        onClick={() =>
+                          setExpandedAccountId(
+                            isExpanded ? null : account.account_id
+                          )
+                        }
+                      >
+                        <p className="font-semibold text-gray-800 dark:text-gray-200">
+                          {account.application_name}
+                        </p>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                          Instance: {account.instance_name}
+                        </p>
+                      </div>
+
+                      {/* Group all actions and badges together for uniform layout */}
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <SourceBadge mode={account.integration_mode} />
+
+                        {account.cost ? (
+                          <div className="text-sm text-right">
+                            <span className="font-medium text-gray-900 dark:text-white">
+                              ${parseFloat(account.cost).toFixed(2)}/mo
+                            </span>
+                            <div className="text-xs text-gray-500 dark:text-gray-400">
+                              {account.tier_name}
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="text-sm text-gray-400 italic">
+                            No License Cost
+                          </span>
+                        )}
+
+                        <span
+                          className={`px-2.5 py-0.5 text-xs font-semibold rounded-full capitalize ${
+                            account.status === "active"
+                              ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300"
+                              : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300"
+                          }`}
+                        >
+                          {account.status}
+                        </span>
+
+                        {/* ADD: The Revoke button, only shown when possible */}
+                        {canBeRevoked && (
+                          <button
+                            onClick={() => setRevokeTarget(account)}
+                            className="p-2 text-red-500 hover:bg-red-100 dark:hover:bg-red-900/20 rounded-full transition-colors"
+                            title="Revoke License"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        )}
+
+                        <button
+                          className="p-2"
+                          onClick={() =>
+                            setExpandedAccountId(
+                              isExpanded ? null : account.account_id
+                            )
+                          }
+                        >
+                          <ChevronDown
+                            className={`w-5 h-5 text-gray-400 transition-transform ${
+                              isExpanded ? "rotate-180" : ""
+                            }`}
+                          />
+                        </button>
+                      </div>
+                    </div>
+
+                    <AnimatePresence>
+                      {isExpanded && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: "auto", opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          transition={{ duration: 0.2 }}
+                          className="overflow-hidden"
+                        >
+                          <DetailView
+                            employeeId={employee.id}
+                            applicationName={account.application_name}
+                          />
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="text-center py-10 text-gray-500 dark:text-gray-400 border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-lg">
+              <AlertCircle className="mx-auto w-12 h-12 text-gray-400" />
+              <p className="font-semibold mt-4">No Provisioned Accounts</p>
+              <p className="text-sm mt-1">
+                This employee has no application accounts detected by the
+                system.
+              </p>
+            </div>
+          )}
         </div>
       </div>
 
-      <div>
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-          Provisioned Accounts ({provisionedAccounts.length})
-        </h3>
-        {provisionedAccounts.length > 0 ? (
-          <div className="space-y-3">
-            {provisionedAccounts.map((account) => {
-              const isExpanded = expandedAccountId === account.account_id;
-
-              return (
-                <div
-                  key={account.account_id}
-                  className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg"
-                >
-                  <div
-                    className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 cursor-pointer"
-                    onClick={() =>
-                      setExpandedAccountId(
-                        isExpanded ? null : account.account_id
-                      )
-                    }
-                  >
-                    <div className="flex-1">
-                      <p className="font-semibold text-gray-800 dark:text-gray-200">
-                        {account.application_name}
-                      </p>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">
-                        Instance: {account.instance_name}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-4 flex-wrap">
-                      <SourceBadge mode={account.integration_mode} />
-
-                      {account.cost ? (
-                        <div className="text-sm text-right">
-                          <span className="font-medium text-gray-900 dark:text-white">
-                            ${parseFloat(account.cost).toFixed(2)}/mo
-                          </span>
-                          <div className="text-xs text-gray-500 dark:text-gray-400">
-                            {account.tier_name}
-                          </div>
-                        </div>
-                      ) : (
-                        <span className="text-sm text-gray-400 italic">
-                          No License Cost
-                        </span>
-                      )}
-
-                      <span
-                        className={`px-2.5 py-0.5 text-xs font-semibold rounded-full capitalize ${
-                          account.status === "active"
-                            ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300"
-                            : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300"
-                        }`}
-                      >
-                        {account.status}
-                      </span>
-                      <ChevronDown
-                        className={`w-5 h-5 text-gray-400 transition-transform ${
-                          isExpanded ? "rotate-180" : ""
-                        }`}
-                      />
-                    </div>
-                  </div>
-
-                  <AnimatePresence>
-                    {isExpanded && (
-                      <motion.div
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: "auto", opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        transition={{ duration: 0.2 }}
-                        className="overflow-hidden"
-                      >
-                        <DetailView
-                          employeeId={employee.id}
-                          applicationName={account.application_name}
-                        />
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <div className="text-center py-10 text-gray-500 dark:text-gray-400 border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-lg">
-            <AlertCircle className="mx-auto w-12 h-12 text-gray-400" />
-            <p className="font-semibold mt-4">No Provisioned Accounts</p>
-            <p className="text-sm mt-1">
-              This employee has no application accounts detected by the system.
-            </p>
-          </div>
-        )}
-      </div>
-    </div>
+      {/* ADD: Render the Confirmation Modal when a revoke target is set */}
+      <ConfirmationModal
+        isOpen={!!revokeTarget}
+        onClose={() => setRevokeTarget(null)}
+        onConfirm={handleRevokeConfirm}
+        title="Revoke License Assignment"
+        message={`Are you sure you want to revoke the "${revokeTarget?.tier_name}" license for "${revokeTarget?.application_name}"? This will remove the manual license assignment.`}
+        confirmationText="revoke"
+      />
+    </>
   );
 };

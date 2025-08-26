@@ -23,8 +23,8 @@ import { useMediaQuery } from "../../hooks/useMediaQuery";
 import api from "../../api/api";
 import { EmployeeDetailSkeleton } from "../../components/ui/EmployeeDetailSkeleton";
 import { useModalStore } from "../../stores/modalStore";
-// Import the new unified tab component
 import { EmployeeAccessTab } from "./EmployeeAccessTab";
+import { AssignLicenseModal } from "../../components/ui/AssignLicenseModal";
 
 const fetchEmployeeById = async (employeeId) => {
   const { data } = await api.get(`/api/employees/${employeeId}`);
@@ -42,7 +42,7 @@ export const EmployeeDetailPage = ({ permissions, onLogout }) => {
   const { employeeId } = useParams();
   const navigate = useNavigate();
   const { setDynamicCrumbs } = useBreadcrumb();
-  const { openModal } = useModalStore();
+  const { openModal, closeModal, modal } = useModalStore(); // Add this line to destructure modal and closeModal
   const [activeTab, setActiveTab] = useState("details");
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
   const moreMenuRef = useRef(null);

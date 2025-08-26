@@ -1,4 +1,5 @@
 const db = require("../config/db");
+const { logActivity } = require("./logService");
 
 const getLicensesForApplication = async (applicationId) => {
   const result = await db.query(
@@ -36,7 +37,7 @@ const addLicenseToApplication = async (applicationId, licenseData) => {
 const assignLicenseToEmployee = async (
   employeeId,
   applicationId,
-  tierName,
+  tierName, // This can now be null or undefined
   actorId,
   reqContext
 ) => {
@@ -44,33 +45,41 @@ const assignLicenseToEmployee = async (
   try {
     await client.query("BEGIN");
 
-    // Find an available license pool for the given application and tier name
-    const availableLicenseQuery = `
+    // --- FIX START: Build the query dynamically ---
+    let availableLicenseQuery = `
       SELECT l.id
       FROM licenses l
       LEFT JOIN (
-          SELECT license_id, COUNT(*) as assigned_seats
+           SELECT license_id, COUNT(*) as assigned_seats
           FROM license_assignments
           GROUP BY license_id
       ) la ON l.id = la.license_id
-      WHERE l.application_id = $1 AND l.tier_name = $2
+      WHERE l.application_id = $1
         AND (l.is_unlimited = TRUE OR COALESCE(la.assigned_seats, 0) < l.total_seats)
-      ORDER BY l.id -- Find the first available pool
-      LIMIT 1;
     `;
-    const licenseRes = await client.query(availableLicenseQuery, [
-      applicationId,
-      tierName,
-    ]);
+    const queryParams = [applicationId];
+
+    if (tierName) {
+      // If a tier name is provided, add it to the filter
+      queryParams.push(tierName);
+      availableLicenseQuery += ` AND l.tier_name = $2`;
+    }
+
+    // Always find the first available license pool
+    availableLicenseQuery += ` ORDER BY l.id LIMIT 1;`;
+
+    const licenseRes = await client.query(availableLicenseQuery, queryParams);
+    // --- FIX END ---
 
     if (licenseRes.rows.length === 0) {
-      throw new Error(
-        `No available seats found for license tier "${tierName}".`
-      );
+      const errorMessage = tierName
+        ? `No available seats found for license tier "${tierName}".`
+        : "No available seats found for this application.";
+      throw new Error(errorMessage);
     }
     const licenseId = licenseRes.rows[0].id;
 
-    // Assign the employee to the found license pool
+    // The rest of the function remains the same
     const insertQuery = `
       INSERT INTO license_assignments (employee_id, license_id)
       VALUES ($1, $2)
@@ -87,7 +96,11 @@ const assignLicenseToEmployee = async (
       "LICENSE_ASSIGNMENT_CREATE",
       {
         targetEmployeeId: employeeId,
-        details: { applicationId, tierName, licenseId },
+        details: {
+          applicationId,
+          tierName: tierName || "Any Available",
+          licenseId,
+        },
       },
       reqContext,
       client
@@ -106,7 +119,6 @@ const assignLicenseToEmployee = async (
     client.release();
   }
 };
-
 // --- ADD NEW FUNCTION ---
 const removeLicenseAssignment = async (assignmentId, actorId, reqContext) => {
   const client = await db.pool.connect();

@@ -68,24 +68,24 @@ const getEmployeeById = async (employeeId) => {
           'is_licensable', ma.is_licensable,
           'tier_name', final_license.tier_name,
           'cost', final_license.monthly_cost,
-          'currency', final_license.currency
+          'currency', final_license.currency,
+          'license_assignment_id', final_license.license_assignment_id -- ADDED THIS LINE
         ))
-        FROM user_accounts ua
+         FROM user_accounts ua
         JOIN app_instances ai ON ua.app_instance_id = ai.id
         JOIN managed_applications ma ON ai.application_id = ma.id
         LEFT JOIN LATERAL (
-          -- This subquery runs for each user_account and finds the single best license match
           (
-            -- PRIORITY 1: Look for a direct, manual assignment for this user and application
-            SELECT l.tier_name, l.monthly_cost, l.currency, 1 as priority
+            -- PRIORITY 1: Look for a direct, manual assignment
+            SELECT l.tier_name, l.monthly_cost, l.currency, la.id as license_assignment_id, 1 as priority -- ADDED la.id
             FROM license_assignments la
             JOIN licenses l ON la.license_id = l.id
             WHERE la.employee_id = ua.user_id AND l.application_id = ma.id
           )
           UNION ALL
           (
-            -- PRIORITY 2: If no manual assignment, look for an automatic single-tier license
-            SELECT l.tier_name, l.monthly_cost, l.currency, 2 as priority
+            -- PRIORITY 2: Look for an automatic single-tier license
+            SELECT l.tier_name, l.monthly_cost, l.currency, NULL::integer as license_assignment_id, 2 as priority -- ADDED NULL placeholder
             FROM licenses l
             WHERE l.application_id = ma.id AND (
               SELECT count(*) FROM licenses WHERE application_id = ma.id
