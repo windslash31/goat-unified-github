@@ -93,7 +93,7 @@ const getJiraData = async (req, res, next) => {
 const getGoogleData = async (req, res, next) => {
   try {
     const query = {
-      google_users: "SELECT * FROM google_users;",
+      google_users: "SELECT * FROM gws_users;",
     };
     const data = await fetchData(query);
     res.json(data);

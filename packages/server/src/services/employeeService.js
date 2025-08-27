@@ -1231,7 +1231,7 @@ const getPlatformStatuses = async (employeeId) => {
 
   const jumpcloudQuery = `SELECT * FROM jumpcloud_users WHERE email = $1`;
   const atlassianQuery = `SELECT * FROM atlassian_users WHERE email_address = $1`;
-  const googleQuery = `SELECT * FROM google_users WHERE primary_email = $1`;
+  const googleQuery = `SELECT * FROM gws_users WHERE primary_email = $1`;
   const slackQuery = `SELECT * FROM slack_users WHERE email = $1`;
 
   const [jumpcloudRes, atlassianRes, googleRes, slackRes] = await Promise.all([

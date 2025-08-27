@@ -186,9 +186,7 @@ const syncUserData = async (employeeId, email) => {
       statusResult.status === "Error" ||
       statusResult.status === "Not Found"
     ) {
-      await db.query("DELETE FROM google_users WHERE primary_email = $1", [
-        email,
-      ]);
+      await db.query("DELETE FROM gws_users WHERE primary_email = $1", [email]);
       console.log(
         `SYNC: User ${email} not found or error in Google. Removed from local DB.`
       );
@@ -197,7 +195,7 @@ const syncUserData = async (employeeId, email) => {
 
     const userDetails = statusResult.details;
     const query = `
-      INSERT INTO google_users (
+      INSERT INTO gws_users (
         primary_email, suspended, is_admin, is_delegated_admin, last_login_time, 
         is_enrolled_in_2sv, org_unit_path, aliases, last_synced_at
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
@@ -277,36 +275,8 @@ const syncAllGoogleUsers = async () => {
     await client.query("BEGIN");
 
     for (const user of allUsers) {
-      // 1. Create a copy of the user object to modify for the raw_data column
-      const rawData = { ...user };
+      // The logic to create a copy and delete keys has been removed.
 
-      // 2. Define the keys for the fields we are storing in dedicated columns
-      const dedicatedFields = [
-        "primaryEmail",
-        "suspended",
-        "isAdmin",
-        "isDelegatedAdmin",
-        "lastLoginTime",
-        "isEnrolledIn2Sv",
-        "orgUnitPath",
-        "name",
-        "creationTime",
-        "agreedToTerms",
-        "archived",
-        "emails",
-        "isMailboxSetup",
-        "isEnforcedIn2Sv",
-        "nonEditableAliases",
-        "id",
-        "etag",
-        "kind",
-        "customerId", // Also remove metadata fields from raw_data
-      ];
-
-      // 3. Remove these keys from the rawData object
-      dedicatedFields.forEach((key) => delete rawData[key]);
-
-      // 4. Prepare values for the database query
       const values = [
         user.primaryEmail,
         user.suspended,
@@ -315,7 +285,11 @@ const syncAllGoogleUsers = async () => {
         user.lastLoginTime,
         user.isEnrolledIn2Sv,
         user.orgUnitPath,
-        JSON.stringify(user.emails || []), // Store the full emails array as JSON
+        user.emails
+          ?.filter((e) => !e.primary)
+          .map((e) => e.address)
+          .join(","),
+        JSON.stringify(user.emails || []),
         user.name?.givenName,
         user.name?.familyName,
         user.name?.fullName,
@@ -324,21 +298,22 @@ const syncAllGoogleUsers = async () => {
         user.archived,
         user.isMailboxSetup,
         user.isEnforcedIn2Sv,
-        JSON.stringify(user.nonEditableAliases || []),
-        JSON.stringify(rawData), // Store the remaining fields as raw_data
+        user.nonEditableAliases?.join(","),
+        // FIX: Store the complete, unmodified user object.
+        JSON.stringify(user),
       ];
 
-      // 5. Build and execute the comprehensive UPSERT query
+      // FIX: The column names in the query have been updated.
       const query = `
-        INSERT INTO google_users (
+        INSERT INTO gws_users (
           primary_email, suspended, is_admin, is_delegated_admin, last_login_time, 
-          is_enrolled_in_2sv, org_unit_path, emails,
+          is_enrolled_in_2sv, org_unit_path, aliases, emails,
           first_name, last_name, full_name, creation_time, agreed_to_terms, archived,
-          is_mailbox_setup, is_enforced_in_2sv, non_editable_aliases, raw_data,
+          is_mailbox_setup, is_enforced_in_2sv, non_editable_aliases, raw_logs, -- Renamed column
           last_synced_at
         ) VALUES (
           $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 
-          $11, $12, $13, $14, $15, $16, $17, $18, NOW()
+          $11, $12, $13, $14, $15, $16, $17, $18, $19, NOW()
         )
         ON CONFLICT (primary_email) DO UPDATE SET
           suspended = EXCLUDED.suspended,
@@ -347,6 +322,7 @@ const syncAllGoogleUsers = async () => {
           last_login_time = EXCLUDED.last_login_time,
           is_enrolled_in_2sv = EXCLUDED.is_enrolled_in_2sv,
           org_unit_path = EXCLUDED.org_unit_path,
+          aliases = EXCLUDED.aliases,
           emails = EXCLUDED.emails,
           first_name = EXCLUDED.first_name,
           last_name = EXCLUDED.last_name,
@@ -357,7 +333,7 @@ const syncAllGoogleUsers = async () => {
           is_mailbox_setup = EXCLUDED.is_mailbox_setup,
           is_enforced_in_2sv = EXCLUDED.is_enforced_in_2sv,
           non_editable_aliases = EXCLUDED.non_editable_aliases,
-          raw_data = EXCLUDED.raw_data,
+          raw_logs = EXCLUDED.raw_logs, -- Renamed column
           last_synced_at = NOW();
       `;
 
@@ -381,6 +357,6 @@ module.exports = {
   suspendUser,
   getLoginEvents,
   getUserLicense,
-  syncUserData,
+  Data,
   syncAllGoogleUsers,
 };
