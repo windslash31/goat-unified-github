@@ -106,6 +106,22 @@ const runIndividualUserSync = async (jobName, serviceSyncFunction) => {
   }
 };
 
+const syncAllGoogleData = async () => {
+  const JOB_NAME = "google_sync";
+  try {
+    await startJob(JOB_NAME);
+    await updateProgress(JOB_NAME, "Syncing all Google Workspace users...", 50);
+    await googleService.syncAllGoogleUsers();
+    await updateProgress(JOB_NAME, "Finished syncing users.", 100);
+    await finishJob(JOB_NAME, "SUCCESS");
+    console.log(`CRON JOB: ${JOB_NAME} finished successfully.`);
+  } catch (error) {
+    console.error(`CRON JOB: An error occurred during ${JOB_NAME}:`, error);
+    await finishJob(JOB_NAME, "FAILED", error);
+    throw error;
+  }
+};
+
 const reconcileDirectApiAccess = async () => {
   const client = await db.pool.connect();
   try {
@@ -237,7 +253,7 @@ const runAllSyncs = async () => {
     // Step 1: Run all raw data syncs
     await syncAllJumpCloudData(); // This also handles SSO app reconciliation
     await atlassianService.syncAllAtlassianData();
-    await runIndividualUserSync("google_sync", googleService.syncUserData);
+    await syncAllGoogleData();
     await runIndividualUserSync("slack_sync", slackService.syncUserData);
     await reconcileDirectApiAccess();
     await jumpcloudService.syncAllUserLogs();

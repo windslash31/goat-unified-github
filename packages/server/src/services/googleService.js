@@ -232,10 +232,97 @@ const syncUserData = async (employeeId, email) => {
   }
 };
 
+const fetchAllGoogleUsers = async () => {
+  const directory = await getDirectoryClient();
+  let allUsers = [];
+  let pageToken = null;
+
+  console.log("SYNC: Starting fetch of all users from Google Workspace...");
+
+  do {
+    try {
+      const response = await directory.users.list({
+        customer: process.env.GOOGLE_CUSTOMER_ID,
+        maxResults: 500, // Max allowed by API
+        pageToken: pageToken,
+        orderBy: "email",
+      });
+
+      if (response.data.users) {
+        allUsers = allUsers.concat(response.data.users);
+      }
+      pageToken = response.data.nextPageToken;
+    } catch (error) {
+      console.error("Error fetching a page of Google users:", error);
+      throw new Error("Failed to fetch all users from Google Workspace.");
+    }
+  } while (pageToken);
+
+  console.log(`SYNC: Fetched a total of ${allUsers.length} users from Google.`);
+  return allUsers;
+};
+
+// NEW FUNCTION to sync all fetched users to the database
+const syncAllGoogleUsers = async () => {
+  const allUsers = await fetchAllGoogleUsers();
+  if (!allUsers || allUsers.length === 0) {
+    console.log("SYNC: No Google Workspace users found to sync.");
+    return;
+  }
+
+  const client = await db.pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    // Optional: Clear the table for a full refresh, or rely on ON CONFLICT
+    // await client.query("TRUNCATE TABLE google_users;");
+
+    for (const user of allUsers) {
+      const query = `
+        INSERT INTO google_users (
+          primary_email, suspended, is_admin, is_delegated_admin, last_login_time, 
+          is_enrolled_in_2sv, org_unit_path, aliases, last_synced_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
+        ON CONFLICT (primary_email) DO UPDATE SET
+          suspended = EXCLUDED.suspended,
+          is_admin = EXCLUDED.is_admin,
+          is_delegated_admin = EXCLUDED.is_delegated_admin,
+          last_login_time = EXCLUDED.last_login_time,
+          is_enrolled_in_2sv = EXCLUDED.is_enrolled_in_2sv,
+          org_unit_path = EXCLUDED.org_unit_path,
+          aliases = EXCLUDED.aliases,
+          last_synced_at = NOW();
+      `;
+      const values = [
+        user.primaryEmail,
+        user.suspended,
+        user.isAdmin,
+        user.isDelegatedAdmin,
+        user.lastLoginTime,
+        user.isEnrolledIn2Sv,
+        user.orgUnitPath,
+        JSON.stringify(user.aliases || []),
+      ];
+      await client.query(query, values);
+    }
+    await client.query("COMMIT");
+    console.log(
+      `SYNC: Successfully synced ${allUsers.length} Google Workspace users to the database.`
+    );
+  } catch (error) {
+    await client.query("ROLLBACK");
+    console.error("Error during Google user database sync:", error);
+    throw error;
+  } finally {
+    client.release();
+  }
+};
+
 module.exports = {
   getUserStatus,
   suspendUser,
   getLoginEvents,
   getUserLicense,
   syncUserData,
+  syncAllGoogleUsers,
 };
