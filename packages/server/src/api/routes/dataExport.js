@@ -5,6 +5,7 @@ const {
   getBitbucketData,
   getConfluenceData,
   getJiraData,
+  getGoogleData,
 } = require("../controllers/dataExportController");
 const {
   authenticateApiKey,
