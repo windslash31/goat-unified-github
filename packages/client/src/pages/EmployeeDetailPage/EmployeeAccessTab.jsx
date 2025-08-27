@@ -14,6 +14,7 @@ import {
   Trash2,
   UserX,
   MoreVertical,
+  KeyRound,
 } from "lucide-react";
 import api from "../../api/api";
 import { motion, AnimatePresence } from "framer-motion";
@@ -39,6 +40,12 @@ const SourceBadge = ({ mode }) => {
       label: "Manual License",
       classes:
         "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300",
+    },
+    SSO_JUMPCLOUD: {
+      icon: <KeyRound size={12} />,
+      label: "JumpCloud SSO",
+      classes:
+        "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300",
     },
   };
   const style = styles[mode] || styles.MANUAL_INTERNAL;
