@@ -242,8 +242,9 @@ const fetchAllGoogleUsers = async () => {
   do {
     try {
       const response = await directory.users.list({
-        customer: process.env.GOOGLE_CUSTOMER_ID,
-        maxResults: 500, // Max allowed by API
+        domain: config.google.domain,
+        showDeleted: "true",
+        maxResults: 500,
         pageToken: pageToken,
         orderBy: "email",
       });
