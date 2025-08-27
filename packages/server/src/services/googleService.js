@@ -1,6 +1,7 @@
 const { google } = require("googleapis");
 const { OAuth2 } = google.auth;
 const db = require("../config/db");
+const config = require("../config/config");
 
 let oauth2Client;
 
@@ -10,24 +11,24 @@ async function getAuthClient() {
   }
 
   if (
-    !process.env.GOOGLE_CLIENT_ID ||
-    !process.env.GOOGLE_CLIENT_SECRET ||
-    !process.env.GOOGLE_REFRESH_TOKEN
+    !config.google.clientId ||
+    !config.google.clientSecret ||
+    !config.google.refreshToken
   ) {
     throw new Error(
-      "Google OAuth 2.0 environment variables are not set. Please check your .env file."
+      "Google OAuth 2.0 environment variables are not set. Please check your .env file and config."
     );
   }
 
   try {
     const client = new OAuth2(
-      process.env.GOOGLE_CLIENT_ID,
-      process.env.GOOGLE_CLIENT_SECRET,
+      config.google.clientId,
+      config.google.clientSecret,
       "urn:ietf:wg:oauth:2.0:oob"
     );
 
     client.setCredentials({
-      refresh_token: process.env.GOOGLE_REFRESH_TOKEN,
+      refresh_token: config.google.refreshToken,
     });
 
     oauth2Client = client;
@@ -242,8 +243,8 @@ const fetchAllGoogleUsers = async () => {
   do {
     try {
       const response = await directory.users.list({
+        // Use the config object here
         domain: config.google.domain,
-        showDeleted: "true",
         maxResults: 500,
         pageToken: pageToken,
         orderBy: "email",

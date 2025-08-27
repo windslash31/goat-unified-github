@@ -22,7 +22,6 @@ import { formatDateTime } from "../../utils/formatters";
 import { useModalStore } from "../../stores/modalStore";
 import { Button } from "../../components/ui/Button";
 import { ConfirmationModal } from "../../components/ui/ConfirmationModal";
-
 const SourceBadge = ({ mode }) => {
   const styles = {
     API_INTEGRATED: {
