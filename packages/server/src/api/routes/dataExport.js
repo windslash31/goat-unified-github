@@ -35,5 +35,11 @@ router.get(
   authorize("log:read:platform"),
   getJiraData
 );
+router.get(
+  "/google",
+  authenticateApiKey,
+  authorize("log:read:platform"),
+  getGoogleData
+);
 
 module.exports = router;

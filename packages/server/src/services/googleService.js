@@ -276,25 +276,37 @@ const syncAllGoogleUsers = async () => {
   try {
     await client.query("BEGIN");
 
-    // Optional: Clear the table for a full refresh, or rely on ON CONFLICT
-    // await client.query("TRUNCATE TABLE google_users;");
-
     for (const user of allUsers) {
-      const query = `
-        INSERT INTO google_users (
-          primary_email, suspended, is_admin, is_delegated_admin, last_login_time, 
-          is_enrolled_in_2sv, org_unit_path, aliases, last_synced_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
-        ON CONFLICT (primary_email) DO UPDATE SET
-          suspended = EXCLUDED.suspended,
-          is_admin = EXCLUDED.is_admin,
-          is_delegated_admin = EXCLUDED.is_delegated_admin,
-          last_login_time = EXCLUDED.last_login_time,
-          is_enrolled_in_2sv = EXCLUDED.is_enrolled_in_2sv,
-          org_unit_path = EXCLUDED.org_unit_path,
-          aliases = EXCLUDED.aliases,
-          last_synced_at = NOW();
-      `;
+      // 1. Create a copy of the user object to modify for the raw_data column
+      const rawData = { ...user };
+
+      // 2. Define the keys for the fields we are storing in dedicated columns
+      const dedicatedFields = [
+        "primaryEmail",
+        "suspended",
+        "isAdmin",
+        "isDelegatedAdmin",
+        "lastLoginTime",
+        "isEnrolledIn2Sv",
+        "orgUnitPath",
+        "name",
+        "creationTime",
+        "agreedToTerms",
+        "archived",
+        "emails",
+        "isMailboxSetup",
+        "isEnforcedIn2Sv",
+        "nonEditableAliases",
+        "id",
+        "etag",
+        "kind",
+        "customerId", // Also remove metadata fields from raw_data
+      ];
+
+      // 3. Remove these keys from the rawData object
+      dedicatedFields.forEach((key) => delete rawData[key]);
+
+      // 4. Prepare values for the database query
       const values = [
         user.primaryEmail,
         user.suspended,
@@ -303,17 +315,61 @@ const syncAllGoogleUsers = async () => {
         user.lastLoginTime,
         user.isEnrolledIn2Sv,
         user.orgUnitPath,
-        JSON.stringify(user.aliases || []),
+        JSON.stringify(user.emails || []), // Store the full emails array as JSON
+        user.name?.givenName,
+        user.name?.familyName,
+        user.name?.fullName,
+        user.creationTime,
+        user.agreedToTerms,
+        user.archived,
+        user.isMailboxSetup,
+        user.isEnforcedIn2Sv,
+        JSON.stringify(user.nonEditableAliases || []),
+        JSON.stringify(rawData), // Store the remaining fields as raw_data
       ];
+
+      // 5. Build and execute the comprehensive UPSERT query
+      const query = `
+        INSERT INTO google_users (
+          primary_email, suspended, is_admin, is_delegated_admin, last_login_time, 
+          is_enrolled_in_2sv, org_unit_path, emails,
+          first_name, last_name, full_name, creation_time, agreed_to_terms, archived,
+          is_mailbox_setup, is_enforced_in_2sv, non_editable_aliases, raw_data,
+          last_synced_at
+        ) VALUES (
+          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 
+          $11, $12, $13, $14, $15, $16, $17, $18, NOW()
+        )
+        ON CONFLICT (primary_email) DO UPDATE SET
+          suspended = EXCLUDED.suspended,
+          is_admin = EXCLUDED.is_admin,
+          is_delegated_admin = EXCLUDED.is_delegated_admin,
+          last_login_time = EXCLUDED.last_login_time,
+          is_enrolled_in_2sv = EXCLUDED.is_enrolled_in_2sv,
+          org_unit_path = EXCLUDED.org_unit_path,
+          emails = EXCLUDED.emails,
+          first_name = EXCLUDED.first_name,
+          last_name = EXCLUDED.last_name,
+          full_name = EXCLUDED.full_name,
+          creation_time = EXCLUDED.creation_time,
+          agreed_to_terms = EXCLUDED.agreed_to_terms,
+          archived = EXCLUDED.archived,
+          is_mailbox_setup = EXCLUDED.is_mailbox_setup,
+          is_enforced_in_2sv = EXCLUDED.is_enforced_in_2sv,
+          non_editable_aliases = EXCLUDED.non_editable_aliases,
+          raw_data = EXCLUDED.raw_data,
+          last_synced_at = NOW();
+      `;
+
       await client.query(query, values);
     }
     await client.query("COMMIT");
     console.log(
-      `SYNC: Successfully synced ${allUsers.length} Google Workspace users to the database.`
+      `SYNC: Successfully synced ${allUsers.length} Google Workspace users with detailed columns.`
     );
   } catch (error) {
     await client.query("ROLLBACK");
-    console.error("Error during Google user database sync:", error);
+    console.error("Error during detailed Google user database sync:", error);
     throw error;
   } finally {
     client.release();

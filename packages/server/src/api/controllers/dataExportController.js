@@ -90,9 +90,23 @@ const getJiraData = async (req, res, next) => {
   }
 };
 
+const getGoogleData = async (req, res, next) => {
+  try {
+    const query = {
+      google_users: "SELECT * FROM google_users;",
+    };
+    const data = await fetchData(query);
+    res.json(data);
+  } catch (error) {
+    console.error("Error fetching Google data:", error);
+    next(error);
+  }
+};
+
 module.exports = {
   getAtlassianData,
   getBitbucketData,
   getConfluenceData,
   getJiraData,
+  getGoogleData,
 };
