@@ -357,6 +357,6 @@ module.exports = {
   suspendUser,
   getLoginEvents,
   getUserLicense,
-  Data,
+  syncUserData,
   syncAllGoogleUsers,
 };
