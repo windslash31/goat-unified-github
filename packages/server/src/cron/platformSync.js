@@ -122,7 +122,6 @@ const syncAllGoogleData = async () => {
   }
 };
 
-JavaScript;
 const reconcileDirectApiAccess = async () => {
   const client = await db.pool.connect();
   try {
