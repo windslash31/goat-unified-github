@@ -1,41 +1,18 @@
-const db = require("../../config/db");
-
-const fetchData = async (queries) => {
-  const client = await db.pool.connect();
-  try {
-    const results = await Promise.all(
-      Object.values(queries).map((query) => client.query(query))
-    );
-    return Object.keys(queries).reduce((acc, key, index) => {
-      acc[key] = results[index].rows;
-      return acc;
-    }, {});
-  } finally {
-    client.release();
-  }
-};
+const { fetchData } = require("../../utils/dbHelpers"); // Import the shared helper
 
 const getAtlassianData = async (req, res, next) => {
   try {
     const atlassianUsersQuery = `
         SELECT 
-          account_id, 
-          email_address, 
-          display_name, 
-          account_status, 
-          billable, 
-          product_access, 
-          last_updated_at, 
-          last_active_date 
+          account_id, email_address, display_name, account_status, 
+          billable, product_access, last_updated_at, last_active_date 
         FROM atlassian_users;
       `;
-
     const queries = {
       atlassian_users: atlassianUsersQuery,
       atlassian_groups: "SELECT * FROM atlassian_groups;",
       atlassian_group_members: "SELECT * FROM atlassian_group_members;",
     };
-
     const data = await fetchData(queries);
     res.json(data);
   } catch (error) {
@@ -90,40 +67,9 @@ const getJiraData = async (req, res, next) => {
   }
 };
 
-const getGoogleData = async (req, res, next) => {
-  try {
-    const query = {
-      google_users: "SELECT * FROM gws_users;",
-    };
-    const data = await fetchData(query);
-    res.json(data);
-  } catch (error) {
-    console.error("Error fetching Google data:", error);
-    next(error);
-  }
-};
-
-const getJumpCloudUsersData = async (req, res, next) => {
-  try {
-    // This query fetches all columns from your jumpcloud_users table.
-    // It's designed for bulk export.
-    const queries = {
-      jumpcloud_users: "SELECT * FROM jumpcloud_users ORDER BY email;",
-    };
-
-    const data = await fetchData(queries);
-    res.json(data);
-  } catch (error) {
-    console.error("Error fetching JumpCloud users data:", error);
-    next(error);
-  }
-};
-
 module.exports = {
   getAtlassianData,
   getBitbucketData,
   getConfluenceData,
   getJiraData,
-  getGoogleData,
-  getJumpCloudUsersData,
 };
