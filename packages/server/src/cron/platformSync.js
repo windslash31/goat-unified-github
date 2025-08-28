@@ -125,10 +125,14 @@ const syncAllGoogleData = async () => {
 const reconcileDirectApiAccess = async () => {
   const client = await db.pool.connect();
   try {
-    console.log("CRON JOB: Starting Direct API access reconciliation...");
+    console.log(
+      "CRON JOB: Starting 3-state access reconciliation (active/suspended/deactivated)..."
+    );
     await client.query("BEGIN");
 
-    // Get all employees for email-to-ID mapping
+    // Note the time before we start the updates.
+    const syncStartTime = new Date();
+
     const employeesResult = await client.query(
       "SELECT id, employee_email FROM employees"
     );
@@ -136,103 +140,97 @@ const reconcileDirectApiAccess = async () => {
       employeesResult.rows.map((e) => [e.employee_email, e.id])
     );
 
-    // Define our direct integration sync strategies
+    // The "recipes" now include info on how to determine status
     const syncStrategies = [
       {
         key: "GOOGLE_WORKSPACE",
         rawTable: "gws_users",
         emailColumn: "primary_email",
-        activeCondition: "suspended = false",
+        statusColumn: "suspended", // boolean
+        // This function translates the raw status into our standard status
+        statusMapper: (rawStatus) => (rawStatus ? "suspended" : "active"),
       },
       {
         key: "SLACK",
         rawTable: "slack_users",
         emailColumn: "email",
-        activeCondition: "status = 'Active'",
+        statusColumn: "status", // text: 'Active' or something else
+        statusMapper: (rawStatus) =>
+          rawStatus === "Active" ? "active" : "suspended",
       },
       {
         key: "ATLASSIAN",
         rawTable: "atlassian_users",
         emailColumn: "email_address",
-        activeCondition: "account_status = 'active'",
+        statusColumn: "account_status", // text: 'active' or 'inactive'
+        statusMapper: (rawStatus) =>
+          rawStatus === "active" ? "active" : "suspended",
       },
       {
         key: "JUMPCLOUD",
         rawTable: "jumpcloud_users",
         emailColumn: "email",
-        activeCondition: "suspended = false",
+        statusColumn: "suspended", // boolean
+        statusMapper: (rawStatus) => (rawStatus ? "suspended" : "active"),
       },
     ];
 
     for (const strategy of syncStrategies) {
-      // Find the app instance for this integration
       const appInstanceResult = await client.query(
-        `
-        SELECT ai.id FROM app_instances ai
-        JOIN managed_applications ma ON ai.application_id = ma.id
-        WHERE ma.key = $1 AND ai.is_primary = true
-      `,
+        `SELECT ai.id FROM app_instances ai
+         JOIN managed_applications ma ON ai.application_id = ma.id
+         WHERE ma.key = $1 AND ai.is_primary = true`,
         [strategy.key]
       );
 
-      if (appInstanceResult.rows.length === 0) {
-        console.log(
-          `CRON JOB: No primary app instance found for key '${strategy.key}'. Skipping reconciliation.`
-        );
-        continue;
-      }
+      if (appInstanceResult.rows.length === 0) continue;
       const appInstanceId = appInstanceResult.rows[0].id;
 
-      // Get all active users from the raw data table for this platform
-      const activeUsersResult = await client.query(
-        `SELECT ${strategy.emailColumn} FROM ${strategy.rawTable} WHERE ${strategy.activeCondition}`
+      // 1. Get ALL users from the raw table, not just active ones
+      const platformUsersResult = await client.query(
+        `SELECT ${strategy.emailColumn}, ${strategy.statusColumn} FROM ${strategy.rawTable}`
       );
 
-      const employeeIdsWithAccess = new Set();
-      for (const user of activeUsersResult.rows) {
-        const email = user[strategy.emailColumn];
-        const employeeId = employeeEmailToIdMap.get(email);
-        if (employeeId) {
-          employeeIdsWithAccess.add(employeeId);
+      if (platformUsersResult.rows.length > 0) {
+        // 2. Loop and upsert with the correct status
+        for (const user of platformUsersResult.rows) {
+          const email = user[strategy.emailColumn];
+          const employeeId = employeeEmailToIdMap.get(email);
+
+          if (employeeId) {
+            const rawStatus = user[strategy.statusColumn];
+            const newStatus = strategy.statusMapper(rawStatus);
+
+            await client.query(
+              `INSERT INTO user_accounts (user_id, app_instance_id, status, updated_at)
+               VALUES ($1, $2, $3, $4)
+               ON CONFLICT (user_id, app_instance_id) DO UPDATE SET
+                 status = EXCLUDED.status,
+                 updated_at = EXCLUDED.updated_at;`,
+              [employeeId, appInstanceId, newStatus, syncStartTime]
+            );
+          }
         }
       }
+    }
 
-      // INSERT or UPDATE records for users who SHOULD have access
-      const employeeIdsArray =
-        employeeIdsWithAccess.size > 0 ? Array.from(employeeIdsWithAccess) : [];
-      if (employeeIdsArray.length > 0) {
-        await client.query(
-          `
-          INSERT INTO user_accounts (user_id, app_instance_id, status, last_seen_at)
-          SELECT unnest($1::int[]), $2, 'active', NOW()
-          ON CONFLICT (user_id, app_instance_id) DO UPDATE SET
-            status = 'active',
-            last_seen_at = NOW();
-          `,
-          [employeeIdsArray, appInstanceId]
-        );
-      }
+    // 3. Deactivate any account that wasn't touched during this sync
+    const deactivateResult = await client.query(
+      `UPDATE user_accounts SET status = 'deactivated' WHERE updated_at < $1`,
+      [syncStartTime]
+    );
 
-      // Deactivate records for users who no longer have access
-      await client.query(
-        `
-        UPDATE user_accounts
-        SET status = 'deactivated'
-        WHERE app_instance_id = $1
-        AND user_id NOT IN (SELECT unnest($2::int[]));
-        `,
-        [appInstanceId, employeeIdsArray.length > 0 ? employeeIdsArray : [0]]
-      );
+    if (deactivateResult.rowCount > 0) {
       console.log(
-        `CRON JOB: Reconciled access for ${strategy.key}. Found ${employeeIdsWithAccess.size} active users.`
+        `CRON JOB: Marked ${deactivateResult.rowCount} stale user accounts as 'deactivated'.`
       );
     }
 
     await client.query("COMMIT");
-    console.log("CRON JOB: Finished Direct API access reconciliation.");
+    console.log("CRON JOB: Finished 3-state access reconciliation.");
   } catch (error) {
     await client.query("ROLLBACK");
-    console.error("Error during Direct API access reconciliation:", error);
+    console.error("Error during 3-state access reconciliation:", error);
     throw error;
   } finally {
     client.release();

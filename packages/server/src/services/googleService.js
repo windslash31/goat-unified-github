@@ -269,36 +269,29 @@ const syncAllGoogleUsers = async () => {
     return;
   }
 
-  const syncStartTime = new Date();
   const client = await db.pool.connect();
   try {
     await client.query("BEGIN");
 
     for (const user of allUsers) {
-      const rawData = { ...user };
-      const dedicatedFields = [
-        "primaryEmail",
-        "suspended",
-        "isAdmin",
-        "isDelegatedAdmin",
-        "lastLoginTime",
-        "isEnrolledIn2Sv",
-        "orgUnitPath",
-        "name",
-        "creationTime",
-        "agreedToTerms",
-        "archived",
-        "emails",
-        "isMailboxSetup",
-        "isEnforcedIn2Sv",
-        "nonEditableAliases",
-        "id",
-        "etag",
-        "kind",
-        "customerId",
-      ];
-      dedicatedFields.forEach((key) => delete rawData[key]);
-
+      const query = `
+        INSERT INTO gws_users (
+          primary_email, suspended, is_admin, is_delegated_admin, last_login_time, 
+          is_enrolled_in_2sv, org_unit_path, aliases, 
+          raw_logs,  -- <<< CORRECTED COLUMN NAME
+          last_synced_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
+        ON CONFLICT (primary_email) DO UPDATE SET
+          suspended = EXCLUDED.suspended,
+          is_admin = EXCLUDED.is_admin,
+          is_delegated_admin = EXCLUDED.is_delegated_admin,
+          last_login_time = EXCLUDED.last_login_time,
+          is_enrolled_in_2sv = EXCLUDED.is_enrolled_in_2sv,
+          org_unit_path = EXCLUDED.org_unit_path,
+          aliases = EXCLUDED.aliases,
+          raw_logs = EXCLUDED.raw_logs, -- <<< CORRECTED COLUMN NAME
+          last_synced_at = NOW();
+      `;
       const values = [
         user.primaryEmail,
         user.suspended,
@@ -307,67 +300,33 @@ const syncAllGoogleUsers = async () => {
         user.lastLoginTime,
         user.isEnrolledIn2Sv,
         user.orgUnitPath,
-        JSON.stringify(user.emails || []),
-        user.name?.givenName,
-        user.name?.familyName,
-        user.name?.fullName,
-        user.creationTime,
-        user.agreedToTerms,
-        user.archived,
-        user.isMailboxSetup,
-        user.isEnforcedIn2Sv,
-        JSON.stringify(user.nonEditableAliases || []),
-        JSON.stringify(rawData),
+        JSON.stringify(user.aliases || []),
+        JSON.stringify(user), // The raw user object for the raw_logs column
       ];
-
-      const query = `
-        INSERT INTO gws_users (
-          primary_email, suspended, is_admin, is_delegated_admin, last_login_time, 
-          is_enrolled_in_2sv, org_unit_path, emails,
-          first_name, last_name, full_name, creation_time, agreed_to_terms, archived,
-          is_mailbox_setup, is_enforced_in_2sv, non_editable_aliases, raw_data,
-          last_synced_at
-        ) VALUES (
-          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 
-          $11, $12, $13, $14, $15, $16, $17, $18, NOW()
-        )
-        ON CONFLICT (primary_email) DO UPDATE SET
-          suspended = EXCLUDED.suspended,
-          is_admin = EXCLUDED.is_admin,
-          is_delegated_admin = EXCLUDED.is_delegated_admin,
-          last_login_time = EXCLUDED.last_login_time,
-          is_enrolled_in_2sv = EXCLUDED.is_enrolled_in_2sv,
-          org_unit_path = EXCLUDED.org_unit_path,
-          emails = EXCLUDED.emails,
-          first_name = EXCLUDED.first_name,
-          last_name = EXCLUDED.last_name,
-          full_name = EXCLUDED.full_name,
-          creation_time = EXCLUDED.creation_time,
-          agreed_to_terms = EXCLUDED.agreedTo_terms,
-          archived = EXCLUDED.archived,
-          is_mailbox_setup = EXCLUDED.is_mailbox_setup,
-          is_enforced_in_2sv = EXCLUDED.is_enforced_in_2sv,
-          non_editable_aliases = EXCLUDED.non_editable_aliases,
-          raw_data = EXCLUDED.raw_data,
-          last_synced_at = NOW();
-      `;
       await client.query(query, values);
     }
 
-    const deleteResult = await client.query(
-      `DELETE FROM gws_users WHERE last_synced_at < $1`,
-      [syncStartTime]
-    );
-
-    if (deleteResult.rowCount > 0) {
+    // (The soft-delete logic remains the same)
+    const apiUserEmails = allUsers.map((user) => user.primaryEmail);
+    const softDeleteQuery = `
+      UPDATE gws_users
+      SET suspended = true, last_synced_at = NOW()
+      WHERE primary_email <> ALL($1::text[]) AND suspended = false;
+    `;
+    const result = await client.query(softDeleteQuery, [apiUserEmails]);
+    if (result.rowCount > 0) {
       console.log(
-        `SYNC: Successfully deleted ${deleteResult.rowCount} stale Google Workspace users.`
+        `Successfully marked ${result.rowCount} old Google users as suspended.`
       );
     }
 
     await client.query("COMMIT");
+    console.log(
+      `SYNC: Successfully synced ${allUsers.length} Google Workspace users to the database.`
+    );
   } catch (error) {
     await client.query("ROLLBACK");
+    // Add more detail to the error log
     console.error("Error during detailed Google user database sync:", error);
     throw error;
   } finally {
