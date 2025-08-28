@@ -103,10 +103,27 @@ const getGoogleData = async (req, res, next) => {
   }
 };
 
+const getJumpCloudUsersData = async (req, res, next) => {
+  try {
+    // This query fetches all columns from your jumpcloud_users table.
+    // It's designed for bulk export.
+    const queries = {
+      jumpcloud_users: "SELECT * FROM jumpcloud_users ORDER BY email;",
+    };
+
+    const data = await fetchData(queries);
+    res.json(data);
+  } catch (error) {
+    console.error("Error fetching JumpCloud users data:", error);
+    next(error);
+  }
+};
+
 module.exports = {
   getAtlassianData,
   getBitbucketData,
   getConfluenceData,
   getJiraData,
   getGoogleData,
+  getJumpCloudUsersData,
 };

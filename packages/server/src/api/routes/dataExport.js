@@ -7,10 +7,14 @@ const {
   getJiraData,
   getGoogleData,
 } = require("../controllers/dataExportController");
+const jumpcloudExportRoutes = require("./jumpcloudExport");
+
 const {
   authenticateApiKey,
   authorize,
 } = require("../middleware/authMiddleware");
+
+router.use("/jumpcloud", jumpcloudExportRoutes);
 
 router.get(
   "/atlassian",
