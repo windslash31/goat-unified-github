@@ -240,13 +240,15 @@ const reconcileDirectApiAccess = async () => {
 };
 
 const syncJobs = {
-  jumpcloud: syncAllJumpCloudData,
-  atlassian: atlassianService.syncAllAtlassianData,
-  google: syncAllGoogleData,
-  slack: () => runIndividualUserSync("slack_sync", slackService.syncUserData),
-  jumpcloud_logs: jumpcloudService.syncAllUserLogs,
+  jumpcloud_sync: syncAllJumpCloudData,
+  atlassian_sync: atlassianService.syncAllAtlassianData,
+  google_sync: syncAllGoogleData,
+  slack_sync: () =>
+    runIndividualUserSync("slack_sync", slackService.syncUserData),
+  jumpcloud_log_sync: jumpcloudService.syncAllUserLogs,
   reconciliation: reconcileDirectApiAccess,
 };
+
 const allJobKeys = Object.keys(syncJobs);
 
 const isMasterSyncRunning = () => _isMasterSyncRunning;
