@@ -48,34 +48,50 @@ const syncAllJumpCloudUsers = async () => {
   }
   try {
     for (const user of users) {
+      // --- MODIFIED START (FINAL VERSION) ---
       const query = `
         INSERT INTO jumpcloud_users (
           id, email, username, display_name, firstname, lastname, 
           activated, suspended, employee_type, account_locked, totp_enabled, 
           password_never_expires, password_expiration_date, created, updated_at,
-          attributes, sudo, mfa_enrollment -- New columns
+          attributes, sudo, mfa_enrollment, addresses, company, cost_center,
+          department, job_title, location, middlename, manager, phone_numbers,
+          state, password_expired, password_date, mfa, organization, allow_public_key,
+          alternate_email, description, disable_device_max_login_attempts,
+          employee_identifier, enable_managed_uid, enable_user_portal_multifactor,
+          external_dn, external_source_type, externally_managed, ldap_binding_user,
+          managed_apple_id, passwordless_sudo, samba_service_user, ssh_keys,
+          system_username, unix_guid, unix_uid
         ) VALUES (
           $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NOW(),
-          $15, $16, $17 -- New value placeholders
+          $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28,
+          $29, $30, $31, $32, $33, $34, $35, $36, $37, $38, $39, $40, $41, $42,
+          $43, $44, $45, $46, $47, $48
         )
         ON CONFLICT (id) DO UPDATE SET
-          email = EXCLUDED.email,
-          username = EXCLUDED.username,
-          display_name = EXCLUDED.display_name,
-          firstname = EXCLUDED.firstname,
-          lastname = EXCLUDED.lastname,
-          activated = EXCLUDED.activated,
-          suspended = EXCLUDED.suspended,
-          employee_type = EXCLUDED.employee_type,
-          account_locked = EXCLUDED.account_locked,
-          totp_enabled = EXCLUDED.totp_enabled,
+          email = EXCLUDED.email, username = EXCLUDED.username, display_name = EXCLUDED.display_name,
+          firstname = EXCLUDED.firstname, lastname = EXCLUDED.lastname, activated = EXCLUDED.activated,
+          suspended = EXCLUDED.suspended, employee_type = EXCLUDED.employee_type,
+          account_locked = EXCLUDED.account_locked, totp_enabled = EXCLUDED.totp_enabled,
           password_never_expires = EXCLUDED.password_never_expires,
-          password_expiration_date = EXCLUDED.password_expiration_date,
-          created = EXCLUDED.created,
-          updated_at = NOW(),
-          attributes = EXCLUDED.attributes, -- Update new column
-          sudo = EXCLUDED.sudo,             -- Update new column
-          mfa_enrollment = EXCLUDED.mfa_enrollment; -- Update new column
+          password_expiration_date = EXCLUDED.password_expiration_date, created = EXCLUDED.created,
+          updated_at = NOW(), attributes = EXCLUDED.attributes, sudo = EXCLUDED.sudo,
+          mfa_enrollment = EXCLUDED.mfa_enrollment, addresses = EXCLUDED.addresses,
+          company = EXCLUDED.company, cost_center = EXCLUDED.cost_center, department = EXCLUDED.department,
+          job_title = EXCLUDED.job_title, location = EXCLUDED.location, middlename = EXCLUDED.middlename,
+          manager = EXCLUDED.manager, phone_numbers = EXCLUDED.phone_numbers, state = EXCLUDED.state,
+          password_expired = EXCLUDED.password_expired, password_date = EXCLUDED.password_date,
+          mfa = EXCLUDED.mfa, organization = EXCLUDED.organization, allow_public_key = EXCLUDED.allow_public_key,
+          alternate_email = EXCLUDED.alternate_email, description = EXCLUDED.description,
+          disable_device_max_login_attempts = EXCLUDED.disable_device_max_login_attempts,
+          employee_identifier = EXCLUDED.employee_identifier, enable_managed_uid = EXCLUDED.enable_managed_uid,
+          enable_user_portal_multifactor = EXCLUDED.enable_user_portal_multifactor,
+          external_dn = EXCLUDED.external_dn, external_source_type = EXCLUDED.external_source_type,
+          externally_managed = EXCLUDED.externally_managed, ldap_binding_user = EXCLUDED.ldap_binding_user,
+          managed_apple_id = EXCLUDED.managed_apple_id, passwordless_sudo = EXCLUDED.passwordless_sudo,
+          samba_service_user = EXCLUDED.samba_service_user, ssh_keys = EXCLUDED.ssh_keys,
+          system_username = EXCLUDED.system_username, unix_guid = EXCLUDED.unix_guid,
+          unix_uid = EXCLUDED.unix_uid;
       `;
       const values = [
         user.id,
@@ -93,12 +109,45 @@ const syncAllJumpCloudUsers = async () => {
         user.password_never_expires,
         user.password_expiration_date,
         user.created,
-        user.attributes ? JSON.stringify(user.attributes) : null, // New field
-        user.sudo, // New field
-        user.mfaEnrollment ? JSON.stringify(user.mfaEnrollment) : null, // New field
+        user.attributes ? JSON.stringify(user.attributes) : null,
+        user.sudo,
+        user.mfaEnrollment ? JSON.stringify(user.mfaEnrollment) : null,
+        user.addresses ? JSON.stringify(user.addresses) : null,
+        user.company || null,
+        user.costCenter || null,
+        user.department || null,
+        user.jobTitle || null,
+        user.location || null,
+        user.middlename || null,
+        user.manager || null,
+        user.phoneNumbers ? JSON.stringify(user.phoneNumbers) : null,
+        user.state || null,
+        user.password_expired,
+        user.password_date || null,
+        user.mfa ? JSON.stringify(user.mfa) : null,
+        user.organization || null,
+        user.allow_public_key,
+        user.alternateEmail || null,
+        user.description || null,
+        user.disableDeviceMaxLoginAttempts,
+        user.employeeIdentifier || null,
+        user.enable_managed_uid,
+        user.enable_user_portal_multifactor,
+        user.external_dn || null,
+        user.external_source_type || null,
+        user.externally_managed,
+        user.ldap_binding_user,
+        user.managedAppleId || null,
+        user.passwordless_sudo,
+        user.samba_service_user,
+        user.ssh_keys ? JSON.stringify(user.ssh_keys) : null,
+        user.systemUsername || null,
+        user.unix_guid || null,
+        user.unix_uid || null,
       ];
       await db.query(query, values);
     }
+    // --- MODIFIED END (FINAL VERSION) ---
     console.log(`Successfully synced ${users.length} JumpCloud users.`);
   } catch (error) {
     console.error("Error during JumpCloud user sync:", error);
