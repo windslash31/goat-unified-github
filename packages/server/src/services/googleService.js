@@ -270,7 +270,7 @@ const syncAllGoogleUsers = async () => {
   }
 
   const syncStartTime = new Date();
-
+  const client = await db.pool.connect();
   try {
     await client.query("BEGIN");
 
@@ -307,9 +307,6 @@ const syncAllGoogleUsers = async () => {
         user.lastLoginTime,
         user.isEnrolledIn2Sv,
         user.orgUnitPath,
-        JSON.stringify(
-          user.emails?.filter((e) => !e.primary).map((e) => e.address) || []
-        ),
         JSON.stringify(user.emails || []),
         user.name?.givenName,
         user.name?.familyName,
@@ -324,15 +321,15 @@ const syncAllGoogleUsers = async () => {
       ];
 
       const query = `
-        INSERT INTO gws_users (
+        INSERT INTO google_users (
           primary_email, suspended, is_admin, is_delegated_admin, last_login_time, 
-          is_enrolled_in_2sv, org_unit_path, aliases, emails,
+          is_enrolled_in_2sv, org_unit_path, emails,
           first_name, last_name, full_name, creation_time, agreed_to_terms, archived,
-          is_mailbox_setup, is_enforced_in_2sv, non_editable_aliases, raw_logs,
+          is_mailbox_setup, is_enforced_in_2sv, non_editable_aliases, raw_data,
           last_synced_at
         ) VALUES (
           $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 
-          $11, $12, $13, $14, $15, $16, $17, $18, $19, NOW()
+          $11, $12, $13, $14, $15, $16, $17, $18, NOW()
         )
         ON CONFLICT (primary_email) DO UPDATE SET
           suspended = EXCLUDED.suspended,
@@ -341,26 +338,24 @@ const syncAllGoogleUsers = async () => {
           last_login_time = EXCLUDED.last_login_time,
           is_enrolled_in_2sv = EXCLUDED.is_enrolled_in_2sv,
           org_unit_path = EXCLUDED.org_unit_path,
-          aliases = EXCLUDED.aliases,
           emails = EXCLUDED.emails,
           first_name = EXCLUDED.first_name,
           last_name = EXCLUDED.last_name,
           full_name = EXCLUDED.full_name,
           creation_time = EXCLUDED.creation_time,
-          agreed_to_terms = EXCLUDED.agreed_to_terms,
+          agreed_to_terms = EXCLUDED.agreedTo_terms,
           archived = EXCLUDED.archived,
           is_mailbox_setup = EXCLUDED.is_mailbox_setup,
           is_enforced_in_2sv = EXCLUDED.is_enforced_in_2sv,
           non_editable_aliases = EXCLUDED.non_editable_aliases,
-          raw_logs = EXCLUDED.raw_logs,
+          raw_data = EXCLUDED.raw_data,
           last_synced_at = NOW();
       `;
-
       await client.query(query, values);
     }
 
     const deleteResult = await client.query(
-      `DELETE FROM gws_users WHERE last_synced_at < $1`,
+      `DELETE FROM google_users WHERE last_synced_at < $1`,
       [syncStartTime]
     );
 
