@@ -48,7 +48,6 @@ const syncAllJumpCloudUsers = async () => {
   }
   try {
     for (const user of users) {
-      // --- MODIFIED START (FINAL VERSION) ---
       const query = `
         INSERT INTO jumpcloud_users (
           id, email, username, display_name, firstname, lastname, 
@@ -91,7 +90,7 @@ const syncAllJumpCloudUsers = async () => {
           managed_apple_id = EXCLUDED.managed_apple_id, passwordless_sudo = EXCLUDED.passwordless_sudo,
           samba_service_user = EXCLUDED.samba_service_user, ssh_keys = EXCLUDED.ssh_keys,
           system_username = EXCLUDED.system_username, unix_guid = EXCLUDED.unix_guid,
-          unix_uid = EXCLUDED.unix_uid;
+          unix_uid = EXCLUDED.unix_uid
       `;
       const values = [
         user.id,
@@ -147,7 +146,6 @@ const syncAllJumpCloudUsers = async () => {
       ];
       await db.query(query, values);
     }
-    // --- MODIFIED END (FINAL VERSION) ---
     console.log(`Successfully synced ${users.length} JumpCloud users.`);
   } catch (error) {
     console.error("Error during JumpCloud user sync:", error);
