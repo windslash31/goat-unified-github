@@ -482,6 +482,7 @@ const syncAllAtlassianUsers = async () => {
     );
   }
 
+  const syncStartTime = new Date();
   let allUsers = [];
   let nextCursor = null;
   let keepFetching = true;
@@ -489,14 +490,7 @@ const syncAllAtlassianUsers = async () => {
     Authorization: `Bearer ${config.atlassian.orgToken}`,
     Accept: "application/json",
   };
-  const userApiHeaders = {
-    Authorization: `Basic ${Buffer.from(
-      `${config.atlassian.apiUser}:${config.atlassian.apiToken}`
-    ).toString("base64")}`,
-    Accept: "application/json",
-  };
 
-  // Step 1: Fetch the list of all users from the Organization API
   while (keepFetching) {
     const url = `https://api.atlassian.com/admin/v1/orgs/${
       config.atlassian.orgId
@@ -561,6 +555,18 @@ const syncAllAtlassianUsers = async () => {
       ];
       await client.query(query, values);
     }
+
+    const deleteResult = await client.query(
+      `DELETE FROM atlassian_users WHERE last_updated_at < $1`,
+      [syncStartTime]
+    );
+
+    if (deleteResult.rowCount > 0) {
+      console.log(
+        `SYNC: Successfully deleted ${deleteResult.rowCount} stale Atlassian users.`
+      );
+    }
+
     await client.query("COMMIT");
     console.log(`Successfully synced ${allUsers.length} Atlassian users.`);
   } catch (error) {
