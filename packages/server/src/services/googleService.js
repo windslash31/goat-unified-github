@@ -262,7 +262,6 @@ const fetchAllGoogleUsers = async () => {
   return allUsers;
 };
 
-// NEW FUNCTION to sync all fetched users to the database
 const syncAllGoogleUsers = async () => {
   const allUsers = await fetchAllGoogleUsers();
   if (!allUsers || allUsers.length === 0) {
@@ -270,12 +269,35 @@ const syncAllGoogleUsers = async () => {
     return;
   }
 
-  const client = await db.pool.connect();
+  const syncStartTime = new Date();
+
   try {
     await client.query("BEGIN");
 
     for (const user of allUsers) {
-      // The logic to create a copy and delete keys has been removed.
+      const rawData = { ...user };
+      const dedicatedFields = [
+        "primaryEmail",
+        "suspended",
+        "isAdmin",
+        "isDelegatedAdmin",
+        "lastLoginTime",
+        "isEnrolledIn2Sv",
+        "orgUnitPath",
+        "name",
+        "creationTime",
+        "agreedToTerms",
+        "archived",
+        "emails",
+        "isMailboxSetup",
+        "isEnforcedIn2Sv",
+        "nonEditableAliases",
+        "id",
+        "etag",
+        "kind",
+        "customerId",
+      ];
+      dedicatedFields.forEach((key) => delete rawData[key]);
 
       const values = [
         user.primaryEmail,
@@ -285,10 +307,9 @@ const syncAllGoogleUsers = async () => {
         user.lastLoginTime,
         user.isEnrolledIn2Sv,
         user.orgUnitPath,
-        user.emails
-          ?.filter((e) => !e.primary)
-          .map((e) => e.address)
-          .join(","),
+        JSON.stringify(
+          user.emails?.filter((e) => !e.primary).map((e) => e.address) || []
+        ),
         JSON.stringify(user.emails || []),
         user.name?.givenName,
         user.name?.familyName,
@@ -298,18 +319,16 @@ const syncAllGoogleUsers = async () => {
         user.archived,
         user.isMailboxSetup,
         user.isEnforcedIn2Sv,
-        user.nonEditableAliases?.join(","),
-        // FIX: Store the complete, unmodified user object.
-        JSON.stringify(user),
+        JSON.stringify(user.nonEditableAliases || []),
+        JSON.stringify(rawData),
       ];
 
-      // FIX: The column names in the query have been updated.
       const query = `
         INSERT INTO gws_users (
           primary_email, suspended, is_admin, is_delegated_admin, last_login_time, 
           is_enrolled_in_2sv, org_unit_path, aliases, emails,
           first_name, last_name, full_name, creation_time, agreed_to_terms, archived,
-          is_mailbox_setup, is_enforced_in_2sv, non_editable_aliases, raw_logs, -- Renamed column
+          is_mailbox_setup, is_enforced_in_2sv, non_editable_aliases, raw_logs,
           last_synced_at
         ) VALUES (
           $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 
@@ -333,16 +352,25 @@ const syncAllGoogleUsers = async () => {
           is_mailbox_setup = EXCLUDED.is_mailbox_setup,
           is_enforced_in_2sv = EXCLUDED.is_enforced_in_2sv,
           non_editable_aliases = EXCLUDED.non_editable_aliases,
-          raw_logs = EXCLUDED.raw_logs, -- Renamed column
+          raw_logs = EXCLUDED.raw_logs,
           last_synced_at = NOW();
       `;
 
       await client.query(query, values);
     }
-    await client.query("COMMIT");
-    console.log(
-      `SYNC: Successfully synced ${allUsers.length} Google Workspace users with detailed columns.`
+
+    const deleteResult = await client.query(
+      `DELETE FROM gws_users WHERE last_synced_at < $1`,
+      [syncStartTime]
     );
+
+    if (deleteResult.rowCount > 0) {
+      console.log(
+        `SYNC: Successfully deleted ${deleteResult.rowCount} stale Google Workspace users.`
+      );
+    }
+
+    await client.query("COMMIT");
   } catch (error) {
     await client.query("ROLLBACK");
     console.error("Error during detailed Google user database sync:", error);
