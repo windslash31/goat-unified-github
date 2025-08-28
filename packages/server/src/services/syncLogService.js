@@ -22,21 +22,27 @@ const finishJob = async (jobName, status, error = null, client = db) => {
   const finalStatus = status.toUpperCase();
   const details = error ? { error: error.message, stack: error.stack } : null;
 
-  let query = `UPDATE sync_jobs SET status = $1, progress = 100, current_step = $2, details = $3, `;
-  if (finalStatus === "SUCCESS") {
-    query += `last_success_at = NOW() `;
-  } else {
-    query += `last_failure_at = NOW() `;
-  }
-  query += `WHERE job_name = $1`;
+  let query = `
+    UPDATE sync_jobs 
+    SET 
+      status = $1, 
+      progress = 100, 
+      current_step = $2, 
+      details = $3, 
+      ${
+        finalStatus === "SUCCESS"
+          ? "last_success_at = NOW()"
+          : "last_failure_at = NOW()"
+      }
+    WHERE job_name = $4`;
 
   await client.query(query, [
-    jobName,
+    finalStatus,
     `Finished with status: ${finalStatus}`,
     details,
+    jobName,
   ]);
 };
-
 const getAllJobStatuses = async () => {
   const result = await db.query("SELECT * FROM sync_jobs");
   return result.rows;
