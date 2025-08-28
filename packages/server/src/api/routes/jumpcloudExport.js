@@ -2,7 +2,7 @@ const express = require("express");
 const router = express.Router();
 const {
   getJumpCloudUsersData,
-} = require("../controllers/dataExportController");
+} = require("../controllers/jumpcloudExportController");
 const {
   authenticateApiKey,
   authorize,
@@ -13,8 +13,5 @@ router.use(authenticateApiKey, authorize("log:read:platform"));
 
 // GET /api/data-export/jumpcloud/users
 router.get("/users", getJumpCloudUsersData);
-
-// Future endpoint for logs
-// router.get("/logs", getJumpCloudLogsData);
 
 module.exports = router;

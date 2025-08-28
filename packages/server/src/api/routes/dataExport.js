@@ -5,9 +5,9 @@ const {
   getBitbucketData,
   getConfluenceData,
   getJiraData,
-  getGoogleData,
 } = require("../controllers/dataExportController");
 const jumpcloudExportRoutes = require("./jumpcloudExport");
+const googleExportRoutes = require("./googleExport");
 
 const {
   authenticateApiKey,
@@ -15,6 +15,7 @@ const {
 } = require("../middleware/authMiddleware");
 
 router.use("/jumpcloud", jumpcloudExportRoutes);
+router.use("/google", googleExportRoutes);
 
 router.get(
   "/atlassian",
@@ -39,12 +40,6 @@ router.get(
   authenticateApiKey,
   authorize("log:read:platform"),
   getJiraData
-);
-router.get(
-  "/google",
-  authenticateApiKey,
-  authorize("log:read:platform"),
-  getGoogleData
 );
 
 module.exports = router;
