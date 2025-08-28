@@ -52,7 +52,7 @@ const syncAllJumpCloudUsers = async () => {
         INSERT INTO jumpcloud_users (
           id, email, username, display_name, firstname, lastname, 
           activated, suspended, employee_type, account_locked, totp_enabled, 
-          password_never_expires, password_expiration_date, created, updated_at,
+          password_never_expires, password_expiration_date, created, 
           attributes, sudo, mfa_enrollment, addresses, company, cost_center,
           department, job_title, location, middlename, manager, phone_numbers,
           state, password_expired, password_date, mfa, organization, allow_public_key,
@@ -62,10 +62,10 @@ const syncAllJumpCloudUsers = async () => {
           managed_apple_id, passwordless_sudo, samba_service_user, ssh_keys,
           system_username, unix_guid, unix_uid
         ) VALUES (
-          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NOW(),
+          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14,
           $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28,
           $29, $30, $31, $32, $33, $34, $35, $36, $37, $38, $39, $40, $41, $42,
-          $43, $44, $45, $46, $47, $48, $49, $50 --
+          $43, $44, $45, $46, $47, $48, $49
         )
         ON CONFLICT (id) DO UPDATE SET
           email = EXCLUDED.email, username = EXCLUDED.username, display_name = EXCLUDED.display_name,
@@ -90,9 +90,8 @@ const syncAllJumpCloudUsers = async () => {
           managed_apple_id = EXCLUDED.managed_apple_id, passwordless_sudo = EXCLUDED.passwordless_sudo,
           samba_service_user = EXCLUDED.samba_service_user, ssh_keys = EXCLUDED.ssh_keys,
           system_username = EXCLUDED.system_username, unix_guid = EXCLUDED.unix_guid,
-          unix_uid = EXCLUDED.unix_uid
+          unix_uid = EXCLUDED.unix_uid;
       `;
-      // --- FIX: The values array now has 50 items to match the columns ---
       const values = [
         user.id,
         user.email,
