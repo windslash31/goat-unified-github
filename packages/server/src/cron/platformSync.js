@@ -140,7 +140,7 @@ const reconcileDirectApiAccess = async () => {
     const syncStrategies = [
       {
         key: "GOOGLE_WORKSPACE",
-        rawTable: "google_users",
+        rawTable: "gws_users",
         emailColumn: "primary_email",
         activeCondition: "suspended = false",
       },
