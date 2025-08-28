@@ -122,6 +122,7 @@ const syncAllGoogleData = async () => {
   }
 };
 
+JavaScript;
 const reconcileDirectApiAccess = async () => {
   const client = await db.pool.connect();
   try {
@@ -130,9 +131,6 @@ const reconcileDirectApiAccess = async () => {
     );
     await client.query("BEGIN");
 
-    // Note the time before we start the updates.
-    const syncStartTime = new Date();
-
     const employeesResult = await client.query(
       "SELECT id, employee_email FROM employees"
     );
@@ -140,38 +138,30 @@ const reconcileDirectApiAccess = async () => {
       employeesResult.rows.map((e) => [e.employee_email, e.id])
     );
 
-    // The "recipes" now include info on how to determine status
     const syncStrategies = [
       {
         key: "GOOGLE_WORKSPACE",
         rawTable: "gws_users",
         emailColumn: "primary_email",
-        statusColumn: "suspended", // boolean
-        // This function translates the raw status into our standard status
-        statusMapper: (rawStatus) => (rawStatus ? "suspended" : "active"),
+        suspendedColumn: "suspended",
       },
       {
         key: "SLACK",
         rawTable: "slack_users",
         emailColumn: "email",
-        statusColumn: "status", // text: 'Active' or something else
-        statusMapper: (rawStatus) =>
-          rawStatus === "Active" ? "active" : "suspended",
+        suspendedColumn: "status <> 'Active'",
       },
       {
         key: "ATLASSIAN",
         rawTable: "atlassian_users",
         emailColumn: "email_address",
-        statusColumn: "account_status", // text: 'active' or 'inactive'
-        statusMapper: (rawStatus) =>
-          rawStatus === "active" ? "active" : "suspended",
+        suspendedColumn: "account_status <> 'active'",
       },
       {
         key: "JUMPCLOUD",
         rawTable: "jumpcloud_users",
         emailColumn: "email",
-        statusColumn: "suspended", // boolean
-        statusMapper: (rawStatus) => (rawStatus ? "suspended" : "active"),
+        suspendedColumn: "suspended",
       },
     ];
 
@@ -183,46 +173,78 @@ const reconcileDirectApiAccess = async () => {
         [strategy.key]
       );
 
-      if (appInstanceResult.rows.length === 0) continue;
+      if (appInstanceResult.rows.length === 0) {
+        console.log(
+          `CRON JOB: No primary app instance found for key '${strategy.key}'. Skipping.`
+        );
+        continue;
+      }
       const appInstanceId = appInstanceResult.rows[0].id;
 
-      // 1. Get ALL users from the raw table, not just active ones
+      // 1. Fetch ALL users from the platform's raw data table, not just active ones.
       const platformUsersResult = await client.query(
-        `SELECT ${strategy.emailColumn}, ${strategy.statusColumn} FROM ${strategy.rawTable}`
+        `SELECT ${strategy.emailColumn} AS email, ${strategy.suspendedColumn} AS is_suspended FROM ${strategy.rawTable}`
       );
 
-      if (platformUsersResult.rows.length > 0) {
-        // 2. Loop and upsert with the correct status
-        for (const user of platformUsersResult.rows) {
-          const email = user[strategy.emailColumn];
-          const employeeId = employeeEmailToIdMap.get(email);
+      const usersToActivate = new Set();
+      const usersToSuspend = new Set();
+      const allPlatformUserIds = new Set();
 
-          if (employeeId) {
-            const rawStatus = user[strategy.statusColumn];
-            const newStatus = strategy.statusMapper(rawStatus);
-
-            await client.query(
-              `INSERT INTO user_accounts (user_id, app_instance_id, status, updated_at)
-               VALUES ($1, $2, $3, $4)
-               ON CONFLICT (user_id, app_instance_id) DO UPDATE SET
-                 status = EXCLUDED.status,
-                 updated_at = EXCLUDED.updated_at;`,
-              [employeeId, appInstanceId, newStatus, syncStartTime]
-            );
+      // 2. Categorize users into "active" or "suspended" lists.
+      for (const user of platformUsersResult.rows) {
+        const employeeId = employeeEmailToIdMap.get(user.email);
+        if (employeeId) {
+          allPlatformUserIds.add(employeeId);
+          if (user.is_suspended) {
+            usersToSuspend.add(employeeId);
+          } else {
+            usersToActivate.add(employeeId);
           }
         }
       }
-    }
 
-    // 3. Deactivate any account that wasn't touched during this sync
-    const deactivateResult = await client.query(
-      `UPDATE user_accounts SET status = 'deactivated' WHERE updated_at < $1`,
-      [syncStartTime]
-    );
+      const allPlatformUserIdsArray = Array.from(allPlatformUserIds);
 
-    if (deactivateResult.rowCount > 0) {
+      // 3. Ensure records exist for all users found on the platform.
+      if (allPlatformUserIdsArray.length > 0) {
+        await client.query(
+          `INSERT INTO user_accounts (user_id, app_instance_id, status, last_seen_at)
+           SELECT unnest($1::int[]), $2, 'PENDING', NOW()
+           ON CONFLICT (user_id, app_instance_id) DO NOTHING;`,
+          [allPlatformUserIdsArray, appInstanceId]
+        );
+      }
+
+      // 4. Find users who are in our DB but no longer on the platform at all.
+      const accountsInDbResult = await client.query(
+        `SELECT user_id FROM user_accounts WHERE app_instance_id = $1`,
+        [appInstanceId]
+      );
+      const usersToDeactivate = accountsInDbResult.rows
+        .map((row) => row.user_id)
+        .filter((id) => !allPlatformUserIds.has(id));
+
+      // 5. Perform batched updates for each status.
+      if (usersToActivate.size > 0) {
+        await client.query(
+          `UPDATE user_accounts SET status = 'ACTIVE', last_seen_at = NOW() WHERE app_instance_id = $1 AND user_id = ANY($2::int[])`,
+          [appInstanceId, Array.from(usersToActivate)]
+        );
+      }
+      if (usersToSuspend.size > 0) {
+        await client.query(
+          `UPDATE user_accounts SET status = 'SUSPENDED', last_seen_at = NOW() WHERE app_instance_id = $1 AND user_id = ANY($2::int[])`,
+          [appInstanceId, Array.from(usersToSuspend)]
+        );
+      }
+      if (usersToDeactivate.length > 0) {
+        await client.query(
+          `UPDATE user_accounts SET status = 'DEACTIVATED' WHERE app_instance_id = $1 AND user_id = ANY($2::int[])`,
+          [appInstanceId, usersToDeactivate]
+        );
+      }
       console.log(
-        `CRON JOB: Marked ${deactivateResult.rowCount} stale user accounts as 'deactivated'.`
+        `CRON JOB: Reconciled ${strategy.key}. Active: ${usersToActivate.size}, Suspended: ${usersToSuspend.size}, Deactivated: ${usersToDeactivate.length}.`
       );
     }
 

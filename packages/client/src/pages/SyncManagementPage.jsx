@@ -15,17 +15,39 @@ import api from "../api/api";
 import { Button } from "../components/ui/Button";
 import { formatDateTime } from "../utils/formatters";
 
-const triggerSync = async (jobs) => {
-  const { data } = await api.post("/api/sync/trigger", { jobs });
-  return data;
-};
-
 const fetchSyncStatuses = async () => {
   const { data } = await api.get("/api/sync/status");
   return data;
 };
 
-const StatusBadge = ({ status }) => {
+const triggerSync = async (jobs) => {
+  const { data } = await api.post("/api/sync/trigger", { jobs });
+  return data;
+};
+
+const StatusBadge = ({ job }) => {
+  let statusToShow = job.status;
+  let textToShow = job.status;
+
+  if (job.status === "IDLE") {
+    const lastSuccess = job.last_success_at
+      ? new Date(job.last_success_at)
+      : null;
+    const lastFailure = job.last_failure_at
+      ? new Date(job.last_failure_at)
+      : null;
+
+    if (lastSuccess && (!lastFailure || lastSuccess > lastFailure)) {
+      statusToShow = "SUCCESS";
+      textToShow = "Success";
+    } else if (lastFailure) {
+      statusToShow = "FAILED";
+      textToShow = "Failed";
+    } else {
+      textToShow = "Idle"; // It remains Idle only if it has never run
+    }
+  }
+
   const styles = {
     RUNNING: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300",
     SUCCESS:
@@ -42,11 +64,11 @@ const StatusBadge = ({ status }) => {
   return (
     <span
       className={`inline-flex items-center gap-2 px-2.5 py-1 text-sm font-semibold rounded-full ${
-        styles[status] || styles["IDLE"]
+        styles[statusToShow] || styles["IDLE"]
       }`}
     >
-      {icons[status]}
-      {status}
+      {icons[statusToShow] || icons["IDLE"]}
+      {textToShow}
     </span>
   );
 };
@@ -96,7 +118,7 @@ const JobStatusCard = ({
               </div>
             </div>
             <div className="flex items-center gap-4">
-              <StatusBadge status={job.status} />
+              <StatusBadge job={job} />
               <ChevronDown
                 className={`w-5 h-5 text-gray-400 transition-transform ${
                   isExpanded ? "rotate-180" : ""
@@ -171,12 +193,10 @@ const JobStatusCard = ({
     </div>
   );
 };
-// --- END: MODIFICATIONS to JobStatusCard ---
 
-// --- START: MODIFICATIONS to SyncManagementPage ---
 const SyncManagementPage = () => {
   const queryClient = useQueryClient();
-  const [selectedJobs, setSelectedJobs] = useState([]); // State for selected jobs
+  const [selectedJobs, setSelectedJobs] = useState([]);
 
   const { data: jobs, isLoading } = useQuery({
     queryKey: ["syncStatuses"],
@@ -185,12 +205,11 @@ const SyncManagementPage = () => {
       data?.some((job) => job.status === "RUNNING") ? 5000 : false,
   });
 
-  // The mutation function now accepts a payload of jobs to run
   const { mutate: runSync, isPending: isTriggering } = useMutation({
-    mutationFn: triggerSync, // triggerSync now accepts the payload
+    mutationFn: triggerSync,
     onSuccess: (data) => {
       toast.success(data.message);
-      setSelectedJobs([]); // Clear selection after triggering
+      setSelectedJobs([]);
       queryClient.invalidateQueries({ queryKey: ["syncStatuses"] });
     },
     onError: (error) => {
@@ -200,7 +219,6 @@ const SyncManagementPage = () => {
 
   const isAnyJobRunning = jobs?.some((job) => job.status === "RUNNING");
 
-  // Function to handle checkbox toggling
   const handleToggleSelection = (jobName) => {
     setSelectedJobs((prev) =>
       prev.includes(jobName)
@@ -227,7 +245,6 @@ const SyncManagementPage = () => {
           </p>
         </div>
 
-        {/* Replaced single button with two new buttons */}
         <div className="flex items-center gap-2 w-full mt-4 sm:mt-0 sm:w-auto">
           <Button
             onClick={() => runSync(selectedJobs)}
@@ -243,7 +260,7 @@ const SyncManagementPage = () => {
             {`Run Selected (${selectedJobs.length})`}
           </Button>
           <Button
-            onClick={() => runSync([])} // Passing an empty/null array triggers all jobs
+            onClick={() => runSync([])}
             disabled={isTriggering || isAnyJobRunning}
             className="w-full justify-center"
             variant="secondary"
@@ -256,19 +273,17 @@ const SyncManagementPage = () => {
       <div className="max-w-4xl mx-auto space-y-4">
         {isLoading && <p>Loading job statuses...</p>}
         {jobs?.map((job) => (
-          // Pass new props to the card
           <JobStatusCard
             key={job.job_name}
             job={job}
             isSelected={selectedJobs.includes(job.job_name)}
             onToggleSelection={handleToggleSelection}
-            isAnyJobRunning={!!isAnyJobRunning} // Pass boolean value
+            isAnyJobRunning={!!isAnyJobRunning}
           />
         ))}
       </div>
     </motion.div>
   );
 };
-// --- END: MODIFICATIONS to SyncManagementPage ---
 
 export default SyncManagementPage;
