@@ -321,7 +321,7 @@ const syncAllGoogleUsers = async () => {
       ];
 
       const query = `
-        INSERT INTO google_users (
+        INSERT INTO gws_users (
           primary_email, suspended, is_admin, is_delegated_admin, last_login_time, 
           is_enrolled_in_2sv, org_unit_path, emails,
           first_name, last_name, full_name, creation_time, agreed_to_terms, archived,
@@ -355,7 +355,7 @@ const syncAllGoogleUsers = async () => {
     }
 
     const deleteResult = await client.query(
-      `DELETE FROM google_users WHERE last_synced_at < $1`,
+      `DELETE FROM gws_users WHERE last_synced_at < $1`,
       [syncStartTime]
     );
 
