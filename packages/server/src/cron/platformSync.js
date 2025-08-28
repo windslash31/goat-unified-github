@@ -12,7 +12,7 @@ const atlassianService = require("../services/atlassianService");
 const googleService = require("../services/googleService");
 const slackService = require("../services/slackService");
 
-let isMasterSyncRunning = false;
+let _isMasterSyncRunning = false;
 const BATCH_SIZE = 20;
 const DELAY_BETWEEN_BATCHES_MS = 1000;
 
@@ -239,35 +239,58 @@ const reconcileDirectApiAccess = async () => {
   }
 };
 
-// REVISED FUNCTION: Update runAllSyncs to call the new reconciliation function at the end.
-const runAllSyncs = async () => {
-  if (isMasterSyncRunning) {
+const syncJobs = {
+  jumpcloud: syncAllJumpCloudData,
+  atlassian: atlassianService.syncAllAtlassianData,
+  google: syncAllGoogleData,
+  slack: () => runIndividualUserSync("slack_sync", slackService.syncUserData),
+  jumpcloud_logs: jumpcloudService.syncAllUserLogs,
+  reconciliation: reconcileDirectApiAccess,
+};
+const allJobKeys = Object.keys(syncJobs);
+
+const isMasterSyncRunning = () => _isMasterSyncRunning;
+
+const runSelectiveSyncs = async (jobNames) => {
+  if (isMasterSyncRunning()) {
     console.log(
       "CRON JOB: Skipping run, a master sync process is still in progress."
     );
     return;
   }
-  isMasterSyncRunning = true;
-  console.log("CRON JOB: Starting master sync job for all platforms...");
-  try {
-    // Step 1: Run all raw data syncs
-    await syncAllJumpCloudData(); // This also handles SSO app reconciliation
-    await atlassianService.syncAllAtlassianData();
-    await syncAllGoogleData();
-    await runIndividualUserSync("slack_sync", slackService.syncUserData);
-    await reconcileDirectApiAccess();
-    await jumpcloudService.syncAllUserLogs();
+  _isMasterSyncRunning = true;
 
-    // Step 2: Run the new final reconciliation for direct API apps
+  const jobsToRun = jobNames && jobNames.length > 0 ? jobNames : allJobKeys;
+  console.log(
+    `CRON JOB: Starting selective sync for jobs: ${jobsToRun.join(", ")}...`
+  );
+
+  try {
+    for (const jobKey of jobsToRun) {
+      const jobFunction = syncJobs[jobKey];
+      if (jobFunction) {
+        console.log(`--- Running job: ${jobKey} ---`);
+        await jobFunction();
+        console.log(`--- Finished job: ${jobKey} ---`);
+      } else {
+        console.warn(
+          `CRON JOB: Unknown job key '${jobKey}' was requested and skipped.`
+        );
+      }
+    }
   } catch (error) {
     console.error(
       "CRON JOB: Master sync stopped due to a failure in a sub-process.",
       error
     );
   } finally {
-    isMasterSyncRunning = false;
+    _isMasterSyncRunning = false;
     console.log("CRON JOB: Master sync job complete. Releasing lock.");
   }
+};
+
+const runAllSyncs = async () => {
+  await runSelectiveSyncs(allJobKeys);
 };
 
 const schedulePlatformSync = () => {
@@ -278,4 +301,9 @@ const schedulePlatformSync = () => {
   console.log("Master cron job for all platform syncs has been scheduled.");
 };
 
-module.exports = { schedulePlatformSync, runAllSyncs, isMasterSyncRunning };
+module.exports = {
+  schedulePlatformSync,
+  runAllSyncs,
+  isMasterSyncRunning,
+  runSelectiveSyncs,
+};
