@@ -42,10 +42,15 @@ const fetchAllJumpCloudUsers = async () => {
 const syncAllJumpCloudUsers = async () => {
   console.log("Starting JumpCloud user sync...");
   const users = await fetchAllJumpCloudUsers();
+
+  const syncStartTime = new Date();
+
   if (!users || users.length === 0) {
-    console.log("No users found in JumpCloud to sync.");
+    console.log("No users found in JumpCloud. Deleting all local records.");
+    await db.query("TRUNCATE TABLE jumpcloud_users;");
     return;
   }
+
   try {
     for (const user of users) {
       const query = `
@@ -147,6 +152,17 @@ const syncAllJumpCloudUsers = async () => {
       await db.query(query, values);
     }
     console.log(`Successfully synced ${users.length} JumpCloud users.`);
+
+    // Delete any users that were not updated during this sync run.
+    const deleteQuery = `
+      DELETE FROM jumpcloud_users
+      WHERE updated_at < $1;
+    `;
+    const result = await db.query(deleteQuery, [syncStartTime]);
+
+    if (result.rowCount > 0) {
+      console.log(`Successfully deleted ${result.rowCount} stale users.`);
+    }
   } catch (error) {
     console.error("Error during JumpCloud user sync:", error);
     throw error;
