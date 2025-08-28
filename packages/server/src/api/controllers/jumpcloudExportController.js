@@ -13,6 +13,20 @@ const getJumpCloudUsersData = async (req, res, next) => {
   }
 };
 
+const getJumpCloudLogsData = async (req, res, next) => {
+  try {
+    const queries = {
+      jumpcloud_logs: "SELECT * FROM jumpcloud_logs ORDER BY timestamp DESC;",
+    };
+    const data = await fetchData(queries);
+    res.json(data);
+  } catch (error) {
+    console.error("Error fetching JumpCloud logs data:", error);
+    next(error);
+  }
+};
+
 module.exports = {
   getJumpCloudUsersData,
+  getJumpCloudLogsData,
 };
