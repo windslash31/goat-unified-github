@@ -343,7 +343,6 @@ const LOG_APPLICATIONS = [
   "saml",
   "groups_enterprise",
 ];
-
 //const MASSIVE_LOG_TYPES = ["drive", "chat"];
 const MASSIVE_LOG_TYPES = [];
 
@@ -353,8 +352,14 @@ const syncAllGoogleLogs = async (client) => {
   const dbClient = client || db;
 
   let totalIngested = 0;
-  // NEW LOGGING: Announce the start of the entire job
   console.log("CRON JOB: Starting Google Workspace log sync...");
+
+  const employeesRes = await dbClient.query(
+    "SELECT id, employee_email FROM employees"
+  );
+  const emailToIdMap = new Map(
+    employeesRes.rows.map((e) => [e.employee_email, e.id])
+  );
 
   for (const appName of LOG_APPLICATIONS) {
     const lastLogResult = await dbClient.query(
@@ -369,7 +374,7 @@ const syncAllGoogleLogs = async (client) => {
       startTime = lastLogTimestamp.toISOString();
     } else {
       if (MASSIVE_LOG_TYPES.includes(appName)) {
-        startTime = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+        startTime = new Date(Date.now() - 10 * 1000).toISOString();
       } else {
         startTime = new Date(
           Date.now() - 2 * 24 * 60 * 60 * 1000
@@ -377,7 +382,6 @@ const syncAllGoogleLogs = async (client) => {
       }
     }
 
-    // NEW LOGGING: Announce which app is being processed and its start time
     console.log(
       ` -> Syncing '${appName}' logs from ${new Date(startTime).toLocaleString(
         "en-US",
@@ -406,13 +410,7 @@ const syncAllGoogleLogs = async (client) => {
 
         const logs = response.data.items || [];
         if (logs.length > 0) {
-          const employeesRes = await dbClient.query(
-            "SELECT id, employee_email FROM employees"
-          );
-          const emailToIdMap = new Map(
-            employeesRes.rows.map((e) => [e.employee_email, e.id])
-          );
-
+          // The employee map is now already available, no need to fetch it again.
           const insertPromises = logs.map((log) => {
             const employeeId = emailToIdMap.get(log.actor.email) || null;
             const query = `
@@ -448,7 +446,6 @@ const syncAllGoogleLogs = async (client) => {
       }
     } while (pageToken);
 
-    // NEW LOGGING: Announce the result for the specific app
     if (appIngestedCount > 0) {
       console.log(
         ` -> Ingested ${appIngestedCount} new logs for '${appName}'.`
@@ -458,7 +455,6 @@ const syncAllGoogleLogs = async (client) => {
     }
     totalIngested += appIngestedCount;
   }
-  // UPDATED LOGGING: Provide a final, detailed summary
   console.log(
     `CRON JOB: GWS log sync finished. Ingested a total of ${totalIngested} new logs across all applications.`
   );
