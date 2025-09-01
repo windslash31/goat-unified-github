@@ -31,6 +31,8 @@ async function getAuthClient() {
       refresh_token: config.google.refreshToken,
     });
 
+    google.options({ auth: client });
+
     oauth2Client = client;
     return oauth2Client;
   } catch (error) {
@@ -44,22 +46,22 @@ async function getAuthClient() {
   }
 }
 
-async function getDirectoryClient() {
-  const auth = await getAuthClient();
-  return google.admin({
-    version: "directory_v1",
-    auth,
-  });
+function getDirectoryClient() {
+  return google.admin({ version: "directory_v1" });
 }
 
-const getLicensingClient = async () => {
-  const auth = await getAuthClient();
-  return google.licensing({ version: "v1", auth });
-};
+function getReportsClient() {
+  return google.admin({ version: "reports_v1" });
+}
+
+function getLicensingClient() {
+  return google.licensing({ version: "v1" });
+}
 
 const getUserStatus = async (email) => {
   try {
-    const directory = await getDirectoryClient();
+    await getAuthClient();
+    const directory = getDirectoryClient();
     const response = await directory.users.get({
       userKey: email,
       fields:
@@ -101,7 +103,8 @@ const getUserStatus = async (email) => {
 
 const suspendUser = async (email) => {
   try {
-    const directory = await getDirectoryClient();
+    await getAuthClient();
+    const directory = getDirectoryClient();
     await directory.users.update({
       userKey: email,
       requestBody: {
@@ -126,11 +129,8 @@ const suspendUser = async (email) => {
 
 const getLoginEvents = async (email) => {
   try {
-    const auth = await getAuthClient();
-    const reports = google.reports({
-      version: "reports_v1",
-      auth: auth,
-    });
+    await getAuthClient();
+    const reports = getReportsClient();
 
     const thirtyDaysAgo = new Date(
       Date.now() - 30 * 24 * 60 * 60 * 1000
@@ -154,7 +154,8 @@ const getLoginEvents = async (email) => {
 
 const getUserLicense = async (email) => {
   try {
-    const licensing = await getLicensingClient();
+    await getAuthClient();
+    const licensing = getLicensingClient();
 
     const response = await licensing.licenseAssignments.listForProduct({
       productId: "Google-Apps",
@@ -232,7 +233,8 @@ const syncUserData = async (employeeId, email) => {
 };
 
 const fetchAllGoogleUsers = async () => {
-  const directory = await getDirectoryClient();
+  await getAuthClient();
+  const directory = getDirectoryClient();
   let allUsers = [];
   let pageToken = null;
 
@@ -241,7 +243,6 @@ const fetchAllGoogleUsers = async () => {
   do {
     try {
       const response = await directory.users.list({
-        // Use the config object here
         domain: config.google.domain,
         maxResults: 500,
         pageToken: pageToken,
@@ -278,7 +279,7 @@ const syncAllGoogleUsers = async () => {
         INSERT INTO gws_users (
           primary_email, suspended, is_admin, is_delegated_admin, last_login_time, 
           is_enrolled_in_2sv, org_unit_path, aliases, 
-          raw_logs,  -- <<< CORRECTED COLUMN NAME
+          raw_logs,
           last_synced_at
         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
         ON CONFLICT (primary_email) DO UPDATE SET
@@ -289,7 +290,7 @@ const syncAllGoogleUsers = async () => {
           is_enrolled_in_2sv = EXCLUDED.is_enrolled_in_2sv,
           org_unit_path = EXCLUDED.org_unit_path,
           aliases = EXCLUDED.aliases,
-          raw_logs = EXCLUDED.raw_logs, -- <<< CORRECTED COLUMN NAME
+          raw_logs = EXCLUDED.raw_logs,
           last_synced_at = NOW();
       `;
       const values = [
@@ -301,12 +302,11 @@ const syncAllGoogleUsers = async () => {
         user.isEnrolledIn2Sv,
         user.orgUnitPath,
         JSON.stringify(user.aliases || []),
-        JSON.stringify(user), // The raw user object for the raw_logs column
+        JSON.stringify(user),
       ];
       await client.query(query, values);
     }
 
-    // (The soft-delete logic remains the same)
     const apiUserEmails = allUsers.map((user) => user.primaryEmail);
     const softDeleteQuery = `
       UPDATE gws_users
@@ -326,11 +326,165 @@ const syncAllGoogleUsers = async () => {
     );
   } catch (error) {
     await client.query("ROLLBACK");
-    // Add more detail to the error log
     console.error("Error during detailed Google user database sync:", error);
     throw error;
   } finally {
     client.release();
+  }
+};
+
+const LOG_APPLICATIONS = [
+  "login",
+  "admin",
+  //"drive",
+  //"chat",
+  "groups",
+  "token",
+  "saml",
+  "groups_enterprise",
+];
+//const MASSIVE_LOG_TYPES = ["drive", "chat"];
+const MASSIVE_LOG_TYPES = [];
+
+const syncAllGoogleLogs = async (client) => {
+  await getAuthClient();
+  const reports = getReportsClient();
+  const dbClient = client || db;
+
+  let totalIngested = 0;
+  console.log("CRON JOB: Starting Google Workspace log sync...");
+
+  const employeesRes = await dbClient.query(
+    "SELECT id, employee_email FROM employees"
+  );
+  const emailToIdMap = new Map(
+    employeesRes.rows.map((e) => [e.employee_email, e.id])
+  );
+
+  for (const appName of LOG_APPLICATIONS) {
+    const lastLogResult = await dbClient.query(
+      "SELECT timestamp FROM gws_logs WHERE application_name = $1 ORDER BY timestamp DESC LIMIT 1",
+      [appName]
+    );
+
+    let startTime;
+    const lastLogTimestamp = lastLogResult.rows[0]?.timestamp;
+
+    if (lastLogTimestamp) {
+      startTime = lastLogTimestamp.toISOString();
+    } else {
+      if (MASSIVE_LOG_TYPES.includes(appName)) {
+        startTime = new Date(Date.now() - 10 * 1000).toISOString();
+      } else {
+        startTime = new Date(
+          Date.now() - 2 * 24 * 60 * 60 * 1000
+        ).toISOString();
+      }
+    }
+
+    console.log(
+      ` -> Syncing '${appName}' logs from ${new Date(startTime).toLocaleString(
+        "en-US",
+        { timeZone: "Asia/Jakarta" }
+      )}...`
+    );
+
+    let pageToken = null;
+    let appIngestedCount = 0;
+
+    do {
+      try {
+        const requestParams = {
+          userKey: "all",
+          applicationName: appName,
+          maxResults: 1000,
+        };
+
+        if (pageToken) {
+          requestParams.pageToken = pageToken;
+        } else {
+          requestParams.startTime = startTime;
+        }
+
+        const response = await reports.activities.list(requestParams);
+
+        const logs = response.data.items || [];
+        if (logs.length > 0) {
+          // The employee map is now already available, no need to fetch it again.
+          const insertPromises = logs.map((log) => {
+            const employeeId = emailToIdMap.get(log.actor.email) || null;
+            const query = `
+              INSERT INTO gws_logs (employee_id, unique_qualifier, timestamp, actor_email, ip_address, application_name, event_name, details)
+              VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+              ON CONFLICT (unique_qualifier) DO NOTHING;
+            `;
+            return dbClient.query(query, [
+              employeeId,
+              log.id.uniqueQualifier,
+              new Date(log.id.time),
+              log.actor.email,
+              log.ipAddress,
+              log.id.applicationName,
+              log.events[0].name,
+              JSON.stringify(log),
+            ]);
+          });
+
+          const results = await Promise.all(insertPromises);
+          const newlyInsertedCount = results.filter(
+            (r) => r.rowCount > 0
+          ).length;
+          appIngestedCount += newlyInsertedCount;
+        }
+        pageToken = response.data.nextPageToken;
+      } catch (error) {
+        console.error(
+          `Error fetching logs for GWS app '${appName}':`,
+          error.message
+        );
+        break;
+      }
+    } while (pageToken);
+
+    if (appIngestedCount > 0) {
+      console.log(
+        ` -> Ingested ${appIngestedCount} new logs for '${appName}'.`
+      );
+    } else {
+      console.log(` -> No new logs found for '${appName}'.`);
+    }
+    totalIngested += appIngestedCount;
+  }
+  console.log(
+    `CRON JOB: GWS log sync finished. Ingested a total of ${totalIngested} new logs across all applications.`
+  );
+  return { ingested: totalIngested };
+};
+
+const reconcileGwsLogs = async (client) => {
+  const dbClient = client || db;
+  console.log(
+    "CRON JOB: Starting GWS log reconciliation for unlinked records..."
+  );
+
+  try {
+    const result = await dbClient.query(`
+      UPDATE gws_logs gl
+      SET employee_id = e.id
+      FROM employees e
+      WHERE gl.employee_id IS NULL AND gl.actor_email = e.employee_email;
+    `);
+
+    if (result.rowCount > 0) {
+      console.log(
+        `CRON JOB: Successfully linked ${result.rowCount} orphaned GWS log records to employees.`
+      );
+    } else {
+      console.log("CRON JOB: No unlinked GWS log records found to reconcile.");
+    }
+    return result.rowCount;
+  } catch (error) {
+    console.error("CRON JOB: Error during GWS log reconciliation:", error);
   }
 };
 
@@ -341,4 +495,6 @@ module.exports = {
   getUserLicense,
   syncUserData,
   syncAllGoogleUsers,
+  syncAllGoogleLogs,
+  reconcileGwsLogs,
 };
