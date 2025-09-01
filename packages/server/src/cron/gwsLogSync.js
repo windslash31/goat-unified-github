@@ -1,31 +1,37 @@
 const cron = require("node-cron");
 const { syncAllGoogleLogs } = require("../services/googleService");
-const db = require("../config/db");
+const {
+  startJob,
+  finishJob,
+  updateProgress,
+} = require("../services/syncLogService");
 
-let isGwsSyncRunning = false;
+const JOB_NAME = "gws_log_sync";
 
 const runGwsLogSync = async () => {
-  if (isGwsSyncRunning) {
-    console.log(
-      "CRON JOB: Skipping GWS log sync, a previous run is still in progress."
-    );
-    return;
-  }
-  isGwsSyncRunning = true;
-  console.log("CRON JOB: Starting scheduled GWS log sync...");
-
-  const client = await db.pool.connect();
   try {
-    await syncAllGoogleLogs(client);
+    await startJob(JOB_NAME);
+    console.log(`CRON JOB: Starting scheduled GWS log sync for ${JOB_NAME}...`);
+
+    await updateProgress(
+      JOB_NAME,
+      "Fetching logs from Google Workspace...",
+      25
+    );
+    const result = await syncAllGoogleLogs();
+
+    await updateProgress(JOB_NAME, `Ingested ${result.ingested} new logs.`, 90);
+
+    // MODIFICATION: Log success upon completion
+    await finishJob(JOB_NAME, "SUCCESS");
+    console.log(`CRON JOB: ${JOB_NAME} finished successfully.`);
   } catch (error) {
     console.error(
-      "CRON JOB: An error occurred during the GWS log sync:",
+      `CRON JOB: An error occurred during the GWS log sync for ${JOB_NAME}:`,
       error
     );
-  } finally {
-    isGwsSyncRunning = false;
-    client.release();
-    console.log("CRON JOB: GWS log sync finished. Releasing lock.");
+    // MODIFICATION: Log failure to the database
+    await finishJob(JOB_NAME, "FAILED", error);
   }
 };
 
@@ -35,7 +41,7 @@ const scheduleGwsLogSync = () => {
     timezone: "Asia/Jakarta",
   });
   console.log(
-    "Cron job for GWS log sync has been scheduled to run every 5 minutes."
+    `Cron job for ${JOB_NAME} has been scheduled to run every minute.`
   );
 };
 

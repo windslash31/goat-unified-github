@@ -698,7 +698,7 @@ const getPlatformLogsFromDB = async (employeeId, platform, filters = {}) => {
       }
       break;
     case "google":
-      tableName = "google_workspace_logs";
+      tableName = "gws_logs";
       // Add filters for Google here in the future
       break;
     default:
