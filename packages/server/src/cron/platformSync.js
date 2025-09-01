@@ -11,12 +11,12 @@ const jumpcloudService = require("../services/jumpcloudService");
 const atlassianService = require("../services/atlassianService");
 const googleService = require("../services/googleService");
 const slackService = require("../services/slackService");
+const { reconcileGwsLogs } = require("../services/googleService");
 
 let _isMasterSyncRunning = false;
 const BATCH_SIZE = 20;
 const DELAY_BETWEEN_BATCHES_MS = 1000;
 
-// --- JUMPCLOUD SYNC LOGIC ---
 const syncAllJumpCloudData = async () => {
   const JOB_NAME = "jumpcloud_sync";
   try {
@@ -36,7 +36,6 @@ const syncAllJumpCloudData = async () => {
         name: "Group Members",
         func: jumpcloudService.syncAllJumpCloudGroupMembers,
       },
-      // ADD THIS NEW STEP
       {
         name: "SSO Access Reconciliation",
         func: jumpcloudService.reconcileSsoAccess,
@@ -58,7 +57,7 @@ const syncAllJumpCloudData = async () => {
   } catch (error) {
     console.error(`CRON JOB: An error occurred during ${JOB_NAME}:`, error);
     await finishJob(JOB_NAME, "FAILED", error);
-    throw error; // Propagate error to stop master sync
+    throw error;
   }
 };
 
@@ -102,7 +101,7 @@ const runIndividualUserSync = async (jobName, serviceSyncFunction) => {
   } catch (error) {
     console.error(`CRON JOB: An error occurred during ${jobName}:`, error);
     await finishJob(jobName, "FAILED", error);
-    throw error; // Propagate error
+    throw error;
   }
 };
 
@@ -266,6 +265,7 @@ const syncJobs = {
     runIndividualUserSync("slack_sync", slackService.syncUserData),
   jumpcloud_log_sync: jumpcloudService.syncAllUserLogs,
   reconciliation: reconcileDirectApiAccess,
+  gws_log_reconciliation: reconcileGwsLogs,
 };
 
 const allJobKeys = Object.keys(syncJobs);

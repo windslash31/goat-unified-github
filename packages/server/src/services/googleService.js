@@ -333,25 +333,61 @@ const syncAllGoogleUsers = async () => {
   }
 };
 
-const LOG_APPLICATIONS = ["token", "saml"];
+const LOG_APPLICATIONS = [
+  "login",
+  "admin",
+  //"drive",
+  //"chat",
+  "groups",
+  "token",
+  "saml",
+  "groups_enterprise",
+];
+
+//const MASSIVE_LOG_TYPES = ["drive", "chat"];
+const MASSIVE_LOG_TYPES = [];
 
 const syncAllGoogleLogs = async (client) => {
   await getAuthClient();
   const reports = getReportsClient();
   const dbClient = client || db;
 
-  const lastLogResult = await dbClient.query(
-    "SELECT timestamp FROM gws_logs ORDER BY timestamp DESC LIMIT 1"
-  );
-
-  let startTime = lastLogResult.rows[0]?.timestamp
-    ? lastLogResult.rows[0].timestamp.toISOString()
-    : new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString();
-
   let totalIngested = 0;
+  // NEW LOGGING: Announce the start of the entire job
+  console.log("CRON JOB: Starting Google Workspace log sync...");
 
   for (const appName of LOG_APPLICATIONS) {
+    const lastLogResult = await dbClient.query(
+      "SELECT timestamp FROM gws_logs WHERE application_name = $1 ORDER BY timestamp DESC LIMIT 1",
+      [appName]
+    );
+
+    let startTime;
+    const lastLogTimestamp = lastLogResult.rows[0]?.timestamp;
+
+    if (lastLogTimestamp) {
+      startTime = lastLogTimestamp.toISOString();
+    } else {
+      if (MASSIVE_LOG_TYPES.includes(appName)) {
+        startTime = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+      } else {
+        startTime = new Date(
+          Date.now() - 2 * 24 * 60 * 60 * 1000
+        ).toISOString();
+      }
+    }
+
+    // NEW LOGGING: Announce which app is being processed and its start time
+    console.log(
+      ` -> Syncing '${appName}' logs from ${new Date(startTime).toLocaleString(
+        "en-US",
+        { timeZone: "Asia/Jakarta" }
+      )}...`
+    );
+
     let pageToken = null;
+    let appIngestedCount = 0;
+
     do {
       try {
         const requestParams = {
@@ -397,7 +433,10 @@ const syncAllGoogleLogs = async (client) => {
           });
 
           const results = await Promise.all(insertPromises);
-          totalIngested += results.filter((r) => r.rowCount > 0).length;
+          const newlyInsertedCount = results.filter(
+            (r) => r.rowCount > 0
+          ).length;
+          appIngestedCount += newlyInsertedCount;
         }
         pageToken = response.data.nextPageToken;
       } catch (error) {
@@ -408,9 +447,49 @@ const syncAllGoogleLogs = async (client) => {
         break;
       }
     } while (pageToken);
+
+    // NEW LOGGING: Announce the result for the specific app
+    if (appIngestedCount > 0) {
+      console.log(
+        ` -> Ingested ${appIngestedCount} new logs for '${appName}'.`
+      );
+    } else {
+      console.log(` -> No new logs found for '${appName}'.`);
+    }
+    totalIngested += appIngestedCount;
   }
-  console.log(`CRON JOB: Ingested ${totalIngested} new GWS logs.`);
+  // UPDATED LOGGING: Provide a final, detailed summary
+  console.log(
+    `CRON JOB: GWS log sync finished. Ingested a total of ${totalIngested} new logs across all applications.`
+  );
   return { ingested: totalIngested };
+};
+
+const reconcileGwsLogs = async (client) => {
+  const dbClient = client || db;
+  console.log(
+    "CRON JOB: Starting GWS log reconciliation for unlinked records..."
+  );
+
+  try {
+    const result = await dbClient.query(`
+      UPDATE gws_logs gl
+      SET employee_id = e.id
+      FROM employees e
+      WHERE gl.employee_id IS NULL AND gl.actor_email = e.employee_email;
+    `);
+
+    if (result.rowCount > 0) {
+      console.log(
+        `CRON JOB: Successfully linked ${result.rowCount} orphaned GWS log records to employees.`
+      );
+    } else {
+      console.log("CRON JOB: No unlinked GWS log records found to reconcile.");
+    }
+    return result.rowCount;
+  } catch (error) {
+    console.error("CRON JOB: Error during GWS log reconciliation:", error);
+  }
 };
 
 module.exports = {
@@ -421,4 +500,5 @@ module.exports = {
   syncUserData,
   syncAllGoogleUsers,
   syncAllGoogleLogs,
+  reconcileGwsLogs,
 };
