@@ -1,5 +1,5 @@
 import React, { useState, memo } from "react";
-import { Shield, Server, ChevronDown, User, Info } from "lucide-react";
+import { Shield, Server, ChevronDown } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { formatDateTime } from "../../utils/formatters";
 
@@ -24,6 +24,7 @@ const SectionHeader = ({ children }) => (
   </h4>
 );
 
+// Note: This component now expects the raw `details` object as its `log` prop.
 const GoogleLogDetailView = ({ log }) => {
   const event = log.events[0];
   const parameters = event.parameters.reduce(
@@ -40,7 +41,6 @@ const GoogleLogDetailView = ({ log }) => {
         label="Login Challenge Method"
         value={parameters.login_challenge_method}
       />
-
       <SectionHeader>Context</SectionHeader>
       <DetailItem label="IP Address" value={log.ipAddress} />
       <DetailItem label="Actor Email" value={log.actor.email} />
@@ -49,7 +49,9 @@ const GoogleLogDetailView = ({ log }) => {
 };
 
 const GoogleLogEntry = memo(({ log, isExpanded, onToggle }) => {
-  const event = log.events[0];
+  // The `log` prop is now the row from our database.
+  // The raw JSON from Google is in the `details` property.
+  const event = log.details.events[0];
   const isSuccess = event.name.includes("login_success");
 
   const getEventIcon = () => {
@@ -85,10 +87,10 @@ const GoogleLogEntry = memo(({ log, isExpanded, onToggle }) => {
               </div>
             </div>
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-              {formatDateTime(log.id.time)}
+              {formatDateTime(log.timestamp)}
             </p>
             <p className="flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400 mt-2">
-              <Server size={14} /> {log.ipAddress || "N/A"}
+              <Server size={14} /> {log.ip_address || "N/A"}
             </p>
           </div>
         </div>
@@ -104,7 +106,8 @@ const GoogleLogEntry = memo(({ log, isExpanded, onToggle }) => {
           >
             <div className="pt-4 mt-4 border-t border-gray-200 dark:border-gray-700">
               <div className="p-3 bg-gray-100 dark:bg-gray-900/70 rounded-lg shadow-inner">
-                <GoogleLogDetailView log={log} />
+                {/* Pass the raw details object to the detail view */}
+                <GoogleLogDetailView log={log.details} />
               </div>
             </div>
           </motion.div>
@@ -138,10 +141,10 @@ export const GoogleLogPage = ({ logs, loading, error }) => {
     <div className="divide-y divide-gray-200 dark:divide-gray-700">
       {logs.map((log) => (
         <GoogleLogEntry
-          key={log.id.uniqueQualifier}
+          key={log.unique_qualifier}
           log={log}
-          isExpanded={expandedLogRowId === log.id.uniqueQualifier}
-          onToggle={() => toggleRowExpansion(log.id.uniqueQualifier)}
+          isExpanded={expandedLogRowId === log.unique_qualifier}
+          onToggle={() => toggleRowExpansion(log.unique_qualifier)}
         />
       ))}
     </div>
