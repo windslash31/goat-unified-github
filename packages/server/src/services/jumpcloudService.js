@@ -43,7 +43,6 @@ const fetchAllJumpCloudUsers = async () => {
 const syncAllJumpCloudUsers = async () => {
   console.log("Starting JumpCloud user sync...");
   const users = await fetchAllJumpCloudUsers();
-
   const syncStartTime = new Date();
 
   if (!users || users.length === 0) {
@@ -61,17 +60,20 @@ const syncAllJumpCloudUsers = async () => {
           password_never_expires, password_expiration_date, created, 
           attributes, sudo, mfa_enrollment, addresses, company, cost_center,
           department, job_title, location, middlename, manager, phone_numbers,
-          state, password_expired, password_date, mfa, organization, allow_public_key,
+          state, password_expired, password_date, mfa,
+          mfa_configured,
+          organization, allow_public_key,
           alternate_email, description, disable_device_max_login_attempts,
           employee_identifier, enable_managed_uid, enable_user_portal_multifactor,
           external_dn, external_source_type, externally_managed, ldap_binding_user,
           managed_apple_id, passwordless_sudo, samba_service_user, ssh_keys,
-          system_username, unix_guid, unix_uid
+          system_username, unix_guid, unix_uid, updated_at
         ) VALUES (
           $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14,
           $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28,
-          $29, $30, $31, $32, $33, $34, $35, $36, $37, $38, $39, $40, $41, $42,
-          $43, $44, $45, $46, $47, $48, $49
+          $29, $30, $31,
+          $32, $33, $34, $35, $36, $37, $38, $39, $40, $41, $42, $43,
+          $44, $45, $46, $47, $48, $49, $50, NOW()
         )
         ON CONFLICT (id) DO UPDATE SET
           email = EXCLUDED.email, username = EXCLUDED.username, display_name = EXCLUDED.display_name,
@@ -80,13 +82,15 @@ const syncAllJumpCloudUsers = async () => {
           account_locked = EXCLUDED.account_locked, totp_enabled = EXCLUDED.totp_enabled,
           password_never_expires = EXCLUDED.password_never_expires,
           password_expiration_date = EXCLUDED.password_expiration_date, created = EXCLUDED.created,
-          updated_at = NOW(), attributes = EXCLUDED.attributes, sudo = EXCLUDED.sudo,
+          attributes = EXCLUDED.attributes, sudo = EXCLUDED.sudo,
           mfa_enrollment = EXCLUDED.mfa_enrollment, addresses = EXCLUDED.addresses,
           company = EXCLUDED.company, cost_center = EXCLUDED.cost_center, department = EXCLUDED.department,
           job_title = EXCLUDED.job_title, location = EXCLUDED.location, middlename = EXCLUDED.middlename,
           manager = EXCLUDED.manager, phone_numbers = EXCLUDED.phone_numbers, state = EXCLUDED.state,
           password_expired = EXCLUDED.password_expired, password_date = EXCLUDED.password_date,
-          mfa = EXCLUDED.mfa, organization = EXCLUDED.organization, allow_public_key = EXCLUDED.allow_public_key,
+          mfa = EXCLUDED.mfa,
+          mfa_configured = EXCLUDED.mfa_configured,
+          organization = EXCLUDED.organization, allow_public_key = EXCLUDED.allow_public_key,
           alternate_email = EXCLUDED.alternate_email, description = EXCLUDED.description,
           disable_device_max_login_attempts = EXCLUDED.disable_device_max_login_attempts,
           employee_identifier = EXCLUDED.employee_identifier, enable_managed_uid = EXCLUDED.enable_managed_uid,
@@ -96,8 +100,9 @@ const syncAllJumpCloudUsers = async () => {
           managed_apple_id = EXCLUDED.managed_apple_id, passwordless_sudo = EXCLUDED.passwordless_sudo,
           samba_service_user = EXCLUDED.samba_service_user, ssh_keys = EXCLUDED.ssh_keys,
           system_username = EXCLUDED.system_username, unix_guid = EXCLUDED.unix_guid,
-          unix_uid = EXCLUDED.unix_uid;
+          unix_uid = EXCLUDED.unix_uid, updated_at = NOW();
       `;
+
       const values = [
         user.id,
         user.email,
@@ -130,6 +135,7 @@ const syncAllJumpCloudUsers = async () => {
         user.password_expired,
         user.password_date || null,
         user.mfa ? JSON.stringify(user.mfa) : null,
+        user.mfa?.configured ?? false,
         user.organization || null,
         user.allow_public_key,
         user.alternateEmail || null,
@@ -154,11 +160,7 @@ const syncAllJumpCloudUsers = async () => {
     }
     console.log(`Successfully synced ${users.length} JumpCloud users.`);
 
-    // Delete any users that were not updated during this sync run.
-    const deleteQuery = `
-      DELETE FROM jumpcloud_users
-      WHERE updated_at < $1;
-    `;
+    const deleteQuery = `DELETE FROM jumpcloud_users WHERE updated_at < $1;`;
     const result = await db.query(deleteQuery, [syncStartTime]);
 
     if (result.rowCount > 0) {
