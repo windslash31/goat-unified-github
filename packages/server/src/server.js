@@ -14,6 +14,7 @@ const dataExportRoutes = require("./api/routes/dataExport");
 const userRoutes = require("./api/routes/users");
 const managedAccountRoutes = require("./api/routes/managedAccount");
 const { schedulePlatformSync } = require("./cron/platformSync");
+const { scheduleGwsLogSync } = require("./cron/gwsLogSync");
 const syncRoutes = require("./api/routes/sync");
 const licenseRoutes = require("./api/routes/licenses");
 
@@ -90,9 +91,8 @@ app.listen(PORT, () => {
   console.log(`Backend server running at http://localhost:${PORT}`);
   resetStaleSyncJobs();
 
-  //if (config.nodeEnv === "production") {
   schedulePlatformSync();
-  //}
+  scheduleGwsLogSync();
 });
 
 module.exports = app;
