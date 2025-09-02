@@ -27,6 +27,13 @@ const upload = multer({
   },
 });
 
+router.get(
+  "/options/search",
+  authenticateToken,
+  authorize("employee:read:all"),
+  employeeController.searchEmployeeOptions
+);
+
 router.post(
   "/onboard",
   authenticateApiKey,

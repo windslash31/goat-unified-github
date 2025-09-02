@@ -7,15 +7,19 @@ import { X } from "lucide-react";
 import api from "../../api/api";
 import { Button } from "../../components/ui/Button";
 import { CustomSelect } from "../../components/ui/CustomSelect";
+import { SearchableSelect } from "../../components/ui/SearchableSelect"; // Import the new component
 
-const fetchEmployees = async () => {
+// This function is no longer needed here as the new component fetches its own data.
+// const fetchEmployees = ...
+
+const fetchEmployeeById = async (employeeId) => {
+  if (!employeeId) return null;
   try {
-    const response = await api.get("/api/employees?limit=1000&status=active");
-    return response.data?.employees || [];
+    const response = await api.get(`/api/employees/${employeeId}`);
+    return response.data;
   } catch (error) {
-    console.error("Failed to fetch employees:", error);
-    toast.error("Could not load the list of owners.");
-    return [];
+    console.error("Failed to fetch employee by ID", error);
+    return null;
   }
 };
 
@@ -35,9 +39,11 @@ const ManagedAccountFormModal = ({ account, onClose, onSuccess }) => {
 
   const isEditMode = Boolean(account?.id);
 
-  const { data: employees = [], isLoading: isLoadingEmployees } = useQuery({
-    queryKey: ["activeEmployees"],
-    queryFn: fetchEmployees,
+  // Fetch initial owner details only when in edit mode
+  const { data: initialOwner } = useQuery({
+    queryKey: ["employee", account?.owner_employee_id],
+    queryFn: () => fetchEmployeeById(account.owner_employee_id),
+    enabled: isEditMode && !!account?.owner_employee_id,
   });
 
   const mutation = useMutation({
@@ -91,16 +97,16 @@ const ManagedAccountFormModal = ({ account, onClose, onSuccess }) => {
     "mt-1 block w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-kredivo-primary focus:border-kredivo-primary text-gray-900 dark:text-gray-200";
   const labelStyle =
     "block text-sm font-medium text-gray-700 dark:text-gray-300";
-  const ownerOptions = employees.map((emp) => ({
-    id: emp.id.toString(),
-    name: `${emp.first_name} ${emp.last_name}`,
-  }));
 
   const accountTypeOptions = [
     { id: "SHARED_ACCOUNT", name: "Shared Account" },
     { id: "SERVICE_ACCOUNT", name: "Service Account" },
     { id: "SYSTEM_BOT", name: "System Bot" },
   ];
+
+  const initialOwnerDisplayValue = initialOwner
+    ? `${initialOwner.first_name} ${initialOwner.last_name} (${initialOwner.employee_email})`
+    : "";
 
   return (
     <AnimatePresence>
@@ -177,18 +183,16 @@ const ManagedAccountFormModal = ({ account, onClose, onSuccess }) => {
                 <label htmlFor="owner_employee_id" className={labelStyle}>
                   Owner (PIC)
                 </label>
-                <CustomSelect
-                  id="owner_employee_id"
-                  value={formData.owner_employee_id}
-                  options={ownerOptions}
-                  onChange={(value) =>
-                    handleSelectChange("owner_employee_id", value)
-                  }
-                  placeholder={
-                    isLoadingEmployees ? "Loading owners..." : "Select an owner"
-                  }
-                  disabled={isLoadingEmployees}
-                />
+                <div className="mt-1">
+                  <SearchableSelect
+                    value={formData.owner_employee_id}
+                    onChange={(value) =>
+                      handleSelectChange("owner_employee_id", value)
+                    }
+                    placeholder="Search by name or email..."
+                    initialDisplayValue={initialOwnerDisplayValue}
+                  />
+                </div>
               </div>
               <div>
                 <label htmlFor="description" className={labelStyle}>
