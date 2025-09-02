@@ -1002,6 +1002,36 @@ const getLicenseDetails = async (employeeId) => {
   return results;
 };
 
+const searchActiveEmployees = async (searchTerm, page = 1, limit = 20) => {
+  const offset = (page - 1) * limit;
+  const queryParams = [];
+  let whereClause = "WHERE is_active = TRUE";
+
+  if (searchTerm && searchTerm.trim() !== "") {
+    queryParams.push(`%${searchTerm.trim()}%`);
+    whereClause += ` AND (CONCAT(first_name, ' ', last_name) ILIKE $1 OR employee_email ILIKE $1)`;
+  }
+
+  const dataQuery = `
+    SELECT id, first_name, last_name, employee_email
+    FROM employees
+    ${whereClause}
+    ORDER BY first_name, last_name
+    LIMIT ${limit} OFFSET ${offset};
+  `;
+
+  const countQuery = `SELECT COUNT(*) FROM employees ${whereClause}`;
+
+  const dataResult = await db.query(dataQuery, queryParams);
+  const countResult = await db.query(countQuery, queryParams);
+
+  const total = parseInt(countResult.rows[0].count, 10);
+  const results = dataResult.rows;
+  const hasMore = page * limit < total;
+
+  return { results, hasMore, total };
+};
+
 const bulkImportEmployees = async (fileBuffer, actorId, reqContext) => {
   const client = await db.pool.connect();
   const results = { created: 0, updated: 0, errors: [] };
@@ -1660,4 +1690,5 @@ module.exports = {
   forceSyncPlatformStatus,
   getJumpCloudSsoAppDetails,
   removeUserAccount,
+  searchActiveEmployees,
 };

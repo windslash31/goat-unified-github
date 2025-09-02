@@ -20,6 +20,20 @@ const listEmployees = async (req, res, next) => {
   }
 };
 
+const searchEmployeeOptions = async (req, res, next) => {
+  try {
+    const { q, page = 1, limit = 20 } = req.query; // Search term and pagination params
+    const data = await employeeService.searchActiveEmployees(
+      q,
+      parseInt(page),
+      parseInt(limit)
+    );
+    res.json(data);
+  } catch (error) {
+    next(error);
+  }
+};
+
 const exportEmployees = async (req, res, next) => {
   try {
     res.header("Content-Type", "text/csv");
@@ -513,4 +527,5 @@ module.exports = {
   onboardDeferred,
   reconcileManagers,
   removeProvisionedAccount,
+  searchEmployeeOptions,
 };
