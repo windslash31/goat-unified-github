@@ -1,13 +1,13 @@
-import React, { useState, useCallback, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   UserSquare,
-  LayoutGrid,
   HardDrive,
   Bot,
-  KeyRound,
   Laptop,
   MoreVertical,
+  KeyRound,
+  Briefcase,
 } from "lucide-react";
 import { EmployeeDetailHeader } from "./EmployeeDetailPage/EmployeeDetailHeader";
 import { EmployeeDetailsTab } from "./EmployeeDetailPage/EmployeeDetailsTab";
@@ -26,7 +26,8 @@ import { useAuthStore } from "../stores/authStore";
 import { useModalStore } from "../stores/modalStore";
 import api from "../api/api";
 import { EmployeeDetailSkeleton } from "../components/ui/EmployeeDetailSkeleton";
-import { EmployeeApplicationsTab } from "./EmployeeDetailPage/EmployeeApplicationsTab";
+import { EmployeeAccessTab } from "./EmployeeDetailPage/EmployeeAccessTab";
+import { AssignLicenseModal } from "../components/ui/AssignLicenseModal";
 
 const fetchMe = async () => {
   const { data } = await api.get("/api/me");
@@ -40,9 +41,9 @@ const fetchTimelineData = async (employeeId) => {
   return data;
 };
 
-export const ProfilePage = ({ employee, permissions, onLogout, user }) => {
+export const ProfilePage = ({ permissions, onLogout, user }) => {
   const { isAuthenticated } = useAuthStore();
-  const { openModal } = useModalStore();
+  const { openModal, closeModal, modal } = useModalStore();
   const [activeTab, setActiveTab] = useState("details");
   const [isChangePasswordModalOpen, setIsChangePasswordModalOpen] =
     useState(false);
@@ -56,14 +57,12 @@ export const ProfilePage = ({ employee, permissions, onLogout, user }) => {
   const [isAssetModalOpen, setIsAssetModalOpen] = useState(false);
   const [selectedAsset, setSelectedAsset] = useState(null);
 
-  const { data: currentUserEmployeeRecord, isLoading: isLoadingMe } = useQuery({
+  const { data: currentEmployee, isLoading: isLoadingMe } = useQuery({
     queryKey: ["me"],
     queryFn: fetchMe,
     enabled: isAuthenticated,
     staleTime: 1000 * 60 * 5,
   });
-
-  const currentEmployee = employee || currentUserEmployeeRecord;
 
   const {
     data: timelineData,
@@ -83,16 +82,16 @@ export const ProfilePage = ({ employee, permissions, onLogout, user }) => {
       permission: true,
     },
     {
-      id: "devices",
-      label: "Devices",
-      icon: <Laptop size={16} />,
+      id: "access",
+      label: "Applications & Licenses",
+      shortLabel: "Access",
+      icon: <Briefcase size={16} />,
       permission: true,
     },
     {
-      id: "platforms",
-      label: "Apps & Platforms",
-      shortLabel: "Access",
-      icon: <LayoutGrid size={16} />,
+      id: "devices",
+      label: "Devices",
+      icon: <Laptop size={16} />,
       permission: true,
     },
     {
@@ -153,7 +152,6 @@ export const ProfilePage = ({ employee, permissions, onLogout, user }) => {
       );
     }
   };
-
   const handleEdit = () => {
     openModal("editEmployee", currentEmployee);
   };
@@ -184,40 +182,40 @@ export const ProfilePage = ({ employee, permissions, onLogout, user }) => {
     </button>
   );
 
-  const TabContent = (
-    <div className="mt-6">
-      {activeTab === "details" && (
-        <EmployeeDetailsTab
-          employee={currentEmployee}
-          permissions={permissions}
-          onTicketClick={handleTicketClick}
-          onAssetClick={handleAssetClick}
-        />
-      )}
-      {activeTab === "devices" && (
-        <DevicesTab employeeId={currentEmployee.id} />
-      )}
-      {activeTab === "platforms" && (
-        <EmployeeApplicationsTab
-          employeeId={currentEmployee.id}
-          applications={currentEmployee.applications || []}
-          platformStatuses={currentEmployee.platform_statuses || []}
-          isLoading={isLoadingMe}
-          onTicketClick={handleTicketClick}
-        />
-      )}
-      {activeTab === "platform-logs" && (
-        <PlatformLogPage employeeId={currentEmployee.id} onLogout={onLogout} />
-      )}
-      {activeTab === "timeline" && (
-        <UnifiedTimelinePage
-          events={timelineData}
-          loading={isTimelineLoading}
-          error={timelineError}
-        />
-      )}
-    </div>
-  );
+  const renderContent = () => {
+    switch (activeTab) {
+      case "details":
+        return (
+          <EmployeeDetailsTab
+            employee={currentEmployee}
+            permissions={permissions}
+            onTicketClick={handleTicketClick}
+            onAssetClick={handleAssetClick}
+          />
+        );
+      case "access":
+        return <EmployeeAccessTab employee={currentEmployee} />;
+      case "devices":
+        return <DevicesTab employeeId={currentEmployee.id} />;
+      case "platform-logs":
+        return (
+          <PlatformLogPage
+            employeeId={currentEmployee.id}
+            onLogout={onLogout}
+          />
+        );
+      case "timeline":
+        return (
+          <UnifiedTimelinePage
+            events={timelineData}
+            loading={isTimelineLoading}
+            error={timelineError}
+          />
+        );
+      default:
+        return null;
+    }
+  };
 
   return (
     <motion.div
@@ -304,9 +302,14 @@ export const ProfilePage = ({ employee, permissions, onLogout, user }) => {
               )}
             </div>
           </div>
-          {TabContent}
+          <div className="mt-6">{renderContent()}</div>
         </div>
       </div>
+
+      {modal === "assignLicense" && (
+        <AssignLicenseModal employee={currentEmployee} onClose={closeModal} />
+      )}
+
       {isJiraModalOpen && (
         <JiraTicketModal
           ticketId={selectedTicketId}
