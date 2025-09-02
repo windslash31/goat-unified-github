@@ -1,27 +1,53 @@
 import React from "react";
-import { useQuery } from "@tanstack/react-query";
-import { Briefcase, PlusCircle } from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Briefcase, PlusCircle, Edit, Trash2 } from "lucide-react";
 import { motion } from "framer-motion";
+import toast from "react-hot-toast";
 
 import api from "../api/api";
 import { useModalStore } from "../stores/modalStore";
 import { Button } from "../components/ui/Button";
 import { ApplicationManagementSkeleton } from "../components/ui/ApplicationManagementSkeleton";
 import { AddApplicationModal } from "../components/ui/AddApplicationModal";
+import { EditApplicationModal } from "../components/ui/EditApplicationModal";
+import { ConfirmationModal } from "../components/ui/ConfirmationModal";
 
-// This endpoint now correctly fetches from the managed_applications table
 const fetchApplications = async () => {
   const { data } = await api.get("/api/applications");
   return data;
 };
 
+const deleteApplication = (id) => api.delete(`/api/applications/${id}`);
+
 export const ApplicationManagementPage = () => {
-  const { openModal, closeModal, modal } = useModalStore();
+  const { openModal, closeModal, modal, data: modalData } = useModalStore();
+  const queryClient = useQueryClient();
 
   const { data: applications, isLoading } = useQuery({
-    queryKey: ["managedApplications"], // Use a new, clear query key
+    queryKey: ["managedApplications"],
     queryFn: fetchApplications,
   });
+
+  const { mutate: deleteAppMutation } = useMutation({
+    mutationFn: deleteApplication,
+    onSuccess: () => {
+      toast.success("Application deleted successfully!");
+      queryClient.invalidateQueries({ queryKey: ["managedApplications"] });
+      closeModal();
+    },
+    onError: (error) => {
+      toast.error(
+        error.response?.data?.message || "Failed to delete application."
+      );
+      closeModal();
+    },
+  });
+
+  const handleDeleteConfirm = () => {
+    if (modalData?.id) {
+      deleteAppMutation(modalData.id);
+    }
+  };
 
   if (isLoading) return <ApplicationManagementSkeleton />;
 
@@ -63,6 +89,9 @@ export const ApplicationManagementPage = () => {
                   <th className="px-6 py-3 text-left text-xs font-bold uppercase">
                     Integration Mode
                   </th>
+                  <th className="px-6 py-3 text-left text-xs font-bold uppercase">
+                    Actions
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
@@ -83,11 +112,29 @@ export const ApplicationManagementPage = () => {
                           {app.integration_mode}
                         </span>
                       </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => openModal("editApplication", app)}
+                          >
+                            <Edit size={14} />
+                          </Button>
+                          <Button
+                            variant="danger"
+                            size="sm"
+                            onClick={() => openModal("deleteApplication", app)}
+                          >
+                            <Trash2 size={14} />
+                          </Button>
+                        </div>
+                      </td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan="3" className="text-center py-16 text-gray-500">
+                    <td colSpan="4" className="text-center py-16 text-gray-500">
                       <Briefcase className="mx-auto w-12 h-12 text-gray-400" />
                       <p className="font-semibold mt-4">
                         No Applications Found
@@ -106,6 +153,19 @@ export const ApplicationManagementPage = () => {
 
       {modal === "addApplication" && (
         <AddApplicationModal onClose={closeModal} />
+      )}
+      {modal === "editApplication" && (
+        <EditApplicationModal application={modalData} onClose={closeModal} />
+      )}
+      {modal === "deleteApplication" && (
+        <ConfirmationModal
+          isOpen={true}
+          onClose={closeModal}
+          onConfirm={handleDeleteConfirm}
+          title="Delete Application"
+          message={`Are you sure you want to delete the application "${modalData?.name}"? This action cannot be undone.`}
+          confirmationText={modalData?.name}
+        />
       )}
     </>
   );
