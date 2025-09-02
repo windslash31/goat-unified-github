@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import api from "../../api/api";
 import { useDebounce } from "../../hooks/useDebounce";
 
-// This function now fetches even if searchTerm is empty
+// This is the function that React Query will use to fetch data
 const fetchEmployeeOptions = async ({ pageParam = 1, queryKey }) => {
   const [, searchTerm] = queryKey;
   const { data } = await api.get(
@@ -33,7 +33,8 @@ export const SearchableSelect = ({
       queryKey: ["employeeSearch", debouncedSearchTerm],
       queryFn: fetchEmployeeOptions,
       getNextPageParam: (lastPage) => lastPage.nextPage,
-      enabled: isOpen, // Only fetch when the dropdown is open
+      enabled: isOpen,
+      keepPreviousData: true, // This prevents the list from disappearing during refetch
     });
 
   const options = data?.pages.flatMap((page) => page.results) ?? [];
@@ -86,6 +87,17 @@ export const SearchableSelect = ({
     }
   };
 
+  const listVariants = {
+    hidden: { opacity: 0 },
+    visible: { opacity: 1 },
+  };
+
+  const itemVariants = {
+    hidden: { y: -10, opacity: 0 },
+    visible: { y: 0, opacity: 1 },
+    exit: { opacity: 0 },
+  };
+
   return (
     <div className="relative w-full" ref={wrapperRef}>
       <div className="relative">
@@ -117,33 +129,43 @@ export const SearchableSelect = ({
             ref={listRef}
           >
             {options.length > 0 ? (
-              <ul className="py-1">
-                {options.map((option, index) => (
-                  <li
-                    key={option.id}
-                    ref={index === options.length - 1 ? lastElementRef : null}
-                  >
-                    <button
-                      onClick={() => handleSelect(option)}
-                      className="w-full text-left flex items-center justify-between px-3 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
+              <motion.ul
+                className="py-1"
+                variants={listVariants}
+                initial="hidden"
+                animate="visible"
+                exit="hidden"
+              >
+                <AnimatePresence>
+                  {options.map((option, index) => (
+                    <motion.li
+                      key={option.id}
+                      ref={index === options.length - 1 ? lastElementRef : null}
+                      variants={itemVariants}
+                      layout="position"
                     >
-                      <span className="truncate">
-                        {option.first_name} {option.last_name} (
-                        {option.employee_email})
-                      </span>
-                      {String(option.id) === String(value) && (
-                        <Check className="w-4 h-4 text-kredivo-primary" />
-                      )}
-                    </button>
-                  </li>
-                ))}
+                      <button
+                        onClick={() => handleSelect(option)}
+                        className="w-full text-left flex items-center justify-between px-3 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
+                      >
+                        <span className="truncate">
+                          {option.first_name} {option.last_name} (
+                          {option.employee_email})
+                        </span>
+                        {String(option.id) === String(value) && (
+                          <Check className="w-4 h-4 text-kredivo-primary" />
+                        )}
+                      </button>
+                    </motion.li>
+                  ))}
+                </AnimatePresence>
                 {isFetchingNextPage && (
                   <li className="flex items-center justify-center p-2 text-sm text-gray-500">
                     <Loader size={16} className="animate-spin mr-2" /> Loading
                     more...
                   </li>
                 )}
-              </ul>
+              </motion.ul>
             ) : (
               <div className="p-4 text-sm text-center text-gray-500">
                 {isFetching

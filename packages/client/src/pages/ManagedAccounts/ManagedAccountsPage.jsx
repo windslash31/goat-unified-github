@@ -35,10 +35,12 @@ const ManagedAccountsPage = () => {
   const {
     data: accountsData,
     isLoading,
+    isFetching,
     error,
   } = useQuery({
     queryKey: ["managedAccounts", debouncedSearchTerm],
     queryFn: () => fetchManagedAccounts(debouncedSearchTerm),
+    keepPreviousData: true,
   });
 
   const { mutate: deleteAccountMutation, isPending: isDeleting } = useMutation({
@@ -113,6 +115,7 @@ const ManagedAccountsPage = () => {
             accounts={accountsData?.data || []}
             onEdit={(account) => openModal("managedAccountForm", account)}
             onDelete={(account) => openModal("deleteManagedAccount", account)}
+            isSearching={isFetching}
           />
         )}
       </motion.div>
