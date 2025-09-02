@@ -16,6 +16,16 @@ router.get(
   managedAccountController.getAllManagedAccounts
 );
 
+// @route   GET /api/managed-accounts/:id
+// @desc    Get a single managed account by ID
+// @access  Private (Requires 'managed_account:manage' permission)
+router.get(
+  "/:id",
+  authenticateToken,
+  authorize("managed_account:manage"),
+  managedAccountController.getManagedAccountById
+);
+
 // @route   POST /api/managed-accounts
 // @desc    Create a new managed account
 // @access  Private (Requires 'managed_account:manage' permission)

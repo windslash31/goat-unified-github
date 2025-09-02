@@ -1,8 +1,6 @@
 const pool = require("../../config/db");
-// ✨ FIX: Import the logActivity service
 const { logActivity } = require("../../services/logService");
 
-// ✨ FIX: Define action types for consistency
 const ACTION_TYPES = {
   MANAGED_ACCOUNT_CREATE: "MANAGED_ACCOUNT_CREATE",
   MANAGED_ACCOUNT_UPDATE: "MANAGED_ACCOUNT_UPDATE",
@@ -17,43 +15,52 @@ const getAllManagedAccounts = async (req, res) => {
   const offset = (page - 1) * limit;
 
   try {
-    let searchQuery = "";
-    const queryParams = [limit, offset];
+    const dataQueryParams = [limit, offset];
+    let dataSearchClause = "";
+    const countQueryParams = [];
+    let countSearchClause = "";
 
     if (search) {
-      searchQuery = `
-                WHERE ma.name ILIKE $3 OR ma.account_identifier ILIKE $3 OR ma.account_type ILIKE $3
-            `;
-      queryParams.push(`%${search}%`);
+      // Clause for the main data query, now includes owner's email
+      dataSearchClause = `WHERE ma.name ILIKE $3 OR ma.account_identifier ILIKE $3 OR ma.account_type ILIKE $3 OR e.employee_email ILIKE $3`;
+      dataQueryParams.push(`%${search}%`);
+
+      // Clause for the count query, now includes owner's email
+      countSearchClause = `WHERE ma.name ILIKE $1 OR ma.account_identifier ILIKE $1 OR ma.account_type ILIKE $1 OR e.employee_email ILIKE $1`;
+      countQueryParams.push(`%${search}%`);
     }
 
-    const result = await pool.query(
-      `
-            SELECT 
-                ma.id, 
-                ma.name, 
-                ma.account_identifier, 
-                ma.account_type, 
-                ma.description, 
-                ma.owner_employee_id,
-                e.first_name AS owner_first_name,
-                e.last_name AS owner_last_name, 
-                ma.status,
-                ma.created_at,
-                ma.updated_at
-            FROM managed_accounts ma
-            LEFT JOIN employees e ON ma.owner_employee_id = e.id
-            ${searchQuery}
-            ORDER BY ma.name
-            LIMIT $1 OFFSET $2
-        `,
-      queryParams
-    );
+    const dataQuery = `
+      SELECT 
+          ma.id, 
+          ma.name, 
+          ma.account_identifier, 
+          ma.account_type, 
+          ma.description, 
+          ma.owner_employee_id,
+          e.first_name AS owner_first_name,
+          e.last_name AS owner_last_name, 
+          e.employee_email AS owner_email,
+          ma.status,
+          ma.created_at,
+          ma.updated_at
+      FROM managed_accounts ma
+      LEFT JOIN employees e ON ma.owner_employee_id = e.id
+      ${dataSearchClause}
+      ORDER BY ma.name
+      LIMIT $1 OFFSET $2
+    `;
 
-    const totalResult = await pool.query(
-      `SELECT COUNT(*) FROM managed_accounts ma ${searchQuery}`,
-      search ? [`%${search}%`] : []
-    );
+    const countQuery = `
+      SELECT COUNT(*) 
+      FROM managed_accounts ma 
+      LEFT JOIN employees e ON ma.owner_employee_id = e.id 
+      ${countSearchClause}
+    `;
+
+    // Execute both queries
+    const result = await pool.query(dataQuery, dataQueryParams);
+    const totalResult = await pool.query(countQuery, countQueryParams);
 
     res.json({
       data: result.rows,
@@ -65,6 +72,28 @@ const getAllManagedAccounts = async (req, res) => {
     });
   } catch (error) {
     console.error("Error fetching managed accounts:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// @desc    Get a single managed account by ID
+// @route   GET /api/managed-accounts/:id
+// @access  Private (requires 'managed_account:manage' permission)
+const getManagedAccountById = async (req, res) => {
+  const { id } = req.params;
+  try {
+    const result = await pool.query(
+      "SELECT * FROM managed_accounts WHERE id = $1",
+      [id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: "Managed account not found" });
+    }
+
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error(`Error fetching managed account with ID ${id}:`, error);
     res.status(500).json({ message: "Server error" });
   }
 };
@@ -102,7 +131,6 @@ const createManagedAccount = async (req, res) => {
 
     const newAccount = newAccountResult.rows[0];
 
-    // ✨ FIX: Log the creation activity
     await logActivity(
       actorUserId,
       ACTION_TYPES.MANAGED_ACCOUNT_CREATE,
@@ -140,7 +168,6 @@ const updateManagedAccount = async (req, res) => {
   const actorUserId = req.user.id;
 
   try {
-    // ✨ FIX: Get the state *before* the update for logging
     const beforeUpdateResult = await pool.query(
       "SELECT * FROM managed_accounts WHERE id = $1",
       [id]
@@ -170,7 +197,6 @@ const updateManagedAccount = async (req, res) => {
 
     const afterState = updatedAccountResult.rows[0];
 
-    // ✨ FIX: Log the update activity with before and after states
     await logActivity(
       actorUserId,
       ACTION_TYPES.MANAGED_ACCOUNT_UPDATE,
@@ -234,6 +260,7 @@ const deleteManagedAccount = async (req, res) => {
 
 module.exports = {
   getAllManagedAccounts,
+  getManagedAccountById,
   createManagedAccount,
   updateManagedAccount,
   deleteManagedAccount,

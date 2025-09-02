@@ -8,7 +8,10 @@ const ManagedAccountsTable = ({ accounts, onEdit, onDelete }) => {
       <div className="text-center py-16 text-gray-500 dark:text-gray-400 border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-lg">
         <UserCog className="mx-auto w-12 h-12 text-gray-400" />
         <p className="font-semibold mt-4">No Managed Accounts Found</p>
-        <p className="text-sm mt-1">Click "Add Account" to get started.</p>
+        <p className="text-sm mt-1">
+          Your search returned no results, or you can click "Add Account" to get
+          started.
+        </p>
       </div>
     );
   }
@@ -70,8 +73,8 @@ const ManagedAccountsTable = ({ accounts, onEdit, onDelete }) => {
                   {acc.account_type.replace(/_/g, " ")}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                  {acc.owner_first_name ? (
-                    `${acc.owner_first_name} ${acc.owner_last_name}`
+                  {acc.owner_email ? (
+                    acc.owner_email
                   ) : (
                     <span className="text-gray-400 italic">Unassigned</span>
                   )}
