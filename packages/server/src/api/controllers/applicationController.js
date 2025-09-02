@@ -42,10 +42,9 @@ const updateApplication = async (req, res, next) => {
     if (!name) {
       return res.status(400).json({ message: "Application name is required." });
     }
-    const updatedApplication = await applicationService.updateApplication(
-      id,
-      name
-    );
+    // This now calls the correct function for the 'managed_applications' table
+    const updatedApplication =
+      await applicationService.updateManagedApplication(id, name);
     res.json(updatedApplication);
   } catch (error) {
     next(error);

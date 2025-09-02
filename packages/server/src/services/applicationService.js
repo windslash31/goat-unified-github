@@ -30,6 +30,17 @@ const deleteApplication = async (id) => {
   return { message: "Application deleted successfully." };
 };
 
+const updateManagedApplication = async (id, name) => {
+  const result = await db.query(
+    "UPDATE managed_applications SET name = $1, updated_at = NOW() WHERE id = $2 RETURNING *",
+    [name, id]
+  );
+  if (result.rows.length === 0) {
+    throw new Error("Application not found.");
+  }
+  return result.rows[0];
+};
+
 const getAllManagedApplications = async (filters = {}) => {
   let query =
     "SELECT id, name, key, integration_mode, is_licensable FROM managed_applications";
@@ -123,4 +134,5 @@ module.exports = {
   getAllManagedApplications,
   setApplicationLicensableStatus,
   onboardApplication,
+  updateManagedApplication,
 };
