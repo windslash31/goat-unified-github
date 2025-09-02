@@ -82,6 +82,12 @@ const ManagedAccountsPage = lazy(() =>
   import("./pages/ManagedAccounts/ManagedAccountsPage")
 );
 
+const NotFoundPage = lazy(() =>
+  import("./components/ui/NotFoundPage").then((module) => ({
+    default: module.NotFoundPage,
+  }))
+);
+
 const fetchMe = async () => {
   const { data } = await api.get("/api/auth/me");
   return data;
@@ -373,6 +379,21 @@ const AppContent = () => {
               ) : (
                 <Navigate to="/profile" replace />
               )
+            }
+          />
+          {/* Add the new catch-all route here */}
+          <Route
+            path="*"
+            element={
+              <Suspense
+                fallback={
+                  <div className="flex h-screen w-screen items-center justify-center text-lg">
+                    Loading...
+                  </div>
+                }
+              >
+                <NotFoundPage />
+              </Suspense>
             }
           />
         </Route>
