@@ -7,7 +7,6 @@ const createApplication = async (name) => {
   );
   return result.rows[0];
 };
-
 const updateApplication = async (id, name) => {
   const result = await db.query(
     "UPDATE internal_applications SET name = $1 WHERE id = $2 RETURNING *",
@@ -30,25 +29,28 @@ const deleteApplication = async (id) => {
   return { message: "Application deleted successfully." };
 };
 
-const updateManagedApplication = async (id, name) => {
-  const result = await db.query(
-    "UPDATE managed_applications SET name = $1, updated_at = NOW() WHERE id = $2 RETURNING *",
-    [name, id]
-  );
-  if (result.rows.length === 0) {
-    throw new Error("Application not found.");
-  }
-  return result.rows[0];
-};
-
 const getAllManagedApplications = async (filters = {}) => {
   let query =
     "SELECT id, name, key, integration_mode, is_licensable FROM managed_applications";
   const queryParams = [];
+  const whereClauses = [];
+  let paramIndex = 1;
 
   if (filters.is_licensable) {
-    query += " WHERE is_licensable = $1";
+    whereClauses.push(`is_licensable = $${paramIndex++}`);
     queryParams.push(filters.is_licensable);
+  }
+
+  if (filters.search) {
+    whereClauses.push(
+      `(name ILIKE $${paramIndex} OR key ILIKE $${paramIndex})`
+    );
+    queryParams.push(`%${filters.search}%`);
+    paramIndex++;
+  }
+
+  if (whereClauses.length > 0) {
+    query += ` WHERE ${whereClauses.join(" AND ")}`;
   }
 
   query += " ORDER BY name";
@@ -57,7 +59,6 @@ const getAllManagedApplications = async (filters = {}) => {
   return result.rows;
 };
 
-// ** NEW FUNCTION to toggle the licensable status **
 const setApplicationLicensableStatus = async (appId, isLicensable) => {
   const result = await db.query(
     "UPDATE managed_applications SET is_licensable = $1, updated_at = NOW() WHERE id = $2 RETURNING *",
@@ -66,7 +67,6 @@ const setApplicationLicensableStatus = async (appId, isLicensable) => {
   if (result.rows.length === 0) {
     throw new Error("Application not found.");
   }
-  // If we are marking it as non-licensable, we should also remove any existing license tiers.
   if (!isLicensable) {
     await db.query("DELETE FROM licenses WHERE application_id = $1", [appId]);
   }
@@ -79,7 +79,6 @@ const onboardApplication = async (appData) => {
   try {
     await client.query("BEGIN");
 
-    // Step A: Insert the main record into the managed_applications table
     const managedAppQuery = `
       INSERT INTO managed_applications (name, key, integration_mode, jumpcloud_app_id)
       VALUES ($1, $2, $3, $4)
@@ -94,7 +93,6 @@ const onboardApplication = async (appData) => {
 
     const newApplication = managedAppResult.rows[0];
 
-    // Step B: Create a default "primary" instance for the new application
     const appInstanceQuery = `
       INSERT INTO app_instances (application_id, display_name, is_primary)
       VALUES ($1, $2, true);
@@ -108,9 +106,7 @@ const onboardApplication = async (appData) => {
     return newApplication;
   } catch (err) {
     await client.query("ROLLBACK");
-    // Provide a user-friendly error if the name or key already exists
     if (err.code === "23505") {
-      // PostgreSQL unique violation error code
       if (err.constraint.includes("managed_applications_key_key")) {
         throw new Error(`An application with the key "${key}" already exists.`);
       }
@@ -126,7 +122,17 @@ const onboardApplication = async (appData) => {
   }
 };
 
-// 2. ADD the new function to the exports
+const updateManagedApplication = async (id, name) => {
+  const result = await db.query(
+    "UPDATE managed_applications SET name = $1, updated_at = NOW() WHERE id = $2 RETURNING *",
+    [name, id]
+  );
+  if (result.rows.length === 0) {
+    throw new Error("Application not found.");
+  }
+  return result.rows[0];
+};
+
 module.exports = {
   createApplication,
   updateApplication,
