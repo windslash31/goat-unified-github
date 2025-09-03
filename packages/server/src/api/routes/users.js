@@ -6,6 +6,8 @@ const {
   authorize,
 } = require("../middleware/authMiddleware");
 const rateLimit = require("express-rate-limit");
+const { validate } = require("../middleware/validationMiddleware"); // Import the middleware
+const { createUserSchema } = require("../schemas/userSchemas"); // Import the schema
 
 const userActionLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
@@ -32,6 +34,7 @@ router.post(
   "/",
   authenticateToken,
   authorize("user:create"),
+  validate(createUserSchema), // Apply the validation middleware here
   userController.createUser
 );
 
