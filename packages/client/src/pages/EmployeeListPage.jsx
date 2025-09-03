@@ -15,8 +15,10 @@ import {
   Upload,
   Loader,
   MoreVertical,
+  Users,
 } from "lucide-react";
 import toast from "react-hot-toast";
+import { useQueryClient, useMutation } from "@tanstack/react-query";
 import { Button } from "../components/ui/Button";
 import { FilterPopover } from "../components/ui/FilterPopover";
 import { Pagination } from "../components/ui/Pagination";
@@ -33,6 +35,8 @@ import { EmployeeListSkeleton } from "../components/ui/EmployeeListSkeleton";
 import { DesktopTable } from "../components/employees/DesktopTable";
 import { MobileList } from "../components/employees/MobileList";
 import { useDebounce } from "../hooks/useDebounce";
+import { useModalStore } from "../stores/modalStore";
+import { BulkUpdateStatusModal } from "../components/ui/BulkUpdateStatusModal";
 
 const SearchAndFilterActions = memo(
   ({
@@ -60,7 +64,6 @@ const SearchAndFilterActions = memo(
       onSearchChange(debouncedSearchTerm);
     }, [debouncedSearchTerm, onSearchChange]);
 
-    // Sync local state if filters are cleared externally
     useEffect(() => {
       if (initialSearch !== searchInputValue) {
         setSearchInputValue(initialSearch);
@@ -203,7 +206,8 @@ export const EmployeeListPage = () => {
     isLoading,
   } = useEmployeeTable();
 
-  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const { openModal, closeModal, modal } = useModalStore();
+  const queryClient = useQueryClient();
   const [selectedRows, setSelectedRows] = useState(new Set());
   const [isBulkActionMenuOpen, setIsBulkActionMenuOpen] = useState(false);
   const [isHeaderMinimized, setIsHeaderMinimized] = useState(false);
@@ -236,6 +240,12 @@ export const EmployeeListPage = () => {
   useEffect(() => {
     setSelectedRows(new Set());
   }, [filters, pagination.currentPage, employees]);
+
+  useEffect(() => {
+    if (selectedRows.size === 0) {
+      setIsBulkActionMenuOpen(false);
+    }
+  }, [selectedRows]);
 
   const handleSearchChange = useCallback(
     (searchTerm) => {
@@ -289,7 +299,7 @@ export const EmployeeListPage = () => {
 
   const areAdvancedFiltersActive = useMemo(() => {
     return Object.entries(filters)
-      .filter(([key]) => key !== "search") // Exclude the 'search' filter
+      .filter(([key]) => key !== "search")
       .some(([, value]) => !!value && value !== "all");
   }, [filters]);
 
@@ -328,6 +338,12 @@ export const EmployeeListPage = () => {
     });
   };
 
+  const handleBulkUpdateSuccess = () => {
+    closeModal();
+    queryClient.invalidateQueries({ queryKey: ["employees"] });
+    setSelectedRows(new Set());
+  };
+
   if (isLoading && !employees.length) {
     return (
       <div className="p-4 sm:p-6">
@@ -352,149 +368,183 @@ export const EmployeeListPage = () => {
     setFilters: setFilters,
     handleClearFilters: handleClearFilters,
     handleExport: handleExport,
-    setIsImportModalOpen: setIsImportModalOpen,
+    setIsImportModalOpen: (isOpen) =>
+      openModal(isOpen ? "importEmployee" : null),
   };
-  // --- MODIFICATION END ---
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -20 }}
-      transition={{ duration: 0.3 }}
-      className="p-4 sm:p-6"
-      ref={pageRef}
-    >
-      {!isDesktop && (
-        <AnimatePresence>
-          {isHeaderMinimized && (
-            <motion.div
-              key="sticky-header"
-              initial={{ y: -70, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: -70, opacity: 0 }}
-              transition={{ type: "spring", stiffness: 400, damping: 40 }}
-              className="fixed top-16 left-0 right-0 p-4 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border-b border-gray-200 dark:border-gray-700 z-20 flex items-center gap-2"
-            >
-              <SearchAndFilterActions
-                {...searchFilterProps}
-                isMinimized={true}
-                isMobile={true}
-              />
-            </motion.div>
-          )}
-        </AnimatePresence>
-      )}
-
-      <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mb-2 min-h-[40px]">
-        {isDesktop && selectedRows.size > 0 ? (
-          <div className="w-full flex justify-between items-center bg-kredivo-light p-2 rounded-lg">
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setSelectedRows(new Set())}
-                className="p-2 text-kredivo-dark-text rounded-full hover:bg-kredivo-primary/20"
+    <>
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -20 }}
+        transition={{ duration: 0.3 }}
+        className="p-4 sm:p-6"
+        ref={pageRef}
+      >
+        {!isDesktop && (
+          <AnimatePresence>
+            {isHeaderMinimized && (
+              <motion.div
+                key="sticky-header"
+                initial={{ y: -70, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                exit={{ y: -70, opacity: 0 }}
+                transition={{ type: "spring", stiffness: 400, damping: 40 }}
+                className="fixed top-16 left-0 right-0 p-4 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border-b border-gray-200 dark:border-gray-700 z-20 flex items-center gap-2"
               >
-                <X className="w-5 h-5" />
-              </button>
-              <span className="font-semibold text-kredivo-dark-text">
-                {selectedRows.size} selected
-              </span>
-            </div>
-            <div className="relative">
-              <Button
-                onClick={() => setIsBulkActionMenuOpen((prev) => !prev)}
-                variant="primary"
-              >
-                Actions
-              </Button>
-              {isBulkActionMenuOpen && (
-                <div className="absolute top-full right-0 mt-2 w-56 bg-white dark:bg-gray-800 border dark:border-gray-700 rounded-lg shadow-xl z-20">
-                  <ul>
-                    <li>
-                      <button
-                        onClick={handleBulkDeactivate}
-                        className="w-full text-left flex items-center gap-3 px-4 py-2 text-sm text-red-500 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/50"
-                      >
-                        <Trash2 className="w-4 h-4" /> Deactivate Selected
-                      </button>
-                    </li>
-                  </ul>
-                </div>
-              )}
-            </div>
-          </div>
-        ) : (
-          <>
-            <AnimatePresence>
-              {!isHeaderMinimized || isDesktop ? (
-                <motion.div
-                  key="full-header"
-                  initial={false}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -20 }}
-                  transition={{ duration: 0.2 }}
-                  className="w-full flex flex-col sm:flex-row justify-between items-center gap-4"
-                >
-                  <h1 className="text-2xl font-bold text-gray-900 dark:text-white self-start sm:self-center">
-                    Employees
-                  </h1>
-                  <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap">
-                    <SearchAndFilterActions
-                      {...searchFilterProps}
-                      isMobile={!isDesktop}
-                    />
-                  </div>
-                </motion.div>
-              ) : (
-                <div className="min-h-[56px] w-full" />
-              )}
-            </AnimatePresence>
-          </>
+                <SearchAndFilterActions
+                  {...searchFilterProps}
+                  isMinimized={true}
+                  isMobile={true}
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>
         )}
-      </div>
 
-      <FilterPills
-        filters={filters}
-        setFilters={setFilters}
-        options={filterOptions}
-        onClear={handleClearFilters}
-      />
-
-      <div className="mt-2">
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
-          <StatusQuickFilters
-            currentStatus={filters.status}
-            onStatusChange={(status) => {
-              setFilters((prev) => ({ ...prev, status }));
-            }}
-          />
-
-          {employees.length > 0 ? (
-            isDesktop ? (
-              <DesktopTable
-                employees={employees}
-                sorting={sorting}
-                setSorting={setSorting}
-                selectedRows={selectedRows}
-                handleSelectAll={handleSelectAll}
-                handleSelectRow={handleSelectRow}
-              />
-            ) : (
-              <MobileList employees={employees} />
-            )
+        <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mb-2 min-h-[40px]">
+          {isDesktop && selectedRows.size > 0 ? (
+            <div className="w-full flex justify-between items-center bg-kredivo-light p-2 rounded-lg">
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setSelectedRows(new Set())}
+                  className="p-2 text-kredivo-dark-text rounded-full hover:bg-kredivo-primary/20"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+                <span className="font-semibold text-kredivo-dark-text">
+                  {selectedRows.size} selected
+                </span>
+              </div>
+              <div className="relative">
+                <Button
+                  onClick={() => setIsBulkActionMenuOpen((prev) => !prev)}
+                  variant="primary"
+                >
+                  Actions
+                </Button>
+                <AnimatePresence>
+                  {isBulkActionMenuOpen && (
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.95, y: -10 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.95, y: -10 }}
+                      transition={{ duration: 0.15 }}
+                      className="absolute top-full right-0 mt-2 w-56 bg-white dark:bg-gray-800 border dark:border-gray-700 rounded-lg shadow-xl z-20"
+                    >
+                      <ul>
+                        <li>
+                          <button
+                            onClick={() => {
+                              openModal("bulkUpdateStatus");
+                              setIsBulkActionMenuOpen(false);
+                            }}
+                            className="w-full text-left flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+                          >
+                            <Users className="w-4 h-4" /> Change Status
+                          </button>
+                        </li>
+                        <li>
+                          <button
+                            onClick={handleBulkDeactivate}
+                            className="w-full text-left flex items-center gap-3 px-4 py-2 text-sm text-red-500 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/50"
+                          >
+                            <Trash2 className="w-4 h-4" /> Deactivate Selected
+                          </button>
+                        </li>
+                      </ul>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            </div>
           ) : (
-            <EmptyState />
-          )}
-
-          {employees.length > 0 && (
-            <Pagination pagination={pagination} setPagination={setPagination} />
+            <>
+              <AnimatePresence>
+                {!isHeaderMinimized || isDesktop ? (
+                  <motion.div
+                    key="full-header"
+                    initial={false}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -20 }}
+                    transition={{ duration: 0.2 }}
+                    className="w-full flex flex-col sm:flex-row justify-between items-center gap-4"
+                  >
+                    <h1 className="text-2xl font-bold text-gray-900 dark:text-white self-start sm:self-center">
+                      Employees
+                    </h1>
+                    <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap">
+                      <SearchAndFilterActions
+                        {...searchFilterProps}
+                        isMobile={!isDesktop}
+                        setIsImportModalOpen={(isOpen) =>
+                          openModal(isOpen ? "importEmployee" : null)
+                        }
+                      />
+                    </div>
+                  </motion.div>
+                ) : (
+                  <div className="min-h-[56px] w-full" />
+                )}
+              </AnimatePresence>
+            </>
           )}
         </div>
-      </div>
-      <EmployeeImportModal
-        isOpen={isImportModalOpen}
-        onClose={() => setIsImportModalOpen(false)}
-      />
-    </motion.div>
+
+        <FilterPills
+          filters={filters}
+          setFilters={setFilters}
+          options={filterOptions}
+          onClear={handleClearFilters}
+        />
+
+        <div className="mt-2">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+            <StatusQuickFilters
+              currentStatus={filters.status}
+              onStatusChange={(status) => {
+                setFilters((prev) => ({ ...prev, status }));
+              }}
+            />
+
+            {employees.length > 0 ? (
+              isDesktop ? (
+                <DesktopTable
+                  employees={employees}
+                  sorting={sorting}
+                  setSorting={setSorting}
+                  selectedRows={selectedRows}
+                  handleSelectAll={handleSelectAll}
+                  handleSelectRow={handleSelectRow}
+                />
+              ) : (
+                <MobileList employees={employees} />
+              )
+            ) : (
+              <EmptyState />
+            )}
+
+            {employees.length > 0 && (
+              <Pagination
+                pagination={pagination}
+                setPagination={setPagination}
+              />
+            )}
+          </div>
+        </div>
+      </motion.div>
+
+      {modal === "importEmployee" && (
+        <EmployeeImportModal isOpen={true} onClose={closeModal} />
+      )}
+      {modal === "bulkUpdateStatus" && (
+        <BulkUpdateStatusModal
+          selectedIds={Array.from(selectedRows)}
+          onClose={closeModal}
+          onSuccess={handleBulkUpdateSuccess}
+        />
+      )}
+    </>
   );
 };

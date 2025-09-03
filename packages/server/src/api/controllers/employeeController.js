@@ -500,6 +500,33 @@ const removeProvisionedAccount = async (req, res, next) => {
   }
 };
 
+const bulkUpdateEmployees = async (req, res, next) => {
+  try {
+    const { employeeIds, updateData } = req.body;
+    if (
+      !employeeIds ||
+      !updateData ||
+      !Array.isArray(employeeIds) ||
+      employeeIds.length === 0
+    ) {
+      return res.status(400).json({
+        message:
+          "Invalid request body. 'employeeIds' array and 'updateData' object are required.",
+      });
+    }
+    const reqContext = { ip: req.ip, userAgent: req.headers["user-agent"] };
+    const result = await employeeService.bulkUpdateEmployees(
+      employeeIds,
+      updateData,
+      req.user.id,
+      reqContext
+    );
+    res.status(200).json(result);
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   listEmployees,
   getEmployee,
@@ -528,4 +555,5 @@ module.exports = {
   reconcileManagers,
   removeProvisionedAccount,
   searchEmployeeOptions,
+  bulkUpdateEmployees,
 };

@@ -1663,6 +1663,57 @@ const removeUserAccount = async (userAccountId, actorId, reqContext) => {
   }
 };
 
+const bulkUpdateEmployees = async (
+  employeeIds,
+  updateData,
+  actorId,
+  reqContext
+) => {
+  const client = await db.pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    const validKeys = ["office_location_id", "is_active"]; // Whitelist of keys that can be updated
+    const updateKey = Object.keys(updateData)[0];
+    const updateValue = updateData[updateKey];
+
+    if (!validKeys.includes(updateKey)) {
+      throw new Error("Invalid field provided for bulk update.");
+    }
+
+    const updateQuery = `UPDATE employees SET ${updateKey} = $1, updated_at = NOW() WHERE id = ANY($2::int[])`;
+    const result = await client.query(updateQuery, [updateValue, employeeIds]);
+
+    if (result.rowCount !== employeeIds.length) {
+      console.warn(
+        `Bulk update expected to change ${employeeIds.length} rows, but changed ${result.rowCount}. Some employees may not have been found.`
+      );
+    }
+
+    await logActivity(
+      actorId,
+      "BULK_EMPLOYEE_UPDATE",
+      {
+        targetEmployeeIds: employeeIds,
+        changes: { [updateKey]: updateValue },
+      },
+      reqContext,
+      client
+    );
+
+    await client.query("COMMIT");
+    return {
+      success: true,
+      message: `${result.rowCount} employee(s) were successfully updated.`,
+    };
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
+};
+
 module.exports = {
   getEmployeeById,
   getEmployees,
@@ -1691,4 +1742,5 @@ module.exports = {
   getJumpCloudSsoAppDetails,
   removeUserAccount,
   searchActiveEmployees,
+  bulkUpdateEmployees,
 };

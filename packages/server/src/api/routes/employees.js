@@ -195,6 +195,13 @@ router.get(
 );
 
 router.post(
+  "/bulk-update",
+  authenticateToken,
+  authorize("employee:update"),
+  employeeController.bulkUpdateEmployees
+);
+
+router.post(
   "/trigger-sync",
   // We will secure this in the Cloud Run settings, so no specific middleware is needed here.
   employeeController.triggerPlatformSync
