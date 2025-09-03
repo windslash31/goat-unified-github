@@ -40,12 +40,10 @@ export const SettingsPage = () => {
 
   const isSettingsHome = location.pathname === "/settings";
 
-  // If we are on a sub-page, just render the Outlet directly
   if (!isSettingsHome) {
     return <Outlet />;
   }
 
-  // Otherwise, render the main settings menu page
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -54,43 +52,60 @@ export const SettingsPage = () => {
       transition={{ duration: 0.3 }}
       className="p-6"
     >
-      <div className="mb-6">
+      <div className="mb-8">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
           Settings
         </h1>
         <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-          Manage application users and their permissions.
+          Manage application users, permissions, and system configurations.
         </p>
       </div>
-      <div className="max-w-2xl mx-auto space-y-4">
-        {canViewUsers && (
-          <SettingsCard
-            title="User Management"
-            description="Create users and assign them to roles."
-            icon={<User className="w-6 h-6" />}
-            path="/settings/users"
-          />
-        )}
-        {canViewRoles && (
-          <SettingsCard
-            title="Roles & Permissions"
-            description="Define what users can see and do."
-            icon={<Shield className="w-6 h-6" />}
-            path="/settings/roles"
-          />
-        )}
-        <SettingsCard
-          title="Application Management"
-          description="Add or remove internal applications."
-          icon={<Briefcase className="w-6 h-6" />}
-          path="/settings/applications"
-        />
-        <SettingsCard
-          title="Data Synchronization"
-          description="Monitor and manage background sync jobs."
-          icon={<RefreshCw className="w-6 h-6" />}
-          path="/settings/sync"
-        />
+      <div className="max-w-3xl mx-auto space-y-8">
+        {/* Access Control Section */}
+        <div>
+          <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-4">
+            Access Control
+          </h2>
+          <div className="space-y-4">
+            {canViewUsers && (
+              <SettingsCard
+                title="User Management"
+                description="Create users and assign them to roles."
+                icon={<User className="w-6 h-6" />}
+                path="/settings/users"
+              />
+            )}
+            {canViewRoles && (
+              <SettingsCard
+                title="Roles & Permissions"
+                description="Define what users can see and do."
+                icon={<Shield className="w-6 h-6" />}
+                path="/settings/roles"
+              />
+            )}
+          </div>
+        </div>
+
+        {/* System Administration Section */}
+        <div>
+          <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-4">
+            System Administration
+          </h2>
+          <div className="space-y-4">
+            <SettingsCard
+              title="Application Management"
+              description="Add or remove internal applications."
+              icon={<Briefcase className="w-6 h-6" />}
+              path="/settings/applications"
+            />
+            <SettingsCard
+              title="Data Synchronization"
+              description="Monitor and manage background sync jobs."
+              icon={<RefreshCw className="w-6 h-6" />}
+              path="/settings/sync"
+            />
+          </div>
+        </div>
       </div>
     </motion.div>
   );

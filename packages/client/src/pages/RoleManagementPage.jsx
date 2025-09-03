@@ -16,7 +16,7 @@ import { RoleManagementSkeleton } from "../components/ui/RoleManagementSkeleton"
 
 const permissionGroups = [
   {
-    title: "Application Access",
+    title: "General Page Access",
     permissions: [
       {
         name: "dashboard:view",
@@ -62,7 +62,7 @@ const permissionGroups = [
     ],
   },
   {
-    title: "User & Role Management",
+    title: "Administration",
     permissions: [
       {
         name: "user:create",
@@ -83,11 +83,6 @@ const permissionGroups = [
         description:
           "Allows creating, deleting, and changing the permissions for a role.",
       },
-    ],
-  },
-  {
-    title: "Application Management",
-    permissions: [
       {
         name: "admin:manage_applications",
         description:
