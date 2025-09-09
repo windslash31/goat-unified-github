@@ -1,12 +1,11 @@
 import React from "react";
 import { motion } from "framer-motion";
-import { FileText, Download, Loader } from "lucide-react"; // <-- Import Loader
-import { Button } from "../components/ui/Button";
-import api from "../api/api"; // <-- Import api
-import toast from "react-hot-toast"; // <-- Import toast
+import { FileText } from "lucide-react";
+import api from "../api/api";
+import toast from "react-hot-toast";
+import { DownloadDropdown } from "../components/ui/DownloadDropdown";
 
 const ReportCard = ({ title, description, onDownload, isDownloading }) => {
-  // <-- Add isDownloading prop
   return (
     <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 flex flex-col sm:flex-row justify-between sm:items-center gap-4">
       <div className="flex items-center">
@@ -22,47 +21,37 @@ const ReportCard = ({ title, description, onDownload, isDownloading }) => {
           </p>
         </div>
       </div>
-      <Button
-        onClick={onDownload}
-        variant="secondary"
-        className="w-full sm:w-auto justify-center"
-        disabled={isDownloading} // <-- Disable button while downloading
-      >
-        {isDownloading ? (
-          <Loader className="w-4 h-4 mr-2 animate-spin" />
-        ) : (
-          <Download className="w-4 h-4 mr-2" />
-        )}
-        {isDownloading ? "Generating..." : "Download PDF"}
-      </Button>
+      <DownloadDropdown onSelect={onDownload} isDownloading={isDownloading} />
     </div>
   );
 };
 
 export const ReportsPage = () => {
-  // --- MODIFICATION START: Add downloading state and API call logic ---
   const [isDownloading, setIsDownloading] = React.useState(false);
 
-  const handleDownloadUAR = async () => {
+  const handleDownload = async (format) => {
+    const toastId = `uar-report-${format}`;
     setIsDownloading(true);
-    toast.loading("Generating your report...", { id: "uar-report" });
+    toast.loading(`Generating your ${format.toUpperCase()} report...`, {
+      id: toastId,
+    });
 
     try {
       const response = await api.get(
-        "/api/employees/reports/user-access-review",
+        `/api/employees/reports/user-access-review?format=${format}`,
         {
-          responseType: "blob", // Important: tells axios to handle the response as a file
+          responseType: "blob",
         }
       );
 
-      // Create a URL for the blob
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement("a");
       link.href = url;
 
-      // Get filename from content-disposition header
       const disposition = response.headers["content-disposition"];
-      let filename = `UAR-Report-${new Date().toISOString().split("T")[0]}.pdf`;
+      let filename = `UAR-Report-${new Date().toISOString().split("T")[0]}.${
+        format === "excel" ? "xlsx" : format
+      }`;
       if (disposition && disposition.indexOf("attachment") !== -1) {
         const filenameRegex = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/;
         const matches = filenameRegex.exec(disposition);
@@ -72,26 +61,20 @@ export const ReportsPage = () => {
       }
 
       link.setAttribute("download", filename);
-
-      // Append to html link element page
       document.body.appendChild(link);
-
-      // Start download
       link.click();
 
-      // Clean up and remove the link
       link.parentNode.removeChild(link);
       window.URL.revokeObjectURL(url);
 
-      toast.success("Report downloaded successfully!", { id: "uar-report" });
+      toast.success("Report downloaded successfully!", { id: toastId });
     } catch (error) {
       console.error("Failed to download report:", error);
-      toast.error("Failed to download report.", { id: "uar-report" });
+      toast.error("Failed to download report.", { id: toastId });
     } finally {
       setIsDownloading(false);
     }
   };
-  // --- MODIFICATION END ---
 
   return (
     <motion.div
@@ -115,8 +98,8 @@ export const ReportsPage = () => {
         <ReportCard
           title="User Access Review (UAR)"
           description="A detailed report of all users and their access to all applications. Essential for ISO 27001 and SOC2 audits."
-          onDownload={handleDownloadUAR}
-          isDownloading={isDownloading} // Pass state to the card
+          onDownload={handleDownload}
+          isDownloading={isDownloading}
         />
       </div>
     </motion.div>

@@ -9,6 +9,8 @@ const googleWorkspaceService = require("./googleService");
 const slackService = require("./slackService");
 const atlassianService = require("./atlassianService");
 const PDFDocument = require("pdfkit");
+const ExcelJS = require("exceljs");
+const { Parser } = require("json2csv");
 
 const optionsCache = {
   data: {},
@@ -1782,6 +1784,70 @@ const generateUarPdf = (data, stream) => {
   doc.end();
 };
 
+const generateUarExcel = async (data, stream) => {
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = "G.O.A.T Platform";
+  workbook.created = new Date();
+
+  const worksheet = workbook.addWorksheet("User Access Review");
+
+  // Define columns with headers and keys
+  worksheet.columns = [
+    { header: "First Name", key: "first_name", width: 20 },
+    { header: "Last Name", key: "last_name", width: 20 },
+    { header: "Email", key: "employee_email", width: 35 },
+    { header: "Status", key: "status", width: 15 },
+    { header: "Application", key: "application_name", width: 30 },
+    { header: "License Tier", key: "license_tier", width: 20 },
+  ];
+
+  // Style the header row
+  worksheet.getRow(1).font = { bold: true, size: 12 };
+  worksheet.getRow(1).fill = {
+    type: "pattern",
+    pattern: "solid",
+    fgColor: { argb: "FFD3D3D3" }, // A light gray
+  };
+
+  // Add the data rows
+  worksheet.addRows(data);
+
+  // Write to the stream (which will be the HTTP response)
+  await workbook.xlsx.write(stream);
+  stream.end();
+};
+
+const generateUarCsv = (data) => {
+  const fields = [
+    "first_name",
+    "last_name",
+    "employee_email",
+    "status",
+    "application_name",
+    "license_tier",
+  ];
+  const json2csvParser = new Parser({ fields });
+  const csv = json2csvParser.parse(data);
+  return csv;
+};
+
+const generateUarReport = async (format, stream) => {
+  const data = await getUserAccessReviewData(); // Fetch the data once
+  switch (format) {
+    case "pdf":
+      return generateUarPdf(data, stream);
+    case "excel":
+      return await generateUarExcel(data, stream);
+    case "csv":
+      const csvData = generateUarCsv(data);
+      stream.write(csvData);
+      stream.end();
+      break;
+    default:
+      throw new Error("Unsupported report format");
+  }
+};
+
 module.exports = {
   getEmployeeById,
   getEmployees,
@@ -1812,4 +1878,7 @@ module.exports = {
   searchActiveEmployees,
   getUserAccessReviewData,
   generateUarPdf,
+  generateUarExcel,
+  generateUarCsv,
+  generateUarReport,
 };

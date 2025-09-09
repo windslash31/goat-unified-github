@@ -20,9 +20,20 @@ const listEmployees = async (req, res, next) => {
   }
 };
 
+const getAccessMatrix = async (req, res, next) => {
+  try {
+    const matrixDataWithPagination = await employeeService.getAccessMatrix(
+      req.query
+    );
+    res.json(matrixDataWithPagination);
+  } catch (error) {
+    next(error);
+  }
+};
+
 const searchEmployeeOptions = async (req, res, next) => {
   try {
-    const { q, page = 1, limit = 20 } = req.query; // Search term and pagination params
+    const { q, page = 1, limit = 20 } = req.query;
     const data = await employeeService.searchActiveEmployees(
       q,
       parseInt(page),
@@ -364,8 +375,6 @@ const getEmployeeDevices = async (req, res, next) => {
 const syncPlatformStatus = async (req, res, next) => {
   try {
     const { id } = req.params;
-    // --- THIS IS THE NEW "FORCE REFRESH" LOGIC ---
-    // It calls the new service function to perform a live sync
     const updatedStatuses = await employeeService.forceSyncPlatformStatus(
       parseInt(id, 10)
     );
@@ -388,9 +397,8 @@ const triggerPlatformSync = async (req, res, next) => {
     .json({ message: "Platform sync job triggered successfully." });
 
   try {
-    // Correctly import the function from the cron file
     const { syncAllUserStatuses } = require("../../cron/platformSync");
-    await syncAllUserStatuses(); // Call the correct function
+    await syncAllUserStatuses();
   } catch (error) {
     console.error("CRON-TRIGGER: The triggered sync job failed.", error);
   }
@@ -440,7 +448,6 @@ const getApplicationAccessDetails = async (req, res, next) => {
     const employeeEmail = req.employee.employee_email;
     let details;
 
-    // Handle direct platform integrations
     if (platformKey === "google") {
       details = await googleService.getUserStatus(employeeEmail);
     } else if (platformKey === "slack") {
@@ -459,7 +466,6 @@ const getApplicationAccessDetails = async (req, res, next) => {
     } else if (platformKey === "jumpcloud") {
       details = await jumpcloudService.getUserStatus(employeeEmail);
     } else {
-      // Handle other managed applications (like JumpCloud SSO apps)
       const appRes = await db.query(
         "SELECT id, jumpcloud_app_id FROM managed_applications WHERE name = $1",
         [platformKey]
@@ -502,15 +508,38 @@ const removeProvisionedAccount = async (req, res, next) => {
 
 const getUserAccessReviewReport = async (req, res, next) => {
   try {
-    const reportData = await employeeService.getUserAccessReviewData();
+    const { format } = req.query; // e.g., ?format=pdf
+    const formatMap = {
+      pdf: {
+        contentType: "application/pdf",
+        extension: "pdf",
+      },
+      excel: {
+        contentType:
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        extension: "xlsx",
+      },
+      csv: {
+        contentType: "text/csv",
+        extension: "csv",
+      },
+    };
 
-    // Set headers for PDF download
-    const filename = `UAR-Report-${new Date().toISOString().split("T")[0]}.pdf`;
-    res.setHeader("Content-disposition", `attachment; filename="${filename}"`);
-    res.setHeader("Content-type", "application/pdf");
+    const selectedFormat = formatMap[format];
+    if (!selectedFormat) {
+      return res.status(400).json({
+        message:
+          "Invalid format requested. Please specify format=pdf, format=excel, or format=csv.",
+      });
+    }
 
-    // Stream the PDF to the response
-    employeeService.generateUarPdf(reportData, res);
+    const filename = `UAR-Report-${new Date().toISOString().split("T")[0]}.${
+      selectedFormat.extension
+    }`;
+    res.setHeader("Content-Type", selectedFormat.contentType);
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+
+    await employeeService.generateUarReport(format, res);
   } catch (error) {
     next(error);
   }
@@ -544,5 +573,6 @@ module.exports = {
   reconcileManagers,
   removeProvisionedAccount,
   searchEmployeeOptions,
+  getAccessMatrix,
   getUserAccessReviewReport,
 };

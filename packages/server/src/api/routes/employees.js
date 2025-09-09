@@ -1,7 +1,39 @@
 const express = require("express");
 const router = express.Router();
 const multer = require("multer");
-const employeeController = require("../controllers/employeeController");
+const {
+  listEmployees,
+  getEmployee,
+  updateEmployee,
+  onboardFromTicket,
+  offboardFromTicket,
+  createApplicationAccess,
+  logEmployeeView,
+  getEmployeeOptions,
+  deactivateOnPlatforms,
+  bulkDeactivateOnPlatforms,
+  getPlatformStatuses,
+  getPlatformLogs,
+  getUnifiedTimeline,
+  exportEmployees,
+  getLicenseDetails,
+  bulkImportEmployees,
+  getEmployeeImportTemplate,
+  getEmployeeDevices,
+  syncPlatformStatus,
+  triggerPlatformSync,
+  getEmployeeAtlassianAccess,
+  getEmployeeApplicationAccess,
+  getApplicationAccessDetails,
+  onboardDeferred,
+  reconcileManagers,
+  removeProvisionedAccount,
+  searchEmployeeOptions,
+  getAccessMatrix,
+  getUserAccessReviewReport,
+  getUserAccessReviewReportExcel,
+  getUserAccessReviewReportCsv,
+} = require("../controllers/employeeController");
 const {
   authenticateToken,
   authenticateApiKey,
@@ -29,45 +61,54 @@ router.get(
   "/options/search",
   authenticateToken,
   authorize("employee:read:all"),
-  employeeController.searchEmployeeOptions
+  searchEmployeeOptions
 );
 
 router.post(
   "/onboard",
   authenticateApiKey,
   authorize("employee:create"),
-  employeeController.onboardFromTicket
+  onboardFromTicket
 );
 router.post(
   "/offboard",
   authenticateApiKey,
   authorize("employee:update"),
-  employeeController.offboardFromTicket
+  offboardFromTicket
 );
 router.post(
   "/application-access",
   authenticateApiKey,
   authorize("employee:update"),
-  employeeController.createApplicationAccess
+  createApplicationAccess
 );
 
 router.get(
   "/",
   authenticateToken,
   authorize("employee:read:all"),
-  employeeController.listEmployees
+  listEmployees
 );
+
+router.get(
+  "/access-matrix",
+  authenticateToken,
+  authorize("employee:read:all"),
+  getAccessMatrix
+);
+
 router.get(
   "/reports/user-access-review",
   authenticateToken,
   authorize("log:read"),
-  employeeController.getUserAccessReviewReport
+  getUserAccessReviewReport
 );
+
 router.get(
   "/export",
   authenticateToken,
   authorize("employee:read:all"),
-  employeeController.exportEmployees
+  exportEmployees
 );
 
 router.post(
@@ -75,140 +116,124 @@ router.post(
   authenticateToken,
   authorize("employee:create"),
   upload.single("file"),
-  employeeController.bulkImportEmployees
+  bulkImportEmployees
 );
 
 router.get(
   "/template/csv",
   authenticateToken,
   authorize("employee:create"),
-  employeeController.getEmployeeImportTemplate
+  getEmployeeImportTemplate
 );
 
-router.get(
-  "/:id",
-  authenticateToken,
-  authorizeAdminOrSelf,
-  employeeController.getEmployee
-);
+router.get("/:id", authenticateToken, authorizeAdminOrSelf, getEmployee);
 router.put(
   "/:id",
   authenticateToken,
   authorize("employee:update"),
-  employeeController.updateEmployee
+  updateEmployee
 );
 
 router.post(
   "/:id/sync-status",
   authenticateToken,
   authorize("employee:update"),
-  employeeController.syncPlatformStatus
+  syncPlatformStatus
 );
 
 router.get(
   "/:id/application-access",
   authenticateToken,
   authorizeAdminOrSelf,
-  employeeController.getEmployeeApplicationAccess
-);
-
-router.post(
-  "/:id/sync-status",
-  authenticateToken,
-  authorize("employee:update"),
-  employeeController.syncPlatformStatus
+  getEmployeeApplicationAccess
 );
 
 router.get(
   "/:id/licenses",
   authenticateToken,
   authorizeAdminOrSelf,
-  employeeController.getLicenseDetails
+  getLicenseDetails
 );
 
 router.get(
   "/:id/platform-statuses",
   authenticateToken,
   authorizeAdminOrSelf,
-  employeeController.getPlatformStatuses
+  getPlatformStatuses
 );
 router.get(
   "/:id/platform-logs",
   authenticateToken,
   authorizeAdminOrSelfForLogs,
-  employeeController.getPlatformLogs
+  getPlatformLogs
 );
 router.get(
   "/:id/unified-timeline",
   authenticateToken,
   authorizeAdminOrSelfForLogs,
-  employeeController.getUnifiedTimeline
+  getUnifiedTimeline
 );
 router.post(
   "/:id/deactivate",
   authenticateToken,
   authorize("employee:deactivate"),
-  employeeController.deactivateOnPlatforms
+  deactivateOnPlatforms
 );
 
 router.post(
   "/logs/view",
   authenticateToken,
   authorize("employee:read:all"),
-  employeeController.logEmployeeView
+  logEmployeeView
 );
 router.post(
   "/onboard-deferred",
   authenticateApiKey,
   authorize("employee:create"),
-  employeeController.onboardDeferred
+  onboardDeferred
 );
 router.post(
   "/reconcile-managers",
   authenticateApiKey,
   authorize("employee:create"),
-  employeeController.reconcileManagers
+  reconcileManagers
 );
 
 router.get(
   "/options/:table",
   authenticateToken,
   authorize("employee:read:all"),
-  employeeController.getEmployeeOptions
+  getEmployeeOptions
 );
 
 router.post(
   "/bulk-deactivate",
   authenticateToken,
   authorize("employee:deactivate"),
-  employeeController.bulkDeactivateOnPlatforms
+  bulkDeactivateOnPlatforms
 );
 
 router.get(
   "/:id/devices",
   authenticateToken,
   authorizeAdminOrSelf,
-  employeeController.getEmployeeDevices
+  getEmployeeDevices
 );
 
 router.get(
   "/:id/access-details/:platformKey",
   authenticateToken,
   authorizeAdminOrSelf,
-  employeeController.getApplicationAccessDetails
+  getApplicationAccessDetails
 );
 
-router.post(
-  "/trigger-sync",
-  // We will secure this in the Cloud Run settings, so no specific middleware is needed here.
-  employeeController.triggerPlatformSync
-);
+router.post("/trigger-sync", triggerPlatformSync);
 
 router.delete(
   "/:employeeId/accounts/:accountId",
   authenticateToken,
   authorize("employee:update"),
-  employeeController.removeProvisionedAccount
+  removeProvisionedAccount
 );
 
 module.exports = router;
