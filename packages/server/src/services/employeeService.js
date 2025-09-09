@@ -1663,6 +1663,29 @@ const removeUserAccount = async (userAccountId, actorId, reqContext) => {
   }
 };
 
+const getAccessMatrix = async () => {
+  const query = `
+    SELECT
+      e.id,
+      e.first_name,
+      e.last_name,
+      e.employee_email,
+      get_employee_status(e.is_active, e.access_cut_off_date_at_date) AS status,
+      COALESCE(
+        jsonb_agg(DISTINCT jsonb_build_object('name', ma.name)) FILTER (WHERE ma.id IS NOT NULL),
+        '[]'::jsonb
+      ) as applications
+    FROM employees e
+    LEFT JOIN user_accounts ua ON e.id = ua.user_id AND ua.status = 'active'
+    LEFT JOIN app_instances ai ON ua.app_instance_id = ai.id
+    LEFT JOIN managed_applications ma ON ai.application_id = ma.id
+    GROUP BY e.id
+    ORDER BY e.first_name, e.last_name;
+  `;
+  const result = await db.query(query);
+  return result.rows;
+};
+
 module.exports = {
   getEmployeeById,
   getEmployees,
@@ -1690,5 +1713,6 @@ module.exports = {
   forceSyncPlatformStatus,
   getJumpCloudSsoAppDetails,
   removeUserAccount,
+  getAccessMatrix,
   searchActiveEmployees,
 };

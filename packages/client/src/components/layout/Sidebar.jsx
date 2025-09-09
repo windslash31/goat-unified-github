@@ -11,6 +11,7 @@ import {
   UserCircle,
   UserCog,
   Tag,
+  Network,
 } from "lucide-react";
 import { createContext, useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
@@ -54,6 +55,13 @@ export function Sidebar({ onLogout, isMobileOpen, setMobileOpen }) {
       path: "/employees",
       label: "Employees",
       icon: <Users size={20} />,
+      visible: permissions.includes("employee:read:all"),
+    },
+    {
+      id: "access-matrix",
+      path: "/access-matrix",
+      label: "Access Matrix",
+      icon: <Network size={20} />,
       visible: permissions.includes("employee:read:all"),
     },
     {
