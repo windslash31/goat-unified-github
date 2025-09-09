@@ -500,6 +500,22 @@ const removeProvisionedAccount = async (req, res, next) => {
   }
 };
 
+const getUserAccessReviewReport = async (req, res, next) => {
+  try {
+    const reportData = await employeeService.getUserAccessReviewData();
+
+    // Set headers for PDF download
+    const filename = `UAR-Report-${new Date().toISOString().split("T")[0]}.pdf`;
+    res.setHeader("Content-disposition", `attachment; filename="${filename}"`);
+    res.setHeader("Content-type", "application/pdf");
+
+    // Stream the PDF to the response
+    employeeService.generateUarPdf(reportData, res);
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   listEmployees,
   getEmployee,
@@ -528,4 +544,5 @@ module.exports = {
   reconcileManagers,
   removeProvisionedAccount,
   searchEmployeeOptions,
+  getUserAccessReviewReport,
 };

@@ -30,6 +30,11 @@ const DashboardPage = lazy(() =>
     default: module.DashboardPage,
   }))
 );
+const ReportsPage = lazy(() =>
+  import("./pages/ReportsPage").then((module) => ({
+    default: module.ReportsPage,
+  }))
+);
 const LicenseManagementPage = lazy(() =>
   import("./pages/LicenseManagementPage").then((module) => ({
     default: module.LicenseManagementPage,
@@ -286,6 +291,14 @@ const AppContent = () => {
             element={
               <Suspense fallback={<EmployeeListSkeleton count={10} />}>
                 <EmployeeListPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path="/reports"
+            element={
+              <Suspense fallback={<ApplicationManagementSkeleton />}>
+                <ReportsPage />
               </Suspense>
             }
           />

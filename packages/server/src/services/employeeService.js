@@ -8,6 +8,7 @@ const jumpcloudService = require("./jumpcloudService");
 const googleWorkspaceService = require("./googleService");
 const slackService = require("./slackService");
 const atlassianService = require("./atlassianService");
+const PDFDocument = require("pdfkit");
 
 const optionsCache = {
   data: {},
@@ -1550,7 +1551,6 @@ const onboardDeferred = async (employeeData, actorId, reqContext) => {
   };
 };
 
-// ** THIS IS THE FULL, CORRECTED reconcileManagers FUNCTION **
 const reconcileManagers = async (actorId, reqContext) => {
   console.log("Starting manager reconciliation job...");
   const client = await db.pool.connect();
@@ -1663,6 +1663,125 @@ const removeUserAccount = async (userAccountId, actorId, reqContext) => {
   }
 };
 
+const getUserAccessReviewData = async () => {
+  const query = `
+    SELECT
+        e.id as employee_id,
+        e.first_name,
+        e.last_name,
+        e.employee_email,
+        get_employee_status(e.is_active, e.access_cut_off_date_at_date) AS status,
+        ma.name as application_name,
+        ma.integration_mode,
+        l.tier_name as license_tier
+    FROM
+        employees e
+    LEFT JOIN user_accounts ua ON e.id = ua.user_id
+    LEFT JOIN app_instances ai ON ua.app_instance_id = ai.id
+    LEFT JOIN managed_applications ma ON ai.application_id = ma.id
+    LEFT JOIN licenses l ON l.application_id = ma.id
+    LEFT JOIN license_assignments la ON e.id = la.employee_id AND la.license_id = l.id
+    WHERE ua.id IS NOT NULL
+    ORDER BY
+        e.last_name, e.first_name, ma.name;
+  `;
+  const result = await db.query(query);
+  return result.rows;
+};
+
+const generateUarPdf = (data, stream) => {
+  const doc = new PDFDocument({ margin: 50, size: "A4" });
+  doc.pipe(stream);
+
+  // --- PDF Header ---
+  doc
+    .fontSize(20)
+    .font("Helvetica-Bold")
+    .text("User Access Review (UAR) Report", { align: "center" });
+
+  doc
+    .fontSize(10)
+    .font("Helvetica")
+    .text(
+      `Generated on: ${new Date().toLocaleDateString("en-US", {
+        timeZone: "Asia/Jakarta",
+      })}`,
+      { align: "center" }
+    );
+
+  doc.moveDown(2);
+
+  // --- Table Header ---
+  const tableTop = doc.y;
+  const itemX = 50;
+  const statusX = 200;
+  const applicationX = 300;
+  const tierX = 450;
+
+  doc
+    .fontSize(10)
+    .font("Helvetica-Bold")
+    .text("Employee", itemX, tableTop)
+    .text("Status", statusX, tableTop)
+    .text("Application", applicationX, tableTop)
+    .text("License Tier", tierX, tableTop);
+
+  // --- Table Header Line ---
+  doc
+    .moveTo(itemX - 10, doc.y + 5)
+    .lineTo(550, doc.y + 5)
+    .stroke();
+
+  doc.moveDown();
+
+  // --- Table Rows ---
+  doc.font("Helvetica").fontSize(9);
+  let currentEmployeeId = null;
+
+  data.forEach((row) => {
+    const rowY = doc.y;
+
+    // Print employee info only once for the first entry
+    if (currentEmployeeId !== row.employee_id) {
+      if (currentEmployeeId !== null) {
+        // Add a light separator line between employees
+        doc
+          .moveTo(itemX - 10, rowY - 5)
+          .lineTo(550, rowY - 5)
+          .lineWidth(0.5)
+          .strokeColor("#cccccc")
+          .stroke()
+          .lineWidth(1)
+          .strokeColor("#000000");
+      }
+      doc
+        .font("Helvetica-Bold")
+        .text(`${row.first_name} ${row.last_name}`, itemX, rowY, {
+          width: 140,
+        });
+      doc
+        .font("Helvetica")
+        .text(row.employee_email, itemX, doc.y, { width: 140 });
+      doc.text(row.status, statusX, rowY);
+      currentEmployeeId = row.employee_id;
+    }
+
+    // Print application info for each row
+    doc.text(row.application_name, applicationX, rowY);
+    doc.text(row.license_tier || "N/A", tierX, rowY);
+
+    // Ensure we move down past the tallest cell (employee info)
+    doc.y = rowY + 30; // Move down a fixed amount for each entry line
+
+    // Add page breaks if content overflows
+    if (doc.y > 750) {
+      doc.addPage();
+    }
+  });
+
+  doc.end();
+};
+
 module.exports = {
   getEmployeeById,
   getEmployees,
@@ -1691,4 +1810,6 @@ module.exports = {
   getJumpCloudSsoAppDetails,
   removeUserAccount,
   searchActiveEmployees,
+  getUserAccessReviewData,
+  generateUarPdf,
 };

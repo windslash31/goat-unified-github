@@ -78,6 +78,13 @@ export function Sidebar({ onLogout, isMobileOpen, setMobileOpen }) {
       visible: permissions.includes("log:read"),
     },
     {
+      id: "reports",
+      path: "/reports",
+      label: "Reports",
+      icon: <FileText size={20} />,
+      visible: permissions.includes("log:read"),
+    },
+    {
       id: "settings",
       path: "/settings",
       label: "Settings",

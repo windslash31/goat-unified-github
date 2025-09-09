@@ -1,5 +1,3 @@
-// packages/server/src/api/routes/employees.js
-
 const express = require("express");
 const router = express.Router();
 const multer = require("multer");
@@ -58,6 +56,12 @@ router.get(
   authenticateToken,
   authorize("employee:read:all"),
   employeeController.listEmployees
+);
+router.get(
+  "/reports/user-access-review",
+  authenticateToken,
+  authorize("log:read"),
+  employeeController.getUserAccessReviewReport
 );
 router.get(
   "/export",
