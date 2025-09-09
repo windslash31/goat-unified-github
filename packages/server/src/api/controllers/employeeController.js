@@ -500,6 +500,17 @@ const removeProvisionedAccount = async (req, res, next) => {
   }
 };
 
+const getAccessMatrix = async (req, res, next) => {
+  try {
+    const matrixDataWithPagination = await employeeService.getAccessMatrix(
+      req.query
+    );
+    res.json(matrixDataWithPagination);
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   listEmployees,
   getEmployee,
@@ -528,4 +539,5 @@ module.exports = {
   reconcileManagers,
   removeProvisionedAccount,
   searchEmployeeOptions,
+  getAccessMatrix,
 };

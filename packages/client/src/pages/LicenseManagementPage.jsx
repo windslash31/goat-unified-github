@@ -10,6 +10,7 @@ import {
   ToggleLeft,
   ToggleRight,
   Loader,
+  BarChart2,
 } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -21,6 +22,82 @@ import { ApplicationManagementSkeleton } from "../components/ui/ApplicationManag
 const fetchAllApps = () => api.get("/api/applications").then((res) => res.data);
 const setLicensableStatus = ({ appId, is_licensable }) =>
   api.put(`/api/applications/${appId}/licensable`, { is_licensable });
+
+// --- START: NEW COMPONENT & FETCHER ---
+const fetchLicenseInventory = () =>
+  api.get("/api/dashboard/license-inventory").then((res) => res.data);
+
+const LicenseInventorySummary = () => {
+  const { data: inventory, isLoading } = useQuery({
+    queryKey: ["licenseInventory"],
+    queryFn: fetchLicenseInventory,
+  });
+
+  if (isLoading) {
+    return (
+      <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm h-40 animate-pulse border border-gray-200 dark:border-gray-700"></div>
+    );
+  }
+
+  if (!inventory || inventory.length === 0) {
+    return null; // Don't show the component if there's no licensable data
+  }
+
+  // Group by application
+  const groupedByApp = inventory.reduce((acc, item) => {
+    (acc[item.application_name] = acc[item.application_name] || []).push(item);
+    return acc;
+  }, {});
+
+  return (
+    <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 mb-6">
+      <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+        <BarChart2 className="w-5 h-5" /> License Inventory
+      </h3>
+      <div className="space-y-4">
+        {Object.entries(groupedByApp).map(([appName, tiers]) => (
+          <div key={appName}>
+            <h4 className="font-bold text-gray-800 dark:text-gray-200">
+              {appName}
+            </h4>
+            <div className="space-y-2 mt-2 pl-4 border-l-2 border-gray-200 dark:border-gray-700">
+              {tiers.map((tier) => {
+                const percentage = tier.is_unlimited
+                  ? 0
+                  : (tier.assigned_seats / tier.total_seats) * 100;
+                return (
+                  <div key={tier.tier_name}>
+                    <div className="flex justify-between items-center text-sm mb-1">
+                      <span className="font-medium text-gray-700 dark:text-gray-300">
+                        {tier.tier_name}
+                      </span>
+                      <span className="text-gray-500 dark:text-gray-400">
+                        {tier.is_unlimited
+                          ? `${tier.assigned_seats} Assigned (Unlimited)`
+                          : `${tier.assigned_seats} / ${tier.total_seats}`}
+                      </span>
+                    </div>
+                    {!tier.is_unlimited && (
+                      <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5">
+                        <motion.div
+                          className="bg-kredivo-primary h-2.5 rounded-full"
+                          initial={{ width: 0 }}
+                          animate={{ width: `${percentage}%` }}
+                          transition={{ duration: 0.5, ease: "easeOut" }}
+                        />
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+// --- END: NEW COMPONENT & FETCHER ---
 
 const StatusPill = ({ isLicensable }) => (
   <span
@@ -140,6 +217,7 @@ export const LicenseManagementPage = () => {
     onSuccess: () => {
       toast.success("Application status updated!");
       queryClient.invalidateQueries({ queryKey: ["allApplications"] });
+      queryClient.invalidateQueries({ queryKey: ["licenseInventory"] }); // Invalidate inventory too
     },
     onError: (error) =>
       toast.error(error.response?.data?.message || "Failed to update status."),
@@ -161,6 +239,9 @@ export const LicenseManagementPage = () => {
           </p>
         </div>
 
+        <LicenseInventorySummary />
+
+        <h3 className="text-lg font-semibold mb-4">Application Settings</h3>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <AnimatePresence>
             {applications?.map((app) => (

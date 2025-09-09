@@ -78,10 +78,30 @@ const getEmployeeDistribution = async () => {
   return result.rows;
 };
 
+const getLicenseInventory = async () => {
+  const query = `
+    SELECT
+        ma.name as application_name,
+        l.tier_name,
+        l.is_unlimited,
+        l.total_seats,
+        COUNT(la.id)::int as assigned_seats
+    FROM managed_applications ma
+    JOIN licenses l ON ma.id = l.application_id
+    LEFT JOIN license_assignments la ON l.id = la.license_id
+    WHERE ma.is_licensable = TRUE
+    GROUP BY ma.id, ma.name, l.id, l.tier_name, l.total_seats, l.is_unlimited
+    ORDER BY ma.name, l.tier_name;
+  `;
+  const result = await db.query(query);
+  return result.rows;
+};
+
 module.exports = {
   getDashboardStats,
   getRecentActivity,
   getRecentTickets,
   getLicenseStats,
   getEmployeeDistribution,
+  getLicenseInventory,
 };

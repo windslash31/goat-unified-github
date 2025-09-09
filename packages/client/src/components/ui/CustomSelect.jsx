@@ -1,3 +1,5 @@
+// packages/client/src/components/ui/CustomSelect.jsx
+
 import React, { useState, useRef, useEffect, useLayoutEffect } from "react";
 import { ChevronsUpDown, Check } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -14,7 +16,16 @@ export const CustomSelect = ({
   const [isOpen, setIsOpen] = useState(false);
   const buttonRef = useRef(null);
   const optionsRef = useRef(null);
-  const [position, setPosition] = useState({ top: 0, left: 0, width: 0 });
+
+  // --- MODIFICATION START: State to hold full position and direction ---
+  const [position, setPosition] = useState({
+    top: 0,
+    left: 0,
+    width: 0,
+    bottom: "auto",
+  });
+  const [opensUp, setOpensUp] = useState(false);
+  // --- MODIFICATION END ---
 
   const selectedOption = options.find(
     (option) => String(option.id) === String(value)
@@ -25,16 +36,35 @@ export const CustomSelect = ({
     setIsOpen(false);
   };
 
+  // --- MODIFICATION START: Smarter position calculation ---
   useLayoutEffect(() => {
     if (isOpen && buttonRef.current) {
       const rect = buttonRef.current.getBoundingClientRect();
-      setPosition({
-        top: rect.bottom + 4,
-        left: rect.left,
-        width: rect.width,
-      });
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const dropdownHeight = 240; // Corresponds to max-h-60
+
+      if (spaceBelow < dropdownHeight && rect.top > dropdownHeight) {
+        // Not enough space below, open upwards
+        setOpensUp(true);
+        setPosition({
+          top: "auto",
+          bottom: window.innerHeight - rect.top + 4,
+          left: rect.left,
+          width: rect.width,
+        });
+      } else {
+        // Default: open downwards
+        setOpensUp(false);
+        setPosition({
+          top: rect.bottom + 4,
+          bottom: "auto",
+          left: rect.left,
+          width: rect.width,
+        });
+      }
     }
   }, [isOpen]);
+  // --- MODIFICATION END ---
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -82,18 +112,19 @@ export const CustomSelect = ({
           <Portal>
             <motion.div
               ref={optionsRef}
-              initial={{ opacity: 0, y: -5 }}
+              // --- MODIFICATION START: Animate based on direction ---
+              initial={{ opacity: 0, y: opensUp ? 5 : -5 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -5 }}
+              exit={{ opacity: 0, y: opensUp ? 5 : -5 }}
               transition={{ duration: 0.15 }}
+              // --- MODIFICATION END ---
               style={{
                 position: "absolute",
-                top: `${position.top}px`,
+                top: position.top,
+                bottom: position.bottom, // Use bottom for upwards positioning
                 left: `${position.left}px`,
                 width: `${position.width}px`,
               }}
-              // --- MODIFICATION HERE ---
-              // Added a data-role attribute to identify this dropdown
               data-role="custom-select-options"
               className="z-[9999] max-h-60 overflow-auto bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg"
             >

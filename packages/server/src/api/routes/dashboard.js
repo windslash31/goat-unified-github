@@ -26,7 +26,12 @@ router.get(
   authorize("dashboard:view"),
   dashboardController.getLicenseUtilization
 );
-
+router.get(
+  "/license-inventory",
+  authenticateToken,
+  authorize("admin:manage_applications"),
+  dashboardController.getLicenseInventory
+);
 router.get(
   "/distribution",
   authenticateToken,

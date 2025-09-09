@@ -1,5 +1,3 @@
-// packages/server/src/api/routes/employees.js
-
 const express = require("express");
 const router = express.Router();
 const multer = require("multer");
@@ -66,6 +64,13 @@ router.get(
   employeeController.exportEmployees
 );
 
+router.get(
+  "/access-matrix",
+  authenticateToken,
+  authorize("employee:read:all"),
+  employeeController.getAccessMatrix
+);
+
 router.post(
   "/bulk-import",
   authenticateToken,
@@ -106,13 +111,6 @@ router.get(
   authenticateToken,
   authorizeAdminOrSelf,
   employeeController.getEmployeeApplicationAccess
-);
-
-router.post(
-  "/:id/sync-status",
-  authenticateToken,
-  authorize("employee:update"),
-  employeeController.syncPlatformStatus
 );
 
 router.get(
@@ -194,11 +192,7 @@ router.get(
   employeeController.getApplicationAccessDetails
 );
 
-router.post(
-  "/trigger-sync",
-  // We will secure this in the Cloud Run settings, so no specific middleware is needed here.
-  employeeController.triggerPlatformSync
-);
+router.post("/trigger-sync", employeeController.triggerPlatformSync);
 
 router.delete(
   "/:employeeId/accounts/:accountId",

@@ -30,6 +30,11 @@ const DashboardPage = lazy(() =>
     default: module.DashboardPage,
   }))
 );
+const AccessMatrixPage = lazy(() =>
+  import("./pages/AccessMatrixPage").then((module) => ({
+    default: module.AccessMatrixPage,
+  }))
+);
 const LicenseManagementPage = lazy(() =>
   import("./pages/LicenseManagementPage").then((module) => ({
     default: module.LicenseManagementPage,
@@ -255,7 +260,16 @@ const AppContent = () => {
               }
             />
           </Route>
-
+          <Route element={<ProtectedRoute permission="employee:read:all" />}>
+            <Route
+              path="/access-matrix"
+              element={
+                <Suspense fallback={<EmployeeListSkeleton count={10} />}>
+                  <AccessMatrixPage />
+                </Suspense>
+              }
+            />
+          </Route>
           <Route
             path="/profile"
             element={

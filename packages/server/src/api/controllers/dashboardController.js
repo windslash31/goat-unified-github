@@ -23,9 +23,6 @@ const getDashboardData = async (req, res, next) => {
   }
 };
 
-// --- MODIFICATION START ---
-// Add new, separate controller functions for each piece of data.
-
 const getStats = async (req, res, next) => {
   try {
     const stats = await dashboardService.getDashboardStats();
@@ -71,6 +68,15 @@ const getTickets = async (req, res, next) => {
   }
 };
 
+const getLicenseInventory = async (req, res, next) => {
+  try {
+    const inventory = await dashboardService.getLicenseInventory();
+    res.json(inventory);
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getDashboardData,
   getStats,
@@ -78,4 +84,5 @@ module.exports = {
   getLocationDistribution,
   getActivity,
   getTickets,
+  getLicenseInventory,
 };

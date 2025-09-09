@@ -23,7 +23,7 @@ const db = require("./config/db");
 const app = express();
 app.set("trust proxy", 1);
 
-const whitelist = ["http://localhost"];
+const whitelist = ["http://localhost", "http://localhost:3000"];
 if (config.clientUrl) {
   whitelist.push(...config.clientUrl.split(",").map((url) => url.trim()));
 }

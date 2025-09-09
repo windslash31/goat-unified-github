@@ -7,6 +7,7 @@ const {
   deleteApplication,
   onboardApplication,
   setLicensableStatus,
+  listApplicationNames,
 } = require("../controllers/applicationController");
 const {
   authenticateToken,
@@ -14,6 +15,13 @@ const {
 } = require("../middleware/authMiddleware");
 
 router.get("/", authenticateToken, listAllApplications);
+
+router.get(
+  "/names",
+  authenticateToken,
+  authorize("employee:read:all"),
+  listApplicationNames
+);
 
 router.post(
   "/",
@@ -36,7 +44,6 @@ router.delete(
   deleteApplication
 );
 
-// This is the new route you added
 router.post(
   "/onboard",
   authenticateToken,

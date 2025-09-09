@@ -1663,6 +1663,79 @@ const removeUserAccount = async (userAccountId, actorId, reqContext) => {
   }
 };
 
+const getAccessMatrix = async (queryParams) => {
+  const page = parseInt(queryParams.page, 10) || 1;
+  const limit = parseInt(queryParams.limit, 10) || 20;
+  const search = queryParams.search || "";
+  const applicationId = queryParams.application_id || null;
+  const offset = (page - 1) * limit;
+
+  let whereClause = "";
+  const queryValues = [];
+  let paramIndex = 1;
+
+  if (search) {
+    whereClause = `WHERE e.first_name ILIKE $${paramIndex} OR e.last_name ILIKE $${paramIndex} OR e.employee_email ILIKE $${paramIndex}`;
+    queryValues.push(`%${search}%`);
+    paramIndex++;
+  }
+
+  let baseQuery = `
+    FROM employees e
+    LEFT JOIN user_accounts ua ON e.id = ua.user_id AND ua.status = 'active'
+    LEFT JOIN app_instances ai ON ua.app_instance_id = ai.id
+    LEFT JOIN managed_applications ma ON ai.application_id = ma.id
+    ${whereClause}
+    GROUP BY e.id
+  `;
+
+  let havingClause = "";
+  if (applicationId) {
+    havingClause = `HAVING COUNT(ma.id) FILTER (WHERE ma.id = $${paramIndex++}) > 0`;
+    queryValues.push(applicationId);
+  }
+
+  const totalResult = await db.query(
+    `SELECT COUNT(*) FROM (SELECT e.id ${baseQuery} ${havingClause}) as subquery`,
+    queryValues
+  );
+  const totalCount = parseInt(totalResult.rows[0].count, 10);
+  const totalPages = Math.ceil(totalCount / limit);
+
+  const matrixQuery = `
+    SELECT
+      e.id,
+      e.first_name,
+      e.last_name,
+      e.employee_email,
+      get_employee_status(e.is_active, e.access_cut_off_date_at_date) AS status,
+      COALESCE(
+        jsonb_agg(DISTINCT jsonb_build_object('name', ma.name)) FILTER (WHERE ma.id IS NOT NULL),
+        '[]'::jsonb
+      ) as applications
+    ${baseQuery}
+    ${havingClause}
+    ORDER BY e.first_name, e.last_name
+    LIMIT $${paramIndex++} OFFSET $${paramIndex++};
+  `;
+
+  const matrixResult = await db.query(matrixQuery, [
+    ...queryValues,
+    limit,
+    offset,
+  ]);
+
+  return {
+    matrixData: matrixResult.rows,
+    pagination: {
+      currentPage: page,
+      totalPages,
+      totalCount,
+      limit,
+    },
+  };
+};
+
 module.exports = {
   getEmployeeById,
   getEmployees,
@@ -1690,5 +1763,6 @@ module.exports = {
   forceSyncPlatformStatus,
   getJumpCloudSsoAppDetails,
   removeUserAccount,
+  getAccessMatrix,
   searchActiveEmployees,
 };
