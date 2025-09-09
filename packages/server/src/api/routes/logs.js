@@ -20,6 +20,12 @@ router.get(
   logController.listActivityLogs
 );
 router.get(
+  "/reports/admin-activity",
+  authenticateToken,
+  authorize("log:read"),
+  logController.getAdminActivityReport
+);
+router.get(
   "/activity/export",
   authenticateToken,
   authorize("log:read"),

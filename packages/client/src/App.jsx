@@ -30,6 +30,11 @@ const DashboardPage = lazy(() =>
     default: module.DashboardPage,
   }))
 );
+const ReportsPage = lazy(() =>
+  import("./pages/ReportsPage").then((module) => ({
+    default: module.ReportsPage,
+  }))
+);
 const AccessMatrixPage = lazy(() =>
   import("./pages/AccessMatrixPage").then((module) => ({
     default: module.AccessMatrixPage,
@@ -326,7 +331,14 @@ const AppContent = () => {
               }
             />
           </Route>
-
+          <Route
+            path="/reports"
+            element={
+              <Suspense fallback={<ApplicationManagementSkeleton />}>
+                <ReportsPage />
+              </Suspense>
+            }
+          />
           <Route element={<ProtectedRoute permission="log:read" />}>
             <Route
               path="/logs/activity"
