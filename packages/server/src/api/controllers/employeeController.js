@@ -502,8 +502,10 @@ const removeProvisionedAccount = async (req, res, next) => {
 
 const getAccessMatrix = async (req, res, next) => {
   try {
-    const matrixData = await employeeService.getAccessMatrix();
-    res.json(matrixData);
+    const matrixDataWithPagination = await employeeService.getAccessMatrix(
+      req.query
+    );
+    res.json(matrixDataWithPagination);
   } catch (error) {
     next(error);
   }

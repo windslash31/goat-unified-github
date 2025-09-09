@@ -133,6 +133,14 @@ const updateManagedApplication = async (id, name) => {
   return result.rows[0];
 };
 
+const getManagedApplicationNames = async () => {
+  const result = await db.query(
+    "SELECT id, name FROM managed_applications ORDER BY name ASC"
+  );
+  // Return the full object array
+  return result.rows;
+};
+
 module.exports = {
   createApplication,
   updateApplication,
@@ -141,4 +149,5 @@ module.exports = {
   setApplicationLicensableStatus,
   onboardApplication,
   updateManagedApplication,
+  getManagedApplicationNames,
 };

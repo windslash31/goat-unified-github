@@ -60,7 +60,6 @@ const SearchAndFilterActions = memo(
       onSearchChange(debouncedSearchTerm);
     }, [debouncedSearchTerm, onSearchChange]);
 
-    // Sync local state if filters are cleared externally
     useEffect(() => {
       if (initialSearch !== searchInputValue) {
         setSearchInputValue(initialSearch);
@@ -123,6 +122,7 @@ const SearchAndFilterActions = memo(
                 onClose={() => setIsFilterPopoverOpen(false)}
                 options={filterOptions}
                 buttonRef={filterButtonRef}
+                isAccessMatrix={false}
               />
             )}
           </div>

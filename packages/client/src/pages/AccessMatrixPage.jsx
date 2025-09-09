@@ -1,34 +1,86 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Search, UserSearch } from "lucide-react";
+import { Search, UserSearch, Filter as FilterIcon } from "lucide-react";
 import api from "../api/api";
 import { EmployeeListSkeleton } from "../components/ui/EmployeeListSkeleton";
 import { StatusBadge } from "../components/ui/StatusBadge";
+import { Pagination } from "../components/ui/Pagination";
+import { useDebounce } from "../hooks/useDebounce";
+import { FilterPopover } from "../components/ui/FilterPopover";
 
-const fetchAccessMatrix = async () => {
-  const { data } = await api.get("/api/employees/access-matrix");
+// --- MODIFICATION START: Update fetcher to use application_id ---
+const fetchAccessMatrix = async (page, limit, search, applicationId) => {
+  const params = new URLSearchParams({ page, limit });
+  if (search) {
+    params.append("search", search);
+  }
+  if (applicationId) {
+    params.append("application_id", applicationId);
+  }
+  // --- MODIFICATION END ---
+  const { data } = await api.get(
+    `/api/employees/access-matrix?${params.toString()}`
+  );
+  return data;
+};
+
+const fetchAppNames = async () => {
+  const { data } = await api.get("/api/applications/names");
   return data;
 };
 
 export const AccessMatrixPage = () => {
   const [searchTerm, setSearchTerm] = useState("");
-  const { data, isLoading, error } = useQuery({
-    queryKey: ["accessMatrix"],
-    queryFn: fetchAccessMatrix,
+  const debouncedSearchTerm = useDebounce(searchTerm, 500);
+
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const filterButtonRef = useRef(null);
+
+  // --- MODIFICATION START: Simplify filter state for single application filter ---
+  const [filters, setFilters] = useState({
+    application_id: "", // Now a single ID string
   });
 
-  const filteredData = useMemo(() => {
-    if (!data) return [];
-    if (!searchTerm) return data;
-    return data.filter(
-      (employee) =>
-        employee.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        employee.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        employee.employee_email.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-  }, [data, searchTerm]);
+  const { data: appOptions, isLoading: isLoadingApps } = useQuery({
+    queryKey: ["appNamesForFilter"],
+    queryFn: fetchAppNames,
+  });
+  // --- MODIFICATION END ---
+
+  const [pagination, setPagination] = useState({
+    currentPage: 1,
+    limit: 20,
+    totalPages: 1,
+    totalCount: 0,
+  });
+
+  const { data, isLoading, error } = useQuery({
+    queryKey: [
+      "accessMatrix",
+      pagination.currentPage,
+      pagination.limit,
+      debouncedSearchTerm,
+      filters.application_id, // Add selected app to query key
+    ],
+    queryFn: () =>
+      fetchAccessMatrix(
+        pagination.currentPage,
+        pagination.limit,
+        debouncedSearchTerm,
+        filters.application_id // Pass selected app to fetcher
+      ),
+    keepPreviousData: true,
+    onSuccess: (responseData) => {
+      setPagination((prev) => ({
+        ...prev,
+        ...responseData.pagination,
+      }));
+    },
+  });
+
+  const matrixData = data?.matrixData || [];
 
   if (error) {
     return (
@@ -37,6 +89,8 @@ export const AccessMatrixPage = () => {
       </div>
     );
   }
+
+  const areFiltersActive = !!filters.application_id;
 
   return (
     <motion.div
@@ -52,23 +106,55 @@ export const AccessMatrixPage = () => {
             applications.
           </p>
         </div>
-        <div className="relative w-full sm:w-64">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Search employees..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-kredivo-primary focus:outline-none"
-          />
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <div className="relative flex-grow">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search employees..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full sm:w-64 pl-10 pr-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-kredivo-primary focus:outline-none"
+            />
+          </div>
+          <div className="relative">
+            <button
+              ref={filterButtonRef}
+              onClick={() => setIsFilterOpen(!isFilterOpen)}
+              className={`flex items-center gap-2 px-4 py-2 border rounded-md text-sm font-medium transition-colors ${
+                areFiltersActive || isFilterOpen
+                  ? "bg-kredivo-light text-kredivo-dark-text border-kredivo-primary/30"
+                  : "bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700"
+              }`}
+            >
+              <FilterIcon size={16} />
+              <span>Filter</span>
+              {areFiltersActive && (
+                <div className="w-2 h-2 bg-kredivo-primary rounded-full"></div>
+              )}
+            </button>
+            {/* --- MODIFICATION START: Pass new prop and correct options --- */}
+            {isFilterOpen && (
+              <FilterPopover
+                isAccessMatrix={true}
+                initialFilters={filters}
+                onApply={setFilters}
+                onClear={() => setFilters({ application_id: "" })}
+                onClose={() => setIsFilterOpen(false)}
+                options={{ applications: appOptions || [] }}
+                buttonRef={filterButtonRef}
+              />
+            )}
+            {/* --- MODIFICATION END --- */}
+          </div>
         </div>
       </div>
 
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
         <div className="overflow-x-auto">
-          {isLoading ? (
+          {isLoading && !data ? (
             <EmployeeListSkeleton count={10} />
-          ) : filteredData.length > 0 ? (
+          ) : matrixData.length > 0 ? (
             <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
               <thead className="bg-gray-50 dark:bg-gray-700/50">
                 <tr>
@@ -84,7 +170,7 @@ export const AccessMatrixPage = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                {filteredData.map((employee) => (
+                {matrixData.map((employee) => (
                   <tr
                     key={employee.id}
                     className="hover:bg-gray-50 dark:hover:bg-gray-700/50"
@@ -125,10 +211,15 @@ export const AccessMatrixPage = () => {
             <div className="text-center py-16 text-gray-500 dark:text-gray-400">
               <UserSearch className="mx-auto w-12 h-12 text-gray-400" />
               <p className="font-semibold mt-4">No Employees Found</p>
-              <p className="text-sm mt-1">Your search returned no results.</p>
+              <p className="text-sm mt-1">
+                Your search and filters returned no results.
+              </p>
             </div>
           )}
         </div>
+        {data && data.pagination.totalCount > 0 && (
+          <Pagination pagination={pagination} setPagination={setPagination} />
+        )}
       </div>
     </motion.div>
   );

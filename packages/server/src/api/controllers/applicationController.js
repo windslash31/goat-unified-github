@@ -75,6 +75,15 @@ const setLicensableStatus = async (req, res, next) => {
   }
 };
 
+const listApplicationNames = async (req, res, next) => {
+  try {
+    const appNames = await applicationService.getManagedApplicationNames();
+    res.json(appNames);
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   listAllApplications,
   createApplication,
@@ -82,4 +91,5 @@ module.exports = {
   deleteApplication,
   onboardApplication,
   setLicensableStatus,
+  listApplicationNames,
 };
