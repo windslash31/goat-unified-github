@@ -70,7 +70,18 @@ router.get(
   authorize("employee:read:all"),
   employeeController.getAccessMatrix
 );
-
+router.get(
+  "/reports/user-access-review",
+  authenticateToken,
+  authorize("log:read"),
+  employeeController.getUserAccessReviewReport
+);
+router.get(
+  "/reports/dormant-accounts",
+  authenticateToken,
+  authorize("log:read"),
+  employeeController.getDormantAccountsReport
+);
 router.post(
   "/bulk-import",
   authenticateToken,
