@@ -31,8 +31,7 @@ const {
   searchEmployeeOptions,
   getAccessMatrix,
   getUserAccessReviewReport,
-  getUserAccessReviewReportExcel,
-  getUserAccessReviewReportCsv,
+  getDormantAccountsReport,
 } = require("../controllers/employeeController");
 const {
   authenticateToken,
@@ -103,7 +102,12 @@ router.get(
   authorize("log:read"),
   getUserAccessReviewReport
 );
-
+router.get(
+  "/reports/dormant-accounts",
+  authenticateToken,
+  authorize("log:read"),
+  getDormantAccountsReport
+);
 router.get(
   "/export",
   authenticateToken,

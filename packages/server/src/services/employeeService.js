@@ -1848,6 +1848,151 @@ const generateUarReport = async (format, stream) => {
   }
 };
 
+const getDormantAccountsData = async () => {
+  const query = `
+    SELECT
+        id,
+        first_name,
+        last_name,
+        employee_email,
+        position_name,
+        date_of_exit_at_date, 
+        access_cut_off_date_at_date
+    FROM
+        employees
+    WHERE
+        get_employee_status(is_active, access_cut_off_date_at_date) = 'Inactive'
+    ORDER BY
+        last_name, first_name;
+  `;
+  const result = await db.query(query);
+  return result.rows;
+};
+
+const generateDormantAccountsPdf = (data, stream) => {
+  const doc = new PDFDocument({ margin: 50, size: "A4", layout: "landscape" });
+  doc.pipe(stream);
+
+  doc
+    .fontSize(20)
+    .font("Helvetica-Bold")
+    .text("Dormant & Inactive Accounts Report", { align: "center" });
+  doc
+    .fontSize(10)
+    .font("Helvetica")
+    .text(
+      `Generated on: ${new Date().toLocaleDateString("en-US", {
+        timeZone: "Asia/Jakarta",
+      })}`,
+      { align: "center" }
+    );
+  doc.moveDown(2);
+
+  const tableTop = doc.y;
+  const nameX = 50;
+  const emailX = 200;
+  const positionX = 400;
+  const lastDayX = 550;
+  const cutoffX = 650;
+
+  doc
+    .fontSize(10)
+    .font("Helvetica-Bold")
+    .text("Name", nameX, tableTop)
+    .text("Email", emailX, tableTop)
+    .text("Last Position", positionX, tableTop)
+    .text("Exit Date", lastDayX, tableTop) // Changed label for clarity
+    .text("Access Cut Off", cutoffX, tableTop);
+
+  doc
+    .moveTo(nameX - 10, doc.y + 5)
+    .lineTo(750, doc.y + 5)
+    .stroke();
+  doc.moveDown();
+
+  doc.font("Helvetica").fontSize(9);
+
+  data.forEach((row) => {
+    const rowY = doc.y;
+    doc.text(`${row.first_name} ${row.last_name}`, nameX, rowY, { width: 140 });
+    doc.text(row.employee_email, emailX, rowY, { width: 190 });
+    doc.text(row.position_name || "N/A", positionX, rowY, { width: 140 });
+    // Use the correct column name here
+    doc.text(
+      row.date_of_exit_at_date
+        ? new Date(row.date_of_exit_at_date).toLocaleDateString()
+        : "N/A",
+      lastDayX,
+      rowY
+    );
+    doc.text(
+      row.access_cut_off_date_at_date
+        ? new Date(row.access_cut_off_date_at_date).toLocaleDateString()
+        : "N/A",
+      cutoffX,
+      rowY
+    );
+
+    doc.y = rowY + 25;
+    if (doc.y > 500) {
+      doc.addPage();
+      doc.y = tableTop;
+    }
+  });
+
+  doc.end();
+};
+
+const generateDormantAccountsExcel = async (data, stream) => {
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = "G.O.A.T Platform";
+  const worksheet = workbook.addWorksheet("Dormant Accounts");
+
+  worksheet.columns = [
+    { header: "First Name", key: "first_name", width: 20 },
+    { header: "Last Name", key: "last_name", width: 20 },
+    { header: "Email", key: "employee_email", width: 35 },
+    { header: "Last Position", key: "position_name", width: 30 },
+    { header: "Exit Date", key: "date_of_exit_at_date", width: 15 }, // Use correct key
+    { header: "Access Cut Off", key: "access_cut_off_date_at_date", width: 15 },
+  ];
+  worksheet.getRow(1).font = { bold: true };
+
+  worksheet.addRows(data);
+  await workbook.xlsx.write(stream);
+  stream.end();
+};
+
+const generateDormantAccountsCsv = (data) => {
+  const fields = [
+    "first_name",
+    "last_name",
+    "employee_email",
+    "position_name",
+    "date_of_exit_at_date",
+    "access_cut_off_date_at_date",
+  ];
+  const json2csvParser = new Parser({ fields });
+  return json2csvParser.parse(data);
+};
+
+const generateDormantAccountsReport = async (format, stream) => {
+  const data = await getDormantAccountsData();
+  switch (format) {
+    case "pdf":
+      return generateDormantAccountsPdf(data, stream);
+    case "excel":
+      return await generateDormantAccountsExcel(data, stream);
+    case "csv":
+      const csvData = generateDormantAccountsCsv(data);
+      stream.write(csvData);
+      stream.end();
+      break;
+    default:
+      throw new Error("Unsupported report format");
+  }
+};
+
 module.exports = {
   getEmployeeById,
   getEmployees,
@@ -1881,4 +2026,6 @@ module.exports = {
   generateUarExcel,
   generateUarCsv,
   generateUarReport,
+  getDormantAccountsData,
+  generateDormantAccountsReport,
 };

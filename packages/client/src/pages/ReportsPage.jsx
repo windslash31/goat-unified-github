@@ -1,6 +1,6 @@
 import React from "react";
 import { motion } from "framer-motion";
-import { FileText, Shield } from "lucide-react";
+import { FileText, Shield, UserX } from "lucide-react";
 import api from "../api/api";
 import toast from "react-hot-toast";
 import { DownloadDropdown } from "../components/ui/DownloadDropdown";
@@ -35,13 +35,15 @@ const ReportCard = ({
 export const ReportsPage = () => {
   const [isDownloadingUAR, setIsDownloadingUAR] = React.useState(false);
   const [isDownloadingAdmin, setIsDownloadingAdmin] = React.useState(false);
+  const [isDownloadingDormant, setIsDownloadingDormant] = React.useState(false);
 
   const handleDownload = async (format, reportType) => {
     let endpoint = "";
-    const toastId = `report-${reportType}-${format}`;
+    let toastId = `report-${reportType}-${format}`;
     let isDownloadingSetter = () => {};
     let isDownloadingState = false;
 
+    // --- MODIFICATION START: Update logic for dormant report ---
     if (reportType === "uar") {
       endpoint = `/api/employees/reports/user-access-review?format=${format}`;
       isDownloadingSetter = setIsDownloadingUAR;
@@ -50,7 +52,12 @@ export const ReportsPage = () => {
       endpoint = `/api/logs/reports/admin-activity?format=${format}`;
       isDownloadingSetter = setIsDownloadingAdmin;
       isDownloadingState = isDownloadingAdmin;
+    } else if (reportType === "dormant") {
+      endpoint = `/api/employees/reports/dormant-accounts?format=${format}`;
+      isDownloadingSetter = setIsDownloadingDormant;
+      isDownloadingState = isDownloadingDormant;
     }
+    // --- MODIFICATION END ---
 
     if (isDownloadingState) return;
 
@@ -65,8 +72,6 @@ export const ReportsPage = () => {
       link.href = url;
 
       const disposition = response.headers["content-disposition"];
-
-      // --- THIS IS THE CORRECTED FILENAME LOGIC ---
       let filename;
       if (disposition && disposition.indexOf("attachment") !== -1) {
         const filenameRegex = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/;
@@ -75,15 +80,17 @@ export const ReportsPage = () => {
           filename = matches[1].replace(/['"]/g, "");
         }
       } else {
-        // Create a fallback filename if the header is not present
         const extension = format === "excel" ? "xlsx" : format;
-        const reportName =
-          reportType === "uar" ? "UAR-Report" : "Admin-Activity-Report";
+        const reportNameMap = {
+          uar: "UAR-Report",
+          admin: "Admin-Activity-Report",
+          dormant: "Dormant-Accounts-Report",
+        };
+        const reportName = reportNameMap[reportType] || "Report";
         filename = `${reportName}-${
           new Date().toISOString().split("T")[0]
         }.${extension}`;
       }
-      // --- END CORRECTION ---
 
       link.setAttribute("download", filename);
       document.body.appendChild(link);
@@ -133,6 +140,13 @@ export const ReportsPage = () => {
           onDownload={(format) => handleDownload(format, "admin")}
           isDownloading={isDownloadingAdmin}
           icon={<Shield className="w-6 h-6" />}
+        />
+        <ReportCard
+          title="Dormant & Inactive Accounts"
+          description="A list of all user accounts that are currently inactive, essential for proving access termination controls."
+          onDownload={(format) => handleDownload(format, "dormant")}
+          isDownloading={isDownloadingDormant}
+          icon={<UserX className="w-6 h-6" />}
         />
       </div>
     </motion.div>

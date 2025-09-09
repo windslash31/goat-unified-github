@@ -545,6 +545,36 @@ const getUserAccessReviewReport = async (req, res, next) => {
   }
 };
 
+const getDormantAccountsReport = async (req, res, next) => {
+  try {
+    const { format } = req.query;
+    const formatMap = {
+      pdf: { contentType: "application/pdf", extension: "pdf" },
+      excel: {
+        contentType:
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        extension: "xlsx",
+      },
+      csv: { contentType: "text/csv", extension: "csv" },
+    };
+
+    const selectedFormat = formatMap[format];
+    if (!selectedFormat) {
+      return res.status(400).json({ message: "Invalid format requested." });
+    }
+
+    const filename = `Dormant-Accounts-Report-${
+      new Date().toISOString().split("T")[0]
+    }.${selectedFormat.extension}`;
+    res.setHeader("Content-Type", selectedFormat.contentType);
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+
+    await employeeService.generateDormantAccountsReport(format, res);
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   listEmployees,
   getEmployee,
@@ -575,4 +605,5 @@ module.exports = {
   searchEmployeeOptions,
   getAccessMatrix,
   getUserAccessReviewReport,
+  getDormantAccountsReport,
 };
