@@ -23,7 +23,7 @@ const db = require("./config/db");
 const app = express();
 app.set("trust proxy", 1);
 
-const whitelist = ["http://localhost:3000"];
+const whitelist = ["http://localhost"];
 if (config.clientUrl) {
   whitelist.push(...config.clientUrl.split(",").map((url) => url.trim()));
 }
@@ -87,7 +87,7 @@ app.use((err, req, res, next) => {
 });
 
 const PORT = config.port;
-app.listen(PORT, () => {
+app.listen(PORT, "0.0.0.0", () => {
   console.log(`Backend server running at http://localhost:${PORT}`);
   resetStaleSyncJobs();
 
