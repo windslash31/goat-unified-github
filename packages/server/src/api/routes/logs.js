@@ -12,7 +12,12 @@ router.get(
   authorize("log:read"),
   logController.getLogFilterOptions
 );
-
+router.get(
+  "/reports/admin-activity",
+  authenticateToken,
+  authorize("log:read"),
+  logController.getAdminActivityReport
+);
 router.get(
   "/activity",
   authenticateToken,
