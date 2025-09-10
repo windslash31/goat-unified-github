@@ -8,6 +8,9 @@ const jumpcloudService = require("./jumpcloudService");
 const googleWorkspaceService = require("./googleService");
 const slackService = require("./slackService");
 const atlassianService = require("./atlassianService");
+const PDFDocument = require("pdfkit");
+const ExcelJS = require("exceljs");
+const { Parser } = require("json2csv");
 
 const optionsCache = {
   data: {},
@@ -1736,6 +1739,316 @@ const getAccessMatrix = async (queryParams) => {
   };
 };
 
+const getUserAccessReviewData = async () => {
+  const query = `
+    SELECT
+        e.id as employee_id,
+        e.first_name,
+        e.last_name,
+        e.employee_email,
+        get_employee_status(e.is_active, e.access_cut_off_date_at_date) AS status,
+        ma.name as application_name,
+        ma.integration_mode,
+        l.tier_name as license_tier
+    FROM
+        employees e
+    LEFT JOIN user_accounts ua ON e.id = ua.user_id
+    LEFT JOIN app_instances ai ON ua.app_instance_id = ai.id
+    LEFT JOIN managed_applications ma ON ai.application_id = ma.id
+    LEFT JOIN licenses l ON l.application_id = ma.id
+    LEFT JOIN license_assignments la ON e.id = la.employee_id AND la.license_id = l.id
+    WHERE ua.id IS NOT NULL
+    ORDER BY
+        e.last_name, e.first_name, ma.name;
+  `;
+  const result = await db.query(query);
+  return result.rows;
+};
+
+const generateUarPdf = (data, stream) => {
+  const doc = new PDFDocument({ margin: 50, size: "A4" });
+  doc.pipe(stream);
+
+  doc
+    .fontSize(20)
+    .font("Helvetica-Bold")
+    .text("User Access Review (UAR) Report", { align: "center" });
+  doc
+    .fontSize(10)
+    .font("Helvetica")
+    .text(
+      `Generated on: ${new Date().toLocaleDateString("en-US", {
+        timeZone: "Asia/Jakarta",
+      })}`,
+      { align: "center" }
+    );
+  doc.moveDown(2);
+
+  const tableTop = doc.y;
+  const itemX = 50;
+  const statusX = 200;
+  const applicationX = 300;
+  const tierX = 450;
+
+  doc
+    .fontSize(10)
+    .font("Helvetica-Bold")
+    .text("Employee", itemX, tableTop)
+    .text("Status", statusX, tableTop)
+    .text("Application", applicationX, tableTop)
+    .text("License Tier", tierX, tableTop);
+
+  doc
+    .moveTo(itemX - 10, doc.y + 5)
+    .lineTo(550, doc.y + 5)
+    .stroke();
+  doc.moveDown();
+
+  doc.font("Helvetica").fontSize(9);
+  let currentEmployeeId = null;
+
+  data.forEach((row) => {
+    const rowY = doc.y;
+
+    if (currentEmployeeId !== row.employee_id) {
+      if (currentEmployeeId !== null) {
+        doc
+          .moveTo(itemX - 10, rowY - 5)
+          .lineTo(550, rowY - 5)
+          .lineWidth(0.5)
+          .strokeColor("#cccccc")
+          .stroke()
+          .lineWidth(1)
+          .strokeColor("#000000");
+      }
+      doc
+        .font("Helvetica-Bold")
+        .text(`${row.first_name} ${row.last_name}`, itemX, rowY, {
+          width: 140,
+        });
+      doc
+        .font("Helvetica")
+        .text(row.employee_email, itemX, doc.y, { width: 140 });
+      doc.text(row.status, statusX, rowY);
+      currentEmployeeId = row.employee_id;
+    }
+
+    doc.text(row.application_name, applicationX, rowY);
+    doc.text(row.license_tier || "N/A", tierX, rowY);
+
+    doc.y = rowY + 30;
+
+    if (doc.y > 750) {
+      doc.addPage();
+    }
+  });
+
+  doc.end();
+};
+
+const generateUarExcel = async (data, stream) => {
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = "G.O.A.T Platform";
+  workbook.created = new Date();
+
+  const worksheet = workbook.addWorksheet("User Access Review");
+
+  worksheet.columns = [
+    { header: "First Name", key: "first_name", width: 20 },
+    { header: "Last Name", key: "last_name", width: 20 },
+    { header: "Email", key: "employee_email", width: 35 },
+    { header: "Status", key: "status", width: 15 },
+    { header: "Application", key: "application_name", width: 30 },
+    { header: "License Tier", key: "license_tier", width: 20 },
+  ];
+
+  worksheet.getRow(1).font = { bold: true, size: 12 };
+  worksheet.getRow(1).fill = {
+    type: "pattern",
+    pattern: "solid",
+    fgColor: { argb: "FFD3D3D3" },
+  };
+
+  worksheet.addRows(data);
+  await workbook.xlsx.write(stream);
+  stream.end();
+};
+
+const generateUarCsv = (data) => {
+  const fields = [
+    "first_name",
+    "last_name",
+    "employee_email",
+    "status",
+    "application_name",
+    "license_tier",
+  ];
+  const json2csvParser = new Parser({ fields });
+  const csv = json2csvParser.parse(data);
+  return csv;
+};
+
+const generateUarReport = async (format, stream) => {
+  const data = await getUserAccessReviewData();
+  switch (format) {
+    case "pdf":
+      return generateUarPdf(data, stream);
+    case "excel":
+      return await generateUarExcel(data, stream);
+    case "csv":
+      const csvData = generateUarCsv(data);
+      stream.write(csvData);
+      stream.end();
+      break;
+    default:
+      throw new Error("Unsupported report format");
+  }
+};
+
+const getDormantAccountsData = async () => {
+  const query = `
+    SELECT
+        id,
+        first_name,
+        last_name,
+        employee_email,
+        position_name,
+        date_of_exit_at_date,
+        access_cut_off_date_at_date
+    FROM
+        employees
+    WHERE
+        get_employee_status(is_active, access_cut_off_date_at_date) = 'Inactive'
+    ORDER BY
+        last_name, first_name;
+  `;
+  const result = await db.query(query);
+  return result.rows;
+};
+
+const generateDormantAccountsPdf = (data, stream) => {
+  const doc = new PDFDocument({ margin: 50, size: "A4", layout: "landscape" });
+  doc.pipe(stream);
+
+  doc
+    .fontSize(20)
+    .font("Helvetica-Bold")
+    .text("Dormant & Inactive Accounts Report", { align: "center" });
+  doc
+    .fontSize(10)
+    .font("Helvetica")
+    .text(
+      `Generated on: ${new Date().toLocaleDateString("en-US", {
+        timeZone: "Asia/Jakarta",
+      })}`,
+      { align: "center" }
+    );
+  doc.moveDown(2);
+
+  const tableTop = doc.y;
+  const nameX = 50;
+  const emailX = 200;
+  const positionX = 400;
+  const lastDayX = 550;
+  const cutoffX = 650;
+
+  doc
+    .fontSize(10)
+    .font("Helvetica-Bold")
+    .text("Name", nameX, tableTop)
+    .text("Email", emailX, tableTop)
+    .text("Last Position", positionX, tableTop)
+    .text("Exit Date", lastDayX, tableTop)
+    .text("Access Cut Off", cutoffX, tableTop);
+
+  doc
+    .moveTo(nameX - 10, doc.y + 5)
+    .lineTo(750, doc.y + 5)
+    .stroke();
+  doc.moveDown();
+
+  doc.font("Helvetica").fontSize(9);
+
+  data.forEach((row) => {
+    const rowY = doc.y;
+    doc.text(`${row.first_name} ${row.last_name}`, nameX, rowY, { width: 140 });
+    doc.text(row.employee_email, emailX, rowY, { width: 190 });
+    doc.text(row.position_name || "N/A", positionX, rowY, { width: 140 });
+    doc.text(
+      row.date_of_exit_at_date
+        ? new Date(row.date_of_exit_at_date).toLocaleDateString()
+        : "N/A",
+      lastDayX,
+      rowY
+    );
+    doc.text(
+      row.access_cut_off_date_at_date
+        ? new Date(row.access_cut_off_date_at_date).toLocaleDateString()
+        : "N/A",
+      cutoffX,
+      rowY
+    );
+
+    doc.y = rowY + 25;
+    if (doc.y > 500) {
+      doc.addPage();
+      doc.y = tableTop;
+    }
+  });
+
+  doc.end();
+};
+
+const generateDormantAccountsExcel = async (data, stream) => {
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = "G.O.A.T Platform";
+  const worksheet = workbook.addWorksheet("Dormant Accounts");
+
+  worksheet.columns = [
+    { header: "First Name", key: "first_name", width: 20 },
+    { header: "Last Name", key: "last_name", width: 20 },
+    { header: "Email", key: "employee_email", width: 35 },
+    { header: "Last Position", key: "position_name", width: 30 },
+    { header: "Exit Date", key: "date_of_exit_at_date", width: 15 },
+    { header: "Access Cut Off", key: "access_cut_off_date_at_date", width: 15 },
+  ];
+  worksheet.getRow(1).font = { bold: true };
+
+  worksheet.addRows(data);
+  await workbook.xlsx.write(stream);
+  stream.end();
+};
+
+const generateDormantAccountsCsv = (data) => {
+  const fields = [
+    "first_name",
+    "last_name",
+    "employee_email",
+    "position_name",
+    "date_of_exit_at_date",
+    "access_cut_off_date_at_date",
+  ];
+  const json2csvParser = new Parser({ fields });
+  return json2csvParser.parse(data);
+};
+
+const generateDormantAccountsReport = async (format, stream) => {
+  const data = await getDormantAccountsData();
+  switch (format) {
+    case "pdf":
+      return generateDormantAccountsPdf(data, stream);
+    case "excel":
+      return await generateDormantAccountsExcel(data, stream);
+    case "csv":
+      const csvData = generateDormantAccountsCsv(data);
+      stream.write(csvData);
+      stream.end();
+      break;
+    default:
+      throw new Error("Unsupported report format");
+  }
+};
+
 module.exports = {
   getEmployeeById,
   getEmployees,
@@ -1765,4 +2078,7 @@ module.exports = {
   removeUserAccount,
   getAccessMatrix,
   searchActiveEmployees,
+  generateUarReport,
+  getDormantAccountsData,
+  generateDormantAccountsReport,
 };

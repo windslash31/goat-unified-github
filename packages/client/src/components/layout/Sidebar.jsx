@@ -65,6 +65,13 @@ export function Sidebar({ onLogout, isMobileOpen, setMobileOpen }) {
       visible: permissions.includes("employee:read:all"),
     },
     {
+      id: "reports",
+      path: "/reports",
+      label: "Reports",
+      icon: <FileText size={20} />,
+      visible: permissions.includes("log:read"),
+    },
+    {
       id: "managed-accounts",
       path: "/managed-accounts",
       label: "Managed Accounts",
