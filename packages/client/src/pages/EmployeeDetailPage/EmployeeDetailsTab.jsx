@@ -33,7 +33,7 @@ const AssetButton = ({ employee, onAssetClick }) => {
     setIsAssetLoading(true);
     try {
       const { data: assetDetails } = await api.get(
-        `/api/jira/asset/search?name=${encodeURIComponent(assetName)}`
+        `/jira/asset/search?name=${encodeURIComponent(assetName)}`
       );
 
       if (assetDetails && Object.keys(assetDetails).length > 0) {

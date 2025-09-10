@@ -99,7 +99,7 @@ const NotFoundPage = lazy(() =>
 );
 
 const fetchMe = async () => {
-  const { data } = await api.get("/api/auth/me");
+  const { data } = await api.get("/auth/me");
   return data;
 };
 

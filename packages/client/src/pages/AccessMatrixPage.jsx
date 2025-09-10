@@ -10,7 +10,6 @@ import { Pagination } from "../components/ui/Pagination";
 import { useDebounce } from "../hooks/useDebounce";
 import { FilterPopover } from "../components/ui/FilterPopover";
 
-// --- MODIFICATION START: Update fetcher to use application_id ---
 const fetchAccessMatrix = async (page, limit, search, applicationId) => {
   const params = new URLSearchParams({ page, limit });
   if (search) {
@@ -19,15 +18,14 @@ const fetchAccessMatrix = async (page, limit, search, applicationId) => {
   if (applicationId) {
     params.append("application_id", applicationId);
   }
-  // --- MODIFICATION END ---
   const { data } = await api.get(
-    `/api/employees/access-matrix?${params.toString()}`
+    `/employees/access-matrix?${params.toString()}`
   );
   return data;
 };
 
 const fetchAppNames = async () => {
-  const { data } = await api.get("/api/applications/names");
+  const { data } = await api.get("/applications/names");
   return data;
 };
 
@@ -38,7 +36,6 @@ export const AccessMatrixPage = () => {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const filterButtonRef = useRef(null);
 
-  // --- MODIFICATION START: Simplify filter state for single application filter ---
   const [filters, setFilters] = useState({
     application_id: "", // Now a single ID string
   });
@@ -47,7 +44,6 @@ export const AccessMatrixPage = () => {
     queryKey: ["appNamesForFilter"],
     queryFn: fetchAppNames,
   });
-  // --- MODIFICATION END ---
 
   const [pagination, setPagination] = useState({
     currentPage: 1,
@@ -133,7 +129,6 @@ export const AccessMatrixPage = () => {
                 <div className="w-2 h-2 bg-kredivo-primary rounded-full"></div>
               )}
             </button>
-            {/* --- MODIFICATION START: Pass new prop and correct options --- */}
             {isFilterOpen && (
               <FilterPopover
                 isAccessMatrix={true}
@@ -145,7 +140,6 @@ export const AccessMatrixPage = () => {
                 buttonRef={filterButtonRef}
               />
             )}
-            {/* --- MODIFICATION END --- */}
           </div>
         </div>
       </div>

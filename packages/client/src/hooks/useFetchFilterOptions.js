@@ -7,7 +7,7 @@ export const useFetchFilterOptions = (endpoint) => {
     if (!endpoint) return;
     const fetchOptions = async () => {
       try {
-        const { data } = await api.get(`/api/${endpoint}`);
+        const { data } = await api.get(`/${endpoint}`);
         if (data) setOptions(data);
       } catch (error) {
         console.error(`Failed to fetch filter options for ${endpoint}:`, error);

@@ -1,4 +1,3 @@
-// packages/client/src/pages/LicenseManagementPage.jsx
 import React, { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
@@ -19,13 +18,12 @@ import { useModalStore } from "../stores/modalStore";
 import { LicenseTierModal } from "../components/ui/LicenseTierModal";
 import { ApplicationManagementSkeleton } from "../components/ui/ApplicationManagementSkeleton";
 
-const fetchAllApps = () => api.get("/api/applications").then((res) => res.data);
+const fetchAllApps = () => api.get("/applications").then((res) => res.data);
 const setLicensableStatus = ({ appId, is_licensable }) =>
-  api.put(`/api/applications/${appId}/licensable`, { is_licensable });
+  api.put(`/applications/${appId}/licensable`, { is_licensable });
 
-// --- START: NEW COMPONENT & FETCHER ---
 const fetchLicenseInventory = () =>
-  api.get("/api/dashboard/license-inventory").then((res) => res.data);
+  api.get("/dashboard/license-inventory").then((res) => res.data);
 
 const LicenseInventorySummary = () => {
   const { data: inventory, isLoading } = useQuery({

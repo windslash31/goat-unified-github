@@ -17,7 +17,7 @@ const fetchEmployees = async (filters, pagination, sorting) => {
     }
   }
 
-  const { data } = await api.get(`/api/employees?${queryParams.toString()}`);
+  const { data } = await api.get(`/employees?${queryParams.toString()}`);
   return data;
 };
 

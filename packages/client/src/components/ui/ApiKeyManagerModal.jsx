@@ -23,7 +23,7 @@ export const ApiKeyManagerModal = ({ user, onClose }) => {
   const fetchKeys = useCallback(async () => {
     setLoading(true);
     try {
-      const { data } = await api.get(`/api/users/${user.id}/api-keys`);
+      const { data } = await api.get(`/users/${user.id}/api-keys`);
       setKeys(data);
     } catch (error) {
       toast.error("Failed to load API keys.");
@@ -45,7 +45,7 @@ export const ApiKeyManagerModal = ({ user, onClose }) => {
     }
     setIsSubmitting(true);
     try {
-      const { data } = await api.post(`/api/users/${user.id}/api-keys`, {
+      const { data } = await api.post(`/users/${user.id}/api-keys`, {
         description,
         expiresInDays,
       });
@@ -70,7 +70,7 @@ export const ApiKeyManagerModal = ({ user, onClose }) => {
   const handleDeleteKey = async () => {
     if (!keyToDelete) return;
     try {
-      await api.delete(`/api/users/api-keys/${keyToDelete.id}`);
+      await api.delete(`/users/api-keys/${keyToDelete.id}`);
       toast.success("API Key revoked successfully!");
       fetchKeys(); // Refresh list
     } catch (error) {

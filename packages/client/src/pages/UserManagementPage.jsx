@@ -148,8 +148,8 @@ export const UserManagementPage = ({ onLogout }) => {
     setLoading(true);
     try {
       const [usersRes, rolesRes] = await Promise.all([
-        api.get("/api/users"),
-        api.get("/api/roles"),
+        api.get("/users"),
+        api.get("/roles"),
       ]);
       setUsers(usersRes.data);
       setRoles(rolesRes.data);
@@ -179,7 +179,7 @@ export const UserManagementPage = ({ onLogout }) => {
     setUsers(newUsers);
 
     try {
-      await api.put(`/api/users/${userId}/role`, { roleId: newRoleId });
+      await api.put(`/users/${userId}/role`, { roleId: newRoleId });
       toast.success("User role updated!");
     } catch (err) {
       toast.error(err.response?.data?.message || "Could not update role.");
@@ -196,7 +196,7 @@ export const UserManagementPage = ({ onLogout }) => {
     if (!userToDelete) return;
 
     try {
-      await api.delete(`/api/users/${userToDelete.id}`);
+      await api.delete(`/users/${userToDelete.id}`);
       toast.success("User deleted successfully!");
       fetchData();
     } catch (error) {
@@ -222,7 +222,7 @@ export const UserManagementPage = ({ onLogout }) => {
 
     try {
       const response = await api.post(
-        `/api/users/${userToReset.id}/reset-password`
+        `/users/${userToReset.id}/reset-password`
       );
       setNewPassword(response.data.temporaryPassword);
       toast.success(`Password for ${userToReset.full_name} has been reset.`);

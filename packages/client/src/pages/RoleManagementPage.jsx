@@ -317,8 +317,8 @@ export const RoleManagementPage = ({ onLogout }) => {
     setLoading(true);
     try {
       const [rolesRes, permsRes] = await Promise.all([
-        api.get("/api/roles/with-permissions"),
-        api.get("/api/roles/permissions"),
+        api.get("/roles/with-permissions"),
+        api.get("/roles/permissions"),
       ]);
       setRoles(rolesRes.data);
       setAllPermissions(permsRes.data);
@@ -399,7 +399,7 @@ export const RoleManagementPage = ({ onLogout }) => {
     const permissionIds = selectedRole.permissions.map((p) => p.id);
 
     try {
-      await api.put(`/api/roles/${selectedRole.id}/permissions`, {
+      await api.put(`/roles/${selectedRole.id}/permissions`, {
         permissionIds,
       });
       toast.success("Permissions saved successfully!");
@@ -420,7 +420,7 @@ export const RoleManagementPage = ({ onLogout }) => {
 
     setIsCreatingRole(true);
     try {
-      await api.post("/api/roles", { name: newRoleName.trim() });
+      await api.post("/roles", { name: newRoleName.trim() });
       toast.success("Role created successfully!");
       setNewRoleName("");
       fetchData();
@@ -442,7 +442,7 @@ export const RoleManagementPage = ({ onLogout }) => {
     if (!roleToDelete) return;
 
     try {
-      await api.delete(`/api/roles/${roleToDelete.id}`);
+      await api.delete(`/roles/${roleToDelete.id}`);
       toast.success("Role deleted successfully!");
       if (selectedRole?.id === roleToDelete.id) {
         setSelectedRole(null);

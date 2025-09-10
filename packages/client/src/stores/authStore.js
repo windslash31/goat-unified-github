@@ -31,7 +31,8 @@ export const useAuthStore = create((set, get) => ({
 
   login: async (email, password) => {
     try {
-      const { data } = await api.post("/api/auth/login", { email, password });
+      // CHANGED: Removed the '/api' prefix from the path
+      const { data } = await api.post("/auth/login", { email, password });
       get().setAccessToken(data.accessToken);
     } catch (error) {
       // Clear state on failed login
@@ -49,7 +50,7 @@ export const useAuthStore = create((set, get) => ({
     try {
       // Only call API if we were actually logged in
       if (previousToken) {
-        await api.post("/api/auth/logout");
+        await api.post("/auth/logout");
       }
     } catch (error) {
       console.error(

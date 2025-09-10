@@ -44,15 +44,15 @@ export const ReportsPage = () => {
     let isDownloadingState = false;
 
     if (reportType === "uar") {
-      endpoint = `/api/employees/reports/user-access-review?format=${format}`;
+      endpoint = `/employees/reports/user-access-review?format=${format}`;
       isDownloadingSetter = setIsDownloadingUAR;
       isDownloadingState = isDownloadingUAR;
     } else if (reportType === "admin") {
-      endpoint = `/api/logs/reports/admin-activity?format=${format}`;
+      endpoint = `/logs/reports/admin-activity?format=${format}`;
       isDownloadingSetter = setIsDownloadingAdmin;
       isDownloadingState = isDownloadingAdmin;
     } else if (reportType === "dormant") {
-      endpoint = `/api/employees/reports/dormant-accounts?format=${format}`;
+      endpoint = `/employees/reports/dormant-accounts?format=${format}`;
       isDownloadingSetter = setIsDownloadingDormant;
       isDownloadingState = isDownloadingDormant;
     }

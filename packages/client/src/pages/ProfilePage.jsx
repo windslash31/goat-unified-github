@@ -30,14 +30,12 @@ import { EmployeeAccessTab } from "./EmployeeDetailPage/EmployeeAccessTab";
 import { AssignLicenseModal } from "../components/ui/AssignLicenseModal";
 
 const fetchMe = async () => {
-  const { data } = await api.get("/api/me");
+  const { data } = await api.get("/me");
   return data;
 };
 
 const fetchTimelineData = async (employeeId) => {
-  const { data } = await api.get(
-    `/api/employees/${employeeId}/unified-timeline`
-  );
+  const { data } = await api.get(`/employees/${employeeId}/unified-timeline`);
   return data;
 };
 

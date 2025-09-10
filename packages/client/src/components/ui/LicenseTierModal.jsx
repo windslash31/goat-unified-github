@@ -1,4 +1,3 @@
-// packages/client/src/components/ui/LicenseTierModal.jsx
 import React, { useState } from "react";
 import toast from "react-hot-toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -8,9 +7,9 @@ import api from "../../api/api";
 import { Button } from "./Button";
 
 const fetchLicenses = (appId) =>
-  api.get(`/api/licenses/${appId}`).then((res) => res.data);
+  api.get(`/licenses/${appId}`).then((res) => res.data);
 const addLicense = ({ appId, licenseData }) =>
-  api.post(`/api/licenses/${appId}`, licenseData);
+  api.post(`/licenses/${appId}`, licenseData);
 
 export const LicenseTierModal = ({ application, onClose }) => {
   const queryClient = useQueryClient();

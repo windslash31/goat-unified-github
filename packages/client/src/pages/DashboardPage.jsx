@@ -20,27 +20,27 @@ import { DashboardSkeleton } from "../components/ui/DashboardSkeleton";
 import { formatDateTime } from "../utils/formatters";
 
 const fetchDashboardStats = async () => {
-  const { data } = await api.get("/api/dashboard/stats");
+  const { data } = await api.get("/dashboard/stats");
   return data;
 };
 
 const fetchLicenseStats = async () => {
-  const { data } = await api.get("/api/dashboard/license-stats");
+  const { data } = await api.get("/dashboard/license-stats");
   return data;
 };
 
 const fetchLocationDistribution = async () => {
-  const { data } = await api.get("/api/dashboard/distribution");
+  const { data } = await api.get("/dashboard/distribution");
   return data;
 };
 
 const fetchRecentActivity = async () => {
-  const { data } = await api.get("/api/dashboard/activity");
+  const { data } = await api.get("/dashboard/activity");
   return data;
 };
 
 const fetchRecentTickets = async () => {
-  const { data } = await api.get("/api/dashboard/tickets");
+  const { data } = await api.get("/dashboard/tickets");
   return data;
 };
 

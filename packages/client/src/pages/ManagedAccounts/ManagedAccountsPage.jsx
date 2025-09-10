@@ -18,12 +18,12 @@ const fetchManagedAccounts = async (searchTerm = "") => {
   if (searchTerm) {
     params.append("search", searchTerm);
   }
-  const { data } = await api.get(`/api/managed-accounts?${params.toString()}`);
+  const { data } = await api.get(`/managed-accounts?${params.toString()}`);
   return data;
 };
 
 const deleteAccount = (id) => {
-  return api.delete(`/api/managed-accounts/${id}`);
+  return api.delete(`/managed-accounts/${id}`);
 };
 
 const ManagedAccountsPage = () => {
