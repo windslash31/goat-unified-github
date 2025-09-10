@@ -16,12 +16,12 @@ import { Button } from "../components/ui/Button";
 import { formatDateTime } from "../utils/formatters";
 
 const fetchSyncStatuses = async () => {
-  const { data } = await api.get("/api/sync/status");
+  const { data } = await api.get("/sync/status");
   return data;
 };
 
 const triggerSync = async (jobs) => {
-  const { data } = await api.post("/api/sync/trigger", { jobs });
+  const { data } = await api.post("/sync/trigger", { jobs });
   return data;
 };
 

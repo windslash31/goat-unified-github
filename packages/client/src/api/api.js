@@ -31,7 +31,8 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
-    const isLoginAttempt = originalRequest.url.endsWith("/api/auth/login");
+    // CHANGED: Removed '/api' prefix
+    const isLoginAttempt = originalRequest.url.endsWith("/auth/login");
 
     if (
       error.response?.status === 401 &&
@@ -52,7 +53,7 @@ api.interceptors.response.use(
 
       refreshPromise = new Promise(async (resolve, reject) => {
         try {
-          const { data } = await api.post("/api/auth/refresh");
+          const { data } = await api.post("/auth/refresh");
           const newAccessToken = data.accessToken;
           useAuthStore.getState().setAccessToken(newAccessToken);
           resolve(newAccessToken);

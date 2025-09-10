@@ -7,7 +7,7 @@ import api from "../../api/api";
 import { Button } from "./Button";
 
 const updateApplication = ({ id, ...updateData }) =>
-  api.put(`/api/applications/${id}`, updateData);
+  api.put(`/applications/${id}`, updateData);
 
 export const EditApplicationModal = ({ application, onClose }) => {
   const queryClient = useQueryClient();

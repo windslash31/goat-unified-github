@@ -19,11 +19,11 @@ const fetchApplications = async (searchTerm = "") => {
   if (searchTerm) {
     params.append("search", searchTerm);
   }
-  const { data } = await api.get(`/api/applications?${params.toString()}`);
+  const { data } = await api.get(`/applications?${params.toString()}`);
   return data;
 };
 
-const deleteApplication = (id) => api.delete(`/api/applications/${id}`);
+const deleteApplication = (id) => api.delete(`/applications/${id}`);
 
 export const ApplicationManagementPage = () => {
   const { openModal, closeModal, modal, data: modalData } = useModalStore();

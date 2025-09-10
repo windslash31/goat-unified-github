@@ -1,4 +1,3 @@
-// In packages/client/src/pages/EmployeeDetailPage/PlatformLogPage.jsx
 import React, { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Filter } from "lucide-react";
@@ -52,7 +51,7 @@ export const PlatformLogPage = ({ employeeId }) => {
         ...filterParams,
       });
       const { data } = await api.get(
-        `/api/employees/${employeeId}/platform-logs?${params}`
+        `/employees/${employeeId}/platform-logs?${params}`
       );
       return data;
     },

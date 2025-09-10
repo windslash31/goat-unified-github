@@ -67,9 +67,7 @@ const fetchAccessDetails = async (employeeId, platformKey) => {
   }[platformKey];
   const finalKey = platformRouteKey || platformKey;
   const { data } = await api.get(
-    `/api/employees/${employeeId}/access-details/${encodeURIComponent(
-      finalKey
-    )}`
+    `/employees/${employeeId}/access-details/${encodeURIComponent(finalKey)}`
   );
   return data;
 };
@@ -415,7 +413,7 @@ export const EmployeeAccessTab = ({ employee }) => {
 
   const { mutate: removeAssignmentMutation } = useMutation({
     mutationFn: (assignmentId) =>
-      api.delete(`/api/licenses/assignments/${assignmentId}`),
+      api.delete(`/licenses/assignments/${assignmentId}`),
     onSuccess: () => {
       toast.success("License revoked successfully!");
       queryClient.invalidateQueries({ queryKey: ["employee", employee.id] });
@@ -429,7 +427,7 @@ export const EmployeeAccessTab = ({ employee }) => {
 
   const { mutate: removeAccountMutation } = useMutation({
     mutationFn: ({ employeeId, accountId }) =>
-      api.delete(`/api/employees/${employeeId}/accounts/${accountId}`),
+      api.delete(`/employees/${employeeId}/accounts/${accountId}`),
     onSuccess: () => {
       toast.success("Application access removed successfully!");
       queryClient.invalidateQueries({ queryKey: ["employee", employee.id] });

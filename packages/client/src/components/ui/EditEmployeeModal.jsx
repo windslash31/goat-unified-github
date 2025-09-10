@@ -68,7 +68,7 @@ export const EditEmployeeModal = ({ employee, onClose, onSave }) => {
       return;
     }
 
-    const promise = api.put(`/api/employees/${employee.id}`, changes);
+    const promise = api.put(`/employees/${employee.id}`, changes);
 
     toast.promise(promise, {
       loading: "Saving changes...",

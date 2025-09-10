@@ -15,7 +15,7 @@ import { SearchableSelect } from "../../components/ui/SearchableSelect"; // Impo
 const fetchEmployeeById = async (employeeId) => {
   if (!employeeId) return null;
   try {
-    const response = await api.get(`/api/employees/${employeeId}`);
+    const response = await api.get(`/employees/${employeeId}`);
     return response.data;
   } catch (error) {
     console.error("Failed to fetch employee by ID", error);
@@ -23,9 +23,9 @@ const fetchEmployeeById = async (employeeId) => {
   }
 };
 
-const createAccount = (newData) => api.post("/api/managed-accounts", newData);
+const createAccount = (newData) => api.post("/managed-accounts", newData);
 const updateAccount = ({ id, ...updateData }) =>
-  api.put(`/api/managed-accounts/${id}`, updateData);
+  api.put(`/managed-accounts/${id}`, updateData);
 
 const ManagedAccountFormModal = ({ account, onClose, onSuccess }) => {
   const [formData, setFormData] = useState({

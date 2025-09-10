@@ -644,14 +644,14 @@ export const ActivityLogPage = () => {
 
   const { data: roles = [] } = useQuery({
     queryKey: ["roles"],
-    queryFn: async () => (await api.get("/api/roles")).data,
+    queryFn: async () => (await api.get("/roles")).data,
   });
 
   const { data: logData, isLoading: isLoadingLogs } = useQuery({
     queryKey: ["activityLogs", filters],
     queryFn: async () => {
       const params = new URLSearchParams(filters).toString();
-      const { data } = await api.get(`/api/logs/activity?${params}`);
+      const { data } = await api.get(`/logs/activity?${params}`);
       return data;
     },
     keepPreviousData: true,
@@ -659,13 +659,13 @@ export const ActivityLogPage = () => {
 
   const { data: filterOptions } = useQuery({
     queryKey: ["activityLogFilters"],
-    queryFn: async () => (await api.get("/api/logs/activity/filters")).data,
+    queryFn: async () => (await api.get("/logs/activity/filters")).data,
   });
 
   const handleExport = async () => {
     try {
       const params = new URLSearchParams(filters).toString();
-      const response = await api.get(`/api/logs/activity/export?${params}`, {
+      const response = await api.get(`/logs/activity/export?${params}`, {
         responseType: "blob",
       });
       const url = window.URL.createObjectURL(new Blob([response.data]));

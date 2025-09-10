@@ -66,19 +66,18 @@ app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-//routes
-app.use("/api/auth", authRoutes);
-app.use("/api/employees", employeeRoutes);
-app.use("/api/roles", roleRoutes);
-app.use("/api/applications", applicationRoutes);
-app.use("/api/dashboard", dashboardRoutes);
-app.use("/api/logs", logRoutes);
-app.use("/api/jira", jiraRoutes);
-app.use("/api/users", userRoutes);
-app.use("/api/managed-accounts", managedAccountRoutes);
-app.use("/api/sync", syncRoutes);
-app.use("/api/data-export", dataExportRoutes);
-app.use("/api/licenses", licenseRoutes);
+app.use("/auth", authRoutes);
+app.use("/employees", employeeRoutes);
+app.use("/roles", roleRoutes);
+app.use("/applications", applicationRoutes);
+app.use("/dashboard", dashboardRoutes);
+app.use("/logs", logRoutes);
+app.use("/jira", jiraRoutes);
+app.use("/users", userRoutes);
+app.use("/managed-accounts", managedAccountRoutes);
+app.use("/sync", syncRoutes);
+app.use("/data-export", dataExportRoutes);
+app.use("/licenses", licenseRoutes);
 
 // Global error handler
 app.use((err, req, res, next) => {

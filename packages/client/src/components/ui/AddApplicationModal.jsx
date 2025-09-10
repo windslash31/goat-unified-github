@@ -9,7 +9,7 @@ import { Button } from "./Button";
 import { CustomSelect } from "./CustomSelect";
 
 const onboardApplication = (newData) =>
-  api.post("/api/applications/onboard", newData);
+  api.post("/applications/onboard", newData);
 
 export const AddApplicationModal = ({ onClose }) => {
   const queryClient = useQueryClient();

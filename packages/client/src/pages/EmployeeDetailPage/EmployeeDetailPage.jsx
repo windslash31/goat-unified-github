@@ -27,14 +27,12 @@ import { EmployeeAccessTab } from "./EmployeeAccessTab";
 import { AssignLicenseModal } from "../../components/ui/AssignLicenseModal";
 
 const fetchEmployeeById = async (employeeId) => {
-  const { data } = await api.get(`/api/employees/${employeeId}`);
+  const { data } = await api.get(`/employees/${employeeId}`);
   return data;
 };
 
 const fetchTimelineData = async (employeeId) => {
-  const { data } = await api.get(
-    `/api/employees/${employeeId}/unified-timeline`
-  );
+  const { data } = await api.get(`/employees/${employeeId}/unified-timeline`);
   return data;
 };
 
@@ -147,7 +145,7 @@ export const EmployeeDetailPage = ({ permissions, onLogout }) => {
       ]);
 
       api
-        .post("/api/employees/logs/view", { targetEmployeeId: employeeId })
+        .post("employees/logs/view", { targetEmployeeId: employeeId })
         .catch((err) => console.error("Failed to log profile view:", err));
     }
     return () => {

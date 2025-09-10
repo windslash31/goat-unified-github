@@ -50,10 +50,9 @@ export const DeactivateEmployeeModal = ({
     setIsSubmitting(true);
 
     try {
-      const { data } = await api.post(
-        `/api/employees/${employee.id}/deactivate`,
-        { platforms: selectedPlatforms }
-      );
+      const { data } = await api.post(`/employees/${employee.id}/deactivate`, {
+        platforms: selectedPlatforms,
+      });
 
       const successCount = data.results.filter(
         (r) => r.status === "SUCCESS"

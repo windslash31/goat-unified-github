@@ -7,7 +7,7 @@ import { DeviceCardSkeleton } from "../../components/ui/DeviceCardSkeleton";
 import { formatDateTime } from "../../utils/formatters";
 
 const fetchEmployeeDevices = async (employeeId) => {
-  const { data } = await api.get(`/api/employees/${employeeId}/devices`);
+  const { data } = await api.get(`/employees/${employeeId}/devices`);
   return data;
 };
 

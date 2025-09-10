@@ -9,7 +9,7 @@ import { useDebounce } from "../../hooks/useDebounce";
 const fetchEmployeeOptions = async ({ pageParam = 1, queryKey }) => {
   const [, searchTerm] = queryKey;
   const { data } = await api.get(
-    `/api/employees/options/search?q=${searchTerm}&page=${pageParam}`
+    `/employees/options/search?q=${searchTerm}&page=${pageParam}`
   );
   return { ...data, nextPage: data.hasMore ? pageParam + 1 : undefined };
 };

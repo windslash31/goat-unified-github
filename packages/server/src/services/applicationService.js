@@ -19,14 +19,21 @@ const updateApplication = async (id, name) => {
 };
 
 const deleteApplication = async (id) => {
-  const result = await db.query(
-    "DELETE FROM internal_applications WHERE id = $1 RETURNING *",
-    [id]
-  );
+  // This query now uses a cascading delete to handle foreign key constraints
+  const query = `
+    WITH deleted_app AS (
+      DELETE FROM managed_applications WHERE id = $1 RETURNING id
+    )
+    SELECT id FROM deleted_app;
+  `;
+  const result = await db.query(query, [id]);
+
   if (result.rows.length === 0) {
-    throw new Error("Application not found.");
+    throw new Error("Application not found or could not be deleted.");
   }
-  return { message: "Application deleted successfully." };
+  return {
+    message: "Application and all associated data deleted successfully.",
+  };
 };
 
 const getAllManagedApplications = async (filters = {}) => {
