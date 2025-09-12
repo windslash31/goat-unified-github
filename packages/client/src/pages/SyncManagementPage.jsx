@@ -10,6 +10,8 @@ import {
   Clock,
   AlertTriangle,
   ChevronDown,
+  Users,
+  ShieldCheck,
 } from "lucide-react";
 import api from "../api/api";
 import { Button } from "../components/ui/Button";
@@ -44,7 +46,7 @@ const StatusBadge = ({ job }) => {
       statusToShow = "FAILED";
       textToShow = "Failed";
     } else {
-      textToShow = "Idle"; // It remains Idle only if it has never run
+      textToShow = "Idle";
     }
   }
 
@@ -197,6 +199,11 @@ const JobStatusCard = ({
 const SyncManagementPage = () => {
   const queryClient = useQueryClient();
   const [selectedJobs, setSelectedJobs] = useState([]);
+  const [loadingStates, setLoadingStates] = useState({
+    all: false,
+    managers: false,
+    access: false,
+  });
 
   const { data: jobs, isLoading } = useQuery({
     queryKey: ["syncStatuses"],
@@ -227,6 +234,49 @@ const SyncManagementPage = () => {
     );
   };
 
+  const handleTriggerReconciliation = async (type) => {
+    setLoadingStates((prev) => ({ ...prev, [type]: true }));
+
+    let promise;
+    let loadingMessage;
+    let successMessage = "Job triggered successfully!";
+
+    switch (type) {
+      case "all":
+        promise = api.post("/sync/trigger/reconciliation");
+        loadingMessage = "Triggering all reconciliation jobs...";
+        break;
+      case "managers":
+        promise = api.post("/employees/reconcile-managers");
+        loadingMessage = "Reconciling managers...";
+        successMessage = "Manager reconciliation complete!";
+        break;
+      case "access":
+        promise = api.post("/sync/trigger", { jobs: ["reconciliation"] });
+        loadingMessage = "Triggering app access reconciliation...";
+        break;
+      default:
+        promise = Promise.reject(new Error("Invalid reconciliation type"));
+    }
+
+    toast.promise(promise, {
+      loading: loadingMessage,
+      success: (res) => res.data.message || successMessage,
+      error: (err) =>
+        err.response?.data?.message || `Failed to trigger ${type}.`,
+    });
+
+    try {
+      await promise;
+      queryClient.invalidateQueries({ queryKey: ["syncStatuses"] });
+      queryClient.invalidateQueries({ queryKey: ["employees"] });
+    } catch (error) {
+      console.error(`Reconciliation for ${type} failed:`, error);
+    } finally {
+      setLoadingStates((prev) => ({ ...prev, [type]: false }));
+    }
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -244,7 +294,6 @@ const SyncManagementPage = () => {
             Monitor and manually trigger background data synchronization jobs.
           </p>
         </div>
-
         <div className="flex items-center gap-2 w-full mt-4 sm:mt-0 sm:w-auto">
           <Button
             onClick={() => runSync(selectedJobs)}
@@ -264,23 +313,80 @@ const SyncManagementPage = () => {
             disabled={isTriggering || isAnyJobRunning}
             className="w-full justify-center"
             variant="secondary"
+            title={
+              isAnyJobRunning
+                ? "A sync is already in progress"
+                : "Run all sync jobs"
+            }
           >
             {isAnyJobRunning ? "Sync in Progress..." : "Sync All"}
           </Button>
         </div>
       </div>
 
-      <div className="max-w-4xl mx-auto space-y-4">
-        {isLoading && <p>Loading job statuses...</p>}
-        {jobs?.map((job) => (
-          <JobStatusCard
-            key={job.job_name}
-            job={job}
-            isSelected={selectedJobs.includes(job.job_name)}
-            onToggleSelection={handleToggleSelection}
-            isAnyJobRunning={!!isAnyJobRunning}
-          />
-        ))}
+      <div className="max-w-4xl mx-auto space-y-6">
+        <div>
+          <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-200 mb-4">
+            Manual Reconciliation
+          </h2>
+          <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 space-y-4">
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              Use these actions to manually fix data inconsistencies without
+              waiting for the daily sync.
+            </p>
+            <div className="flex flex-col sm:flex-row items-center gap-3">
+              <Button
+                onClick={() => handleTriggerReconciliation("all")}
+                disabled={loadingStates.all || isAnyJobRunning}
+                variant="primary"
+                className="w-full sm:w-auto justify-center"
+              >
+                <RefreshCw
+                  className={`mr-2 h-4 w-4 ${
+                    loadingStates.all ? "animate-spin" : ""
+                  }`}
+                />
+                {loadingStates.all ? "Running..." : "Run All Reconciliations"}
+              </Button>
+              <div className="flex items-center gap-3">
+                <Button
+                  onClick={() => handleTriggerReconciliation("managers")}
+                  disabled={loadingStates.managers || isAnyJobRunning}
+                  variant="secondary"
+                >
+                  <Users className="mr-2 h-4 w-4" />
+                  Reconcile Managers
+                </Button>
+                <Button
+                  onClick={() => handleTriggerReconciliation("access")}
+                  disabled={loadingStates.access || isAnyJobRunning}
+                  variant="secondary"
+                >
+                  <ShieldCheck className="mr-2 h-4 w-4" />
+                  Reconcile App Access
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-200 mb-4">
+            Scheduled Jobs
+          </h2>
+          <div className="space-y-4">
+            {isLoading && <p>Loading job statuses...</p>}
+            {jobs?.map((job) => (
+              <JobStatusCard
+                key={job.job_name}
+                job={job}
+                isSelected={selectedJobs.includes(job.job_name)}
+                onToggleSelection={handleToggleSelection}
+                isAnyJobRunning={!!isAnyJobRunning}
+              />
+            ))}
+          </div>
+        </div>
       </div>
     </motion.div>
   );
