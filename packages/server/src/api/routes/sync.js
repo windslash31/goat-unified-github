@@ -20,4 +20,11 @@ router.post(
   syncController.triggerSync
 );
 
+router.post(
+  "/trigger/reconciliation",
+  authenticateToken,
+  authorize("log:read:platform"),
+  syncController.triggerReconciliationJobs
+);
+
 module.exports = router;

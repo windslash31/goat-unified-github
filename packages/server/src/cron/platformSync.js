@@ -207,8 +207,8 @@ const reconcileDirectApiAccess = async () => {
       if (allPlatformUserIdsArray.length > 0) {
         await client.query(
           `INSERT INTO user_accounts (user_id, app_instance_id, status, last_seen_at)
-           SELECT unnest($1::int[]), $2, 'PENDING', NOW()
-           ON CONFLICT (user_id, app_instance_id) DO NOTHING;`,
+          SELECT unnest($1::int[]), $2, 'deactivated', NOW()
+          ON CONFLICT (user_id, app_instance_id) DO NOTHING;`,
           [allPlatformUserIdsArray, appInstanceId]
         );
       }
@@ -225,19 +225,19 @@ const reconcileDirectApiAccess = async () => {
       // 5. Perform batched updates for each status.
       if (usersToActivate.size > 0) {
         await client.query(
-          `UPDATE user_accounts SET status = 'ACTIVE', last_seen_at = NOW() WHERE app_instance_id = $1 AND user_id = ANY($2::int[])`,
+          `UPDATE user_accounts SET status = 'active', last_seen_at = NOW() WHERE app_instance_id = $1 AND user_id = ANY($2::int[])`,
           [appInstanceId, Array.from(usersToActivate)]
         );
       }
       if (usersToSuspend.size > 0) {
         await client.query(
-          `UPDATE user_accounts SET status = 'SUSPENDED', last_seen_at = NOW() WHERE app_instance_id = $1 AND user_id = ANY($2::int[])`,
+          `UPDATE user_accounts SET status = 'suspended', last_seen_at = NOW() WHERE app_instance_id = $1 AND user_id = ANY($2::int[])`,
           [appInstanceId, Array.from(usersToSuspend)]
         );
       }
       if (usersToDeactivate.length > 0) {
         await client.query(
-          `UPDATE user_accounts SET status = 'DEACTIVATED' WHERE app_instance_id = $1 AND user_id = ANY($2::int[])`,
+          `UPDATE user_accounts SET status = 'deactivated' WHERE app_instance_id = $1 AND user_id = ANY($2::int[])`,
           [appInstanceId, usersToDeactivate]
         );
       }

@@ -30,4 +30,21 @@ const triggerSync = (req, res, next) => {
     .json({ message: `Sync triggered successfully for jobs: ${jobList}.` });
 };
 
-module.exports = { getSyncStatuses, triggerSync };
+const triggerReconciliationJobs = (req, res, next) => {
+  if (isMasterSyncRunning()) {
+    return res.status(409).json({ message: "A sync is already in progress." });
+  }
+
+  // Define which jobs are part of the main reconciliation process
+  const reconciliationJobs = ["reconciliation", "gws_log_reconciliation"];
+
+  runSelectiveSyncs(reconciliationJobs).catch((err) => {
+    console.error("Manual reconciliation trigger failed:", err);
+  });
+
+  res
+    .status(202)
+    .json({ message: "Reconciliation jobs triggered successfully." });
+};
+
+module.exports = { getSyncStatuses, triggerSync, triggerReconciliationJobs };
