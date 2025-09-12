@@ -1,9 +1,23 @@
-const express = require('express');
+const express = require("express");
 const router = express.Router();
-const jiraController = require('../controllers/jiraController');
-const { authenticateToken } = require('../middleware/authMiddleware');
+const jiraController = require("../controllers/jiraController");
+const {
+  authenticateToken,
+  authorize,
+} = require("../middleware/authMiddleware");
 
-// Any authenticated user can view ticket details
-router.get('/ticket/:ticketId', authenticateToken, jiraController.getTicket);
+router.get(
+  "/ticket/:ticketId",
+  authenticateToken,
+  authorize("employee:read:all"),
+  jiraController.getTicket
+);
+
+router.get(
+  "/asset/search",
+  authenticateToken,
+  authorize("employee:read:all"),
+  jiraController.searchAsset
+);
 
 module.exports = router;

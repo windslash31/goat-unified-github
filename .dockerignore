@@ -1,0 +1,21 @@
+# .dockerignore
+
+# Dependencies
+node_modules
+packages/client/node_modules
+packages/server/node_modules
+
+# Build artifacts
+packages/client/build
+dist
+
+# Environment files
+.env
+.env.*
+
+# Metadata
+.git
+.github
+.firebase
+.vscode
+npm-debug.log

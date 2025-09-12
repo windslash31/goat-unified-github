@@ -1,59 +1,97 @@
-// --- THIS IS THE CRUCIAL FIX ---
-// Load environment variables before anything else.
-require('./config/loadEnv');
+const express = require("express");
+const cookieParser = require("cookie-parser");
+const cors = require("cors");
+const helmet = require("helmet");
+const config = require("./config/config");
+const authRoutes = require("./api/routes/auth");
+const employeeRoutes = require("./api/routes/employees");
+const roleRoutes = require("./api/routes/roles");
+const applicationRoutes = require("./api/routes/applications");
+const dashboardRoutes = require("./api/routes/dashboard");
+const logRoutes = require("./api/routes/logs");
+const jiraRoutes = require("./api/routes/jira");
+const dataExportRoutes = require("./api/routes/dataExport");
+const userRoutes = require("./api/routes/users");
+const managedAccountRoutes = require("./api/routes/managedAccount");
+const { schedulePlatformSync } = require("./cron/platformSync");
+const { scheduleGwsLogSync } = require("./cron/gwsLogSync");
+const syncRoutes = require("./api/routes/sync");
+const licenseRoutes = require("./api/routes/licenses");
 
-const express = require('express');
-const cors = require('cors');
-const helmet = require('helmet');
-
-// Import modular routes
-const authRoutes = require('./api/routes/auth');
-const employeeRoutes = require('./api/routes/employees');
-const roleRoutes = require('./api/routes/roles');
-const userRoutes = require('./api/routes/users');
-const logRoutes = require('./api/routes/logs');
-const applicationRoutes = require('./api/routes/applications');
-const jiraRoutes = require('./api/routes/jira');
-
+const db = require("./config/db");
 
 const app = express();
-const port = process.env.PORT || 4000;
+app.set("trust proxy", 1);
 
-// Setup global middleware
-app.use(cors());
+const whitelist = ["http://localhost", "http://localhost:3000"];
+if (config.clientUrl) {
+  whitelist.push(...config.clientUrl.split(",").map((url) => url.trim()));
+}
+
+const corsOptions = {
+  origin: function (origin, callback) {
+    if (!origin || whitelist.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error("Not allowed by CORS"));
+    }
+  },
+  credentials: true,
+};
+
+const resetStaleSyncJobs = async () => {
+  try {
+    const query = `
+      UPDATE sync_jobs 
+      SET 
+        status = 'FAILED', 
+        details = '{"error": "Job failed due to an unexpected server shutdown."}',
+        last_failure_at = NOW()
+      WHERE status = 'RUNNING';
+    `;
+    const result = await db.query(query);
+    if (result.rowCount > 0) {
+      console.log(
+        `Reset ${result.rowCount} stale 'RUNNING' sync jobs to 'FAILED'.`
+      );
+    }
+  } catch (error) {
+    console.error("Failed to reset stale sync jobs on startup:", error);
+  }
+};
+
+app.use(helmet());
+app.use(cookieParser(config.cookie.secret));
+app.use(cors(corsOptions));
 app.use(express.json());
-app.use(helmet.contentSecurityPolicy({
-    directives: {
-      defaultSrc: ["'self'"],
-      scriptSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'"],
-      imgSrc: ["'self'", "data:", "i.pravatar.cc", "upload.wikimedia.org", "a.slack-edge.com", "www.jumpcloud.com", "wac-cdn.atlassian.com"],
-      connectSrc: ["'self'"],
-      fontSrc: ["'self'"],
-      objectSrc: ["'none'"],
-      upgradeInsecureRequests: [],
-    },
-}));
+app.use(express.urlencoded({ extended: true }));
 
-// --- API Routes ---
-app.use('/api', authRoutes);
-app.use('/api/employees', employeeRoutes);
-app.use('/api/roles', roleRoutes);
-app.use('/api/users', userRoutes);
-app.use('/api/logs', logRoutes);
-app.use('/api/applications', applicationRoutes);
-app.use('/api/jira', jiraRoutes);
+app.use("/auth", authRoutes);
+app.use("/employees", employeeRoutes);
+app.use("/roles", roleRoutes);
+app.use("/applications", applicationRoutes);
+app.use("/dashboard", dashboardRoutes);
+app.use("/logs", logRoutes);
+app.use("/jira", jiraRoutes);
+app.use("/users", userRoutes);
+app.use("/managed-accounts", managedAccountRoutes);
+app.use("/sync", syncRoutes);
+app.use("/data-export", dataExportRoutes);
+app.use("/licenses", licenseRoutes);
 
-
-// --- Global Error Handler ---
+// Global error handler
 app.use((err, req, res, next) => {
-    console.error(err.stack);
-    const status = err.status || 500;
-    const message = err.message || 'Something went wrong on the server.';
-    res.status(status).json({ message });
+  console.error(err.stack);
+  res.status(500).send("Something broke!");
 });
 
-// Start the server
-app.listen(port, () => {
-  console.log(`Backend server running at http://localhost:${port}`);
+const PORT = config.port;
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`Backend server running at http://localhost:${PORT}`);
+  resetStaleSyncJobs();
+
+  schedulePlatformSync();
+  scheduleGwsLogSync();
 });
+
+module.exports = app;

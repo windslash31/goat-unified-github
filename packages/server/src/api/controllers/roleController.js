@@ -18,11 +18,21 @@ const listAllPermissions = async (req, res, next) => {
     }
 };
 
+const listSimpleRoles = async (req, res, next) => {
+    try {
+        const roles = await roleService.getSimpleRoles();
+        res.json(roles);
+    } catch (error) {
+        next(error);
+    }
+};
+
 const createRole = async (req, res, next) => {
     try {
         const { name } = req.body;
         if (!name) return res.status(400).json({ message: 'Role name is required.' });
-        const newRole = await roleService.createRole(name, req.user.id);
+        const reqContext = { ip: req.ip, userAgent: req.headers['user-agent'] };
+        const newRole = await roleService.createRole(name, req.user.id, reqContext);
         res.status(201).json(newRole);
     } catch (error) {
         next(error);
@@ -33,7 +43,8 @@ const updateRolePermissions = async (req, res, next) => {
     try {
         const { id } = req.params;
         const { permissionIds } = req.body;
-        const result = await roleService.updateRolePermissions(id, permissionIds, req.user.id);
+        const reqContext = { ip: req.ip, userAgent: req.headers['user-agent'] };
+        const result = await roleService.updateRolePermissions(id, permissionIds, req.user.id, reqContext);
         res.status(200).json(result);
     } catch (error) {
         next(error);
@@ -43,7 +54,8 @@ const updateRolePermissions = async (req, res, next) => {
 const deleteRole = async (req, res, next) => {
     try {
         const { id } = req.params;
-        const result = await roleService.deleteRole(id, req.user.id);
+        const reqContext = { ip: req.ip, userAgent: req.headers['user-agent'] };
+        const result = await roleService.deleteRole(id, req.user.id, reqContext);
         res.status(200).json(result);
     } catch (error) {
         if(error.message.includes('Cannot delete')){
@@ -52,15 +64,6 @@ const deleteRole = async (req, res, next) => {
         if(error.message.includes('not found')){
             return res.status(404).json({ message: error.message });
         }
-        next(error);
-    }
-};
-
-const listSimpleRoles = async (req, res, next) => {
-    try {
-        const roles = await roleService.getSimpleRoles();
-        res.json(roles);
-    } catch (error) {
         next(error);
     }
 };
