@@ -170,7 +170,7 @@ router.post(
 );
 router.post(
   "/reconcile-managers",
-  authenticateApiKey,
+  authenticateToken,
   authorize("employee:create"),
   employeeController.reconcileManagers
 );

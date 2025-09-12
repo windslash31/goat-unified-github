@@ -103,7 +103,9 @@ const fetchMe = async () => {
   return data;
 };
 
-const SyncManagementPage = lazy(() => import("./pages/SyncManagementPage"));
+const SyncManagementPage = lazy(() =>
+  import("./pages/SyncManagementPage/SyncManagementPage")
+);
 
 const AppContent = () => {
   const { isAuthenticated, user, logout, fetchUser } = useAuthStore();
