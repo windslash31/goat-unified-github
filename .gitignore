@@ -1,3 +1,13 @@
+# Dependencies
+node_modules
+/packages/client/node_modules
+/packages/server/node_modules
+
+# Build artifacts
+/packages/client/build
+/packages/client/dist
+/packages/server/dist
+
 # Logs
 logs
 *.log
