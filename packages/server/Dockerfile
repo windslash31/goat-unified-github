@@ -1,25 +1,24 @@
-# Use an official Node.js 20 runtime as a parent image
-FROM node:20-slim
+FROM 414751826153.dkr.ecr.ap-southeast-3.amazonaws.com/midas/nodejs:20
 
-# Set the working directory in the container
-WORKDIR /usr/src/app
-
-# --- ADD THIS LINE ---
 # Set the environment to production
 ENV NODE_ENV=production
 
-# Copy package.json and the lock file
-# This is done first to leverage Docker's caching for faster builds
+# 2. Use standard working directory
+WORKDIR $APP_DIR
+
+# Copy package.json and the lock file first for better caching
 COPY package.json ./
 
-# Install dependencies, omitting development-only packages
+# Install dependencies
 RUN npm install --omit=dev
 
-# Copy the rest of your application's source code into the image
 COPY . .
 
-# Cloud Run provides the PORT environment variable, defaulting to 8080.
-# This makes your application's port available.
+RUN chown -R "$APP_USER:$APP_GROUP" "$APP_DIR"
+
+USER $APP_USER
+
+# Expose the application port
 EXPOSE 8080
 
 # Define the command to run your application
